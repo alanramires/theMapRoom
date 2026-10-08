@@ -355,7 +355,9 @@ public partial class AIController
         reason = "";
         if (attacker == null || target == null)
             return false;
-        if (!PassesAttackDecision(attacker, target, attackCell, true, out string attackDecisionReason))
+        AttackDecisionResult decision = EvaluateAttackDecision(attacker, target, attackCell, true);
+        string attackDecisionReason = decision.Reason;
+        if (!decision.IsAllowed)
         {
             reason = attackDecisionReason;
             return false;
@@ -371,32 +373,24 @@ public partial class AIController
         bool kill = false;
         bool simulated = false;
 
-        if (attacker.TryGetUnitData(out UnitData attackerData) && attackerData != null
-            && target.TryGetUnitData(out UnitData targetData) && targetData != null
-            && turnStateManager != null
-            && turnStateManager.RpsDatabaseRef != null
-            && turnStateManager.DpqMatchupDatabaseRef != null
-            && turnStateManager.WeaponPriorityDataRef != null)
+        // Estimativa com a arma e o revide que o PodeMirar oferece desta celula,
+        // e com o DPQ real. A decisao ja simulou; se ela estava desligada para
+        // esta unidade, simula pelo mesmo caminho canonico.
+        if (decision.HasSimulation)
         {
-            int distance = Mathf.Max(1, Mathf.RoundToInt(SectorManager.HexDistance(attackCell, targetCell)));
-            AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
-                attackerData,
-                targetData,
-                Mathf.Max(0, attacker.CurrentHP),
-                Mathf.Max(0, target.CurrentHP),
-                distance,
-                turnStateManager.RpsDatabaseRef,
-                turnStateManager.DpqMatchupDatabaseRef,
-                turnStateManager.WeaponPriorityDataRef);
-
-            if (sim.isValid)
-            {
-                simulated = true;
-                hpAfter = Mathf.Max(0, sim.defenderHpAfter);
-                damage = Mathf.Max(0, target.CurrentHP - hpAfter);
-                kill = sim.killGuaranteed;
-            }
+            simulated = true;
+            hpAfter = Mathf.Max(0, decision.TargetHpAfter);
+            kill = decision.KillGuaranteed;
         }
+        else if (TrySimulateAttackForAI(attacker, target, attackCell, out CombatEvaluationResult sim))
+        {
+            simulated = true;
+            hpAfter = Mathf.Max(0, sim.Simulation.defenderHpAfter);
+            kill = sim.Simulation.killGuaranteed;
+        }
+
+        if (simulated)
+            damage = Mathf.Max(0, target.CurrentHP - hpAfter);
 
         int pathSteps = paths != null ? GetPathStepCount(paths, attackCell) : 0;
         float objectiveScore = onObjective ? 1000000f : 0f;

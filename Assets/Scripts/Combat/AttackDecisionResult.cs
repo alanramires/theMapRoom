@@ -15,13 +15,17 @@ public enum AttackDecisionStatus
     BlockedHpLoss = 12,
     MissingParticipants = 13,
     AttackerDataUnavailable = 14,
-    TargetDataUnavailable = 15
+    TargetDataUnavailable = 15,
+    // O PodeMirar nao oferece este alvo desta celula: nao ha ataque para avaliar.
+    BlockedNoSensorOption = 16
 }
 
 /// <summary>
 /// Structured explanation of the current Attack Decision policy.
 /// IsAllowed remains authoritative: unavailable or invalid simulations are
 /// explicitly identified by Status but keep the legacy permissive fallback.
+/// Exception: when the sensor offers no option for the target, the attack does
+/// not exist and the decision blocks (BlockedNoSensorOption).
 /// </summary>
 public readonly struct AttackDecisionResult
 {

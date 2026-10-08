@@ -236,7 +236,7 @@ public static class CombatEvaluationService
             return terminal;
 
         if (!TryEvaluate(request, out CombatEvaluationResult evaluation))
-            return BuildSimulationInvalidResult(request);
+            return BuildInvalidEvaluationResult(request);
 
         return EvaluateAttackDecision(request, evaluation);
     }
@@ -249,7 +249,7 @@ public static class CombatEvaluationService
             return terminal;
 
         if (!evaluation.IsValid)
-            return BuildSimulationInvalidResult(request);
+            return BuildInvalidEvaluationResult(request);
 
         request.Attacker.TryGetUnitData(out UnitData attackerData);
         AICombatHpSimulator.AICombatHpResult simulation = evaluation.Simulation;
@@ -457,6 +457,26 @@ public static class CombatEvaluationService
             && option.weapon != null
             && option.attackerUnit == request.Attacker
             && option.targetUnit == request.Target;
+    }
+
+    // Sem opcao do sensor e sem fallback legado, o ataque nao existe: bloqueia.
+    // Simulacao invalida COM opcao continua no caminho permissivo antigo.
+    private static AttackDecisionResult BuildInvalidEvaluationResult(
+        CombatEvaluationRequest request)
+    {
+        if (request != null
+            && !request.AllowLegacyAutomaticWeaponFallback
+            && !IsCanonicalOptionForRequest(request.SensorOption, request))
+        {
+            return new AttackDecisionResult(
+                AttackDecisionStatus.BlockedNoSensorOption,
+                false,
+                "atkDecision=BLOCK noSensorOption",
+                attackerDpq: request.AttackerDpq,
+                defenderDpq: request.DefenderDpq);
+        }
+
+        return BuildSimulationInvalidResult(request);
     }
 
     private static AttackDecisionResult BuildSimulationInvalidResult(

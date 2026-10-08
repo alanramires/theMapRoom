@@ -284,11 +284,10 @@ public partial class TurnStateManager
             if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
                 continue;
 
-            int distance = Mathf.Max(1, option.distance);
             if (!TryEvaluateAutomatedAttackCandidateScore(
                     selectedUnit,
                     target,
-                    distance,
+                    option,
                     // attackerProfile,
                     out int candidateScore))
             {
@@ -369,7 +368,7 @@ public partial class TurnStateManager
     private bool TryEvaluateAutomatedAttackCandidateScore(
         UnitManager attacker,
         UnitManager target,
-        int distance,
+        PodeMirarTargetOption option,
         // AIUnitStanceBehavior attackerProfile,
         out int score)
     {
@@ -380,18 +379,30 @@ public partial class TurnStateManager
             return false;
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
             return false;
-        if (rpsDatabase == null || dpqMatchupDatabase == null || weaponPriorityData == null)
+        if (rpsDatabase == null || dpqMatchupDatabase == null || option == null || option.weapon == null)
             return false;
 
-        AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.Simulate(
+        // A arma e o revide que o PodeMirar ofereceu, com o DPQ real de cada um:
+        // a mesma conta que a execucao vai fazer.
+        PositionDpqResult attackerDpq = PositionDpqResolver.Resolve(
+            attacker, attacker.CurrentCellPosition, attacker.BoardTilemap, terrainDatabase, dpqAirHeightConfig);
+        PositionDpqResult targetDpq = PositionDpqResolver.Resolve(
+            target, target.CurrentCellPosition, target.BoardTilemap, terrainDatabase, dpqAirHeightConfig);
+        AICombatHpSimulator.AICombatHpResult sim = AICombatHpSimulator.SimulateWithWeapons(
             attackerData,
             targetData,
-            attacker.CurrentHP,
-            target.CurrentHP,
-            Mathf.Max(1, distance),
+            option.weapon,
+            option.defenderCanCounterAttack ? option.defenderCounterWeapon : null,
+            Mathf.Max(0, attacker.CurrentHP),
+            Mathf.Max(0, target.CurrentHP),
             rpsDatabase,
             dpqMatchupDatabase,
-            weaponPriorityData);
+            attackerDpq.Points,
+            targetDpq.Points,
+            attackerDpq.DefenseBonus,
+            targetDpq.DefenseBonus,
+            attacker.IsAircraftGrounded,
+            target.IsAircraftGrounded);
 
         if (!sim.isValid)
             return false;
@@ -472,11 +483,10 @@ public partial class TurnStateManager
             if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
                 continue;
 
-            int distance = Mathf.Max(1, option.distance);
             if (!TryEvaluateAutomatedAttackCandidateScore(
                     selectedUnit,
                     target,
-                    distance,
+                    option,
                     // null,
                     out int candidateScore))
             {

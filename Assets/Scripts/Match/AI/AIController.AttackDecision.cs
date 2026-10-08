@@ -47,7 +47,8 @@ public partial class AIController
             DpqMatchupDatabase = turnStateManager != null ? turnStateManager.DpqMatchupDatabaseRef : null,
             WeaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null,
             DefensiveContext = defensiveContext,
-            AllowLegacyAutomaticWeaponFallback = true
+            // Em jogo so se simula o que o PodeMirar oferece daquela celula.
+            AllowLegacyAutomaticWeaponFallback = false
         };
     }
 

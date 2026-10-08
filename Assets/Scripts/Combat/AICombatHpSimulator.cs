@@ -1,10 +1,16 @@
 using UnityEngine;
 
 /// <summary>
-/// Simulador de combate consultivo usado pela IA e pelas ferramentas de auditoria.
-/// Estima o resultado de um duelo (HP restante de cada lado) usando a mesma formula
-/// da Matriz de HP, sem aplicar dano real ao jogo.
-/// Pode receber DPQ real das posicoes para aproximar a decisao do combate resolvido.
+/// Simulador de combate consultivo: estima o duelo (HP restante de cada lado) com
+/// a mesma formula da execucao (CombatFormula), sem aplicar dano real ao jogo.
+///
+/// Duas portas, para duas perguntas diferentes:
+///   SimulateWithWeapons — JOGO. "Se ESTA unidade, DAQUI, atirar NAQUELA, o que
+///     acontece?" Recebe a arma e o revide que o PodeMirar ofereceu e o DPQ real.
+///     E o caminho do CombatEvaluationService; use este.
+///   Simulate(ficha, ficha, distancia, ...) — CALCULADORA DE BALANCEAMENTO. "Quanto
+///     uma unidade vale contra outra em condicoes padrao?" Assume planicie (sem DPQ),
+///     municao cheia e arma/revide escolhidos pela ficha. Nao use em decisao de jogo.
 /// </summary>
 public static class AICombatHpSimulator
 {
@@ -50,7 +56,7 @@ public static class AICombatHpSimulator
     // ---- API publica ----
 
     /// <summary>
-    /// Simula o duelo com o HP maximo das unidades (sem ferimentos previos).
+    /// CALCULADORA: HP maximo, planicie, municao cheia. So para balanceamento.
     /// </summary>
     public static AICombatHpResult Simulate(
         UnitData attacker,
@@ -68,7 +74,8 @@ public static class AICombatHpSimulator
     }
 
     /// <summary>
-    /// Simula o duelo com HP customizado (unidades ja feridas).
+    /// CALCULADORA: HP customizado, mas ainda planicie e arma pela ficha.
+    /// Em jogo, use SimulateWithWeapons com a opcao do PodeMirar.
     /// </summary>
     public static AICombatHpResult Simulate(
         UnitData attacker,
@@ -100,6 +107,10 @@ public static class AICombatHpSimulator
             defenderDpqDefenseBonus: 0);
     }
 
+    /// <summary>
+    /// CALCULADORA com DPQ informado; arma e revide ainda escolhidos pela ficha
+    /// (ignora municao e se a unidade andou). Em jogo, use SimulateWithWeapons.
+    /// </summary>
     public static AICombatHpResult Simulate(
         UnitData attacker,
         UnitData defender,
