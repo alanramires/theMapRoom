@@ -992,23 +992,12 @@ public partial class TurnStateManager
         if (board == null)
             return 1;
 
-        cell.z = 0;
-        Domain domain = unit.GetDomain();
-        HeightLevel height = unit.GetHeightLevel();
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(board, cell);
-        if (construction != null && TryGetConstructionDpq(construction, out DPQData constructionDpq) && constructionDpq != null)
-            return constructionDpq.Pontos;
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(board, cell);
-        if (structure != null && structure.dpqData != null)
-            return structure.dpqData.Pontos;
-
-        if (TryResolveTerrainAtCellForLayer(board, terrainDatabase, cell, domain, height, out TerrainTypeData terrain)
-            && terrain != null && terrain.dpqData != null)
-            return terrain.dpqData.Pontos;
-
-        return 1;
+        // Mesmo DPQ que o combate vai usar (camada, construcao, estrutura, terreno).
+        return PositionDpqResolver.TryResolveData(
+                unit, cell, board, terrainDatabase, dpqAirHeightConfig,
+                out DPQData dpq, out _)
+            ? dpq.Pontos
+            : 1;
     }
 
     // Equivalente ao ExecuteReplayConfirmInput do ReplayManager: confirma e toca o SFX correspondente.

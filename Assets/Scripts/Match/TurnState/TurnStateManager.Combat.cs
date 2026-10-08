@@ -399,43 +399,17 @@ public partial class TurnStateManager
         if (unit == null)
             return info;
 
-        Tilemap referenceTilemap = unit.BoardTilemap;
-        Vector3Int cell = unit.CurrentCellPosition;
-        cell.z = 0;
-        Domain activeDomain = unit.GetDomain();
-        HeightLevel activeHeight = unit.GetHeightLevel();
-
-        bool usesConfiguredLayerDpq = activeDomain == Domain.Air ||
-            (activeDomain == Domain.Submarine && activeHeight == HeightLevel.Submerged);
-        if (usesConfiguredLayerDpq
-            && dpqAirHeightConfig != null
-            && dpqAirHeightConfig.TryGetFor(activeDomain, activeHeight, out DPQData layerDpq)
-            && layerDpq != null)
+        // Fonte unica: a previsao da IA le o mesmo resolvedor.
+        if (PositionDpqResolver.TryResolveData(
+                unit,
+                unit.CurrentCellPosition,
+                unit.BoardTilemap,
+                terrainDatabase,
+                dpqAirHeightConfig,
+                out DPQData dpq,
+                out string source))
         {
-            return BuildDpqInfo(layerDpq, $"Camada ativa: {activeDomain}/{activeHeight}");
-        }
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(referenceTilemap, cell);
-        if (construction != null
-            && ConstructionSupportsLayer(construction, activeDomain, activeHeight)
-            && TryGetConstructionDpq(construction, out DPQData constructionDpq))
-        {
-            return BuildDpqInfo(constructionDpq, $"Construcao: {ResolveConstructionName(construction)}");
-        }
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(referenceTilemap, cell);
-        if (structure != null
-            && StructureSupportsLayer(structure, activeDomain, activeHeight)
-            && structure.dpqData != null)
-        {
-            return BuildDpqInfo(structure.dpqData, $"Estrutura: {ResolveStructureName(structure)}");
-        }
-
-        if (TryResolveTerrainAtCellForLayer(referenceTilemap, terrainDatabase, cell, activeDomain, activeHeight, out TerrainTypeData terrain)
-            && terrain != null
-            && terrain.dpqData != null)
-        {
-            return BuildDpqInfo(terrain.dpqData, $"Terreno: {ResolveTerrainName(terrain)}");
+            return BuildDpqInfo(dpq, source);
         }
 
         return info;
@@ -540,118 +514,6 @@ public partial class TurnStateManager
         };
     }
 
-    private static bool TryResolveTerrainAtCellForLayer(
-        Tilemap terrainTilemap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        Domain activeDomain,
-        HeightLevel activeHeight,
-        out TerrainTypeData terrain)
-    {
-        terrain = null;
-        if (terrainTilemap == null || terrainDb == null)
-            return false;
-
-        cell.z = 0;
-        TerrainTypeData fallback = null;
-        TileBase tile = terrainTilemap.GetTile(cell);
-        if (tile != null && terrainDb.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
-        {
-            if (TerrainSupportsLayer(byMainTile, activeDomain, activeHeight))
-            {
-                terrain = byMainTile;
-                return true;
-            }
-
-            fallback = byMainTile;
-        }
-
-        GridLayout grid = terrainTilemap.layoutGrid;
-        if (grid == null)
-        {
-            terrain = fallback;
-            return terrain != null;
-        }
-
-        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
-        for (int i = 0; i < maps.Length; i++)
-        {
-            Tilemap map = maps[i];
-            if (map == null)
-                continue;
-
-            TileBase other = map.GetTile(cell);
-            if (other == null)
-                continue;
-
-            if (terrainDb.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
-            {
-                if (fallback == null)
-                    fallback = byGridTile;
-
-                if (TerrainSupportsLayer(byGridTile, activeDomain, activeHeight))
-                {
-                    terrain = byGridTile;
-                    return true;
-                }
-            }
-        }
-
-        terrain = fallback;
-        return terrain != null;
-    }
-
-    private static bool TerrainSupportsLayer(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
-    {
-        if (terrain == null)
-            return false;
-        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
-            return true;
-        if (terrain.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool StructureSupportsLayer(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null)
-            return false;
-        if (structure.domain == domain && structure.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
-            return true;
-        if (structure.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool ConstructionSupportsLayer(ConstructionManager construction, Domain domain, HeightLevel heightLevel)
-    {
-        if (construction == null)
-            return false;
-        if (construction.SupportsLayerMode(domain, heightLevel))
-            return true;
-        return domain == Domain.Air && construction.AllowsAirDomain();
-    }
-
     private static string ResolveConstructionName(ConstructionManager construction)
     {
         if (construction == null)
@@ -661,17 +523,6 @@ public partial class TurnStateManager
         if (!string.IsNullOrWhiteSpace(construction.ConstructionId))
             return construction.ConstructionId;
         return construction.name;
-    }
-
-    private static string ResolveStructureName(StructureData structure)
-    {
-        if (structure == null)
-            return "(null)";
-        if (!string.IsNullOrWhiteSpace(structure.displayName))
-            return structure.displayName;
-        if (!string.IsNullOrWhiteSpace(structure.id))
-            return structure.id;
-        return structure.name;
     }
 
     private static string ResolveTerrainName(TerrainTypeData terrain)

@@ -12,11 +12,14 @@ public partial class AIController
     private bool aiThreatEnvelopeResolved;
     private readonly Dictionary<Vector3Int, PositionDpqResult> aiDpqByCell =
         new Dictionary<Vector3Int, PositionDpqResult>();
+    private readonly Dictionary<(Vector3Int, Domain, HeightLevel), PositionDpqResult> aiDpqByCellLayer =
+        new Dictionary<(Vector3Int, Domain, HeightLevel), PositionDpqResult>();
 
     private void PrepareAIThreatEnvelope(UnitManager unit)
     {
         aiAttackTargetsByOrigin.Clear();
         aiDpqByCell.Clear();
+        aiDpqByCellLayer.Clear();
         aiThreatEnemyCellsBySlot.Clear();
         aiThreatEnvelopeUnit = unit;
         aiThreatEnvelope = null;
@@ -699,16 +702,24 @@ public partial class AIController
         return resolved;
     }
 
+    // DPQ de combate: depende da camada da unidade, entao o cache e por celula + camada.
     private PositionDpqResult ResolveDpqForAttackDecision(UnitManager unit, Vector3Int cell)
     {
+        if (unit == null)
+            return ResolveDpqForAttackDecision(cell);
+
+        cell.z = 0;
+        var key = (cell, unit.GetDomain(), unit.GetHeightLevel());
+        if (aiDpqByCellLayer.TryGetValue(key, out PositionDpqResult cached))
+            return cached;
+
         DPQAirHeightConfig airHeightConfig = turnStateManager != null
             ? turnStateManager.DpqAirHeightConfigRef
             : null;
-
-        if (PositionDpqResolver.TryResolveUnitLayer(unit, airHeightConfig, out PositionDpqResult layerDpq))
-            return layerDpq;
-
-        return ResolveDpqForAttackDecision(cell);
+        PositionDpqResult resolved = PositionDpqResolver.Resolve(
+            unit, cell, boardTilemap, terrainDatabase, airHeightConfig);
+        aiDpqByCellLayer[key] = resolved;
+        return resolved;
     }
 
     private static bool IsBetterAttackCandidate(
