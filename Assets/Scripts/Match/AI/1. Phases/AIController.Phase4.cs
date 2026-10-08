@@ -14,9 +14,10 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("phase4_start"))
             yield break;
 
-        yield return new WaitUntil(() =>
-            turnStateManager == null ||
-            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+        yield return WaitUntilWatched(
+            () => turnStateManager == null ||
+                  turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral,
+            "phase4_neutral");
         if (ShouldStopAIForMatchEnd("phase4_apos_neutral"))
             yield break;
 

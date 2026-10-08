@@ -21,10 +21,10 @@ public partial class AIController
         // e apenas apresentacao e nunca participa desta barreira logica.
         if (matchController != null)
         {
-            yield return new WaitUntil(() =>
-                matchController == null
-                || !matchController.AreTurnStartEffectsPending
-                || IsMatchEnded());
+            yield return WaitUntilWatched(
+                () => matchController == null
+                      || !matchController.AreTurnStartEffectsPending,
+                "phase0_efeitos_inicio_turno");
             if (ShouldStopAIForMatchEnd(
                     "phase0_apos_efeitos_inicio_turno"))
             {
@@ -34,11 +34,14 @@ public partial class AIController
 
         if (turnStateManager != null)
         {
-            yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);
+            yield return WaitUntilWatched(
+                () => !turnStateManager.IsAutoCommandServiceBusy,
+                "phase0_command_service");
             if (ShouldStopAIForMatchEnd("phase0_apos_command_service"))
                 yield break;
-            yield return new WaitUntil(() =>
-                turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+            yield return WaitUntilWatched(
+                () => turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral,
+                "phase0_neutral");
             if (ShouldStopAIForMatchEnd("phase0_apos_neutral"))
                 yield break;
         }

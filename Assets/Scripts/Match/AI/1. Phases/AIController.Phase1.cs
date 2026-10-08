@@ -33,7 +33,9 @@ public partial class AIController
         Debug.Log($"{TL()} Fase1 — batch concluído. Aguardando IsAutoCommandServiceBusy...");
 
         if (turnStateManager != null)
-            yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);
+            yield return WaitUntilWatched(
+                () => !turnStateManager.IsAutoCommandServiceBusy,
+                "phase1_command_service");
         if (ShouldStopAIForMatchEnd("phase1_apos_command_service"))
             yield break;
 

@@ -5,6 +5,46 @@ using UnityEngine;
 public partial class AIController
 {
     // -------------------------------------------------------------------------
+    // Watchdog das esperas de fase
+    // So AVISA. Nunca confirma, cancela nem pula acao por tempo decorrido —
+    // isso furaria o contrato transacional. O relogio para enquanto o jogador
+    // ou o debug seguram a IA, e a espera solta sozinha se a partida acabar.
+    // -------------------------------------------------------------------------
+
+    private const float AIWaitWatchdogWarnSeconds = 20f;
+
+    private IEnumerator WaitUntilWatched(System.Func<bool> condition, string context)
+    {
+        float waited = 0f;
+        float nextWarnAt = AIWaitWatchdogWarnSeconds;
+        while (!condition())
+        {
+            if (IsMatchEnded())
+                yield break;
+
+            if (!PlayerPauseHolds() && !isDebugPaused)
+                waited += Time.unscaledDeltaTime;
+
+            if (waited >= nextWarnAt)
+            {
+                Debug.LogWarning($"{TL("Watchdog")} esperando '{context}' ha {waited:0}s | {DescribeWatchdogState()}");
+                nextWarnAt += AIWaitWatchdogWarnSeconds;
+            }
+
+            yield return null;
+        }
+    }
+
+    private string DescribeWatchdogState()
+    {
+        string cursor = turnStateManager != null ? turnStateManager.CurrentCursorState.ToString() : "sem TurnState";
+        string commandBusy = turnStateManager != null ? turnStateManager.IsAutoCommandServiceBusy.ToString() : "-";
+        string replayBusy = replayManager != null ? replayManager.IsStepExecutionBusy.ToString() : "-";
+        string turnStart = matchController != null ? matchController.AreTurnStartEffectsPending.ToString() : "-";
+        return $"cursor={cursor} commandServiceBusy={commandBusy} replayBusy={replayBusy} efeitosInicioTurno={turnStart}";
+    }
+
+    // -------------------------------------------------------------------------
     // Loop principal de fases
     // Cada fase é uma coroutine que executa um estágio específico do turno da IA,
     // com pontos de verificação para pausa e interrupção caso a partida termine.
@@ -285,12 +325,15 @@ public partial class AIController
         currentAITeam = aiTeam;
         currentAISlotIndex = ResolveAISlotKey(aiTeam);
         currentAIStage = Mathf.Clamp(stage, 1, 3);
-        yield return new WaitUntil(() => replayManager == null || !replayManager.IsStepExecutionBusy);
+        yield return WaitUntilWatched(
+            () => replayManager == null || !replayManager.IsStepExecutionBusy,
+            "debug_stage_replay_busy");
         if (ShouldStopAIForMatchEnd("debug_apos_replay_busy"))
             yield break;
-        yield return new WaitUntil(() =>
-            turnStateManager == null ||
-            turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral);
+        yield return WaitUntilWatched(
+            () => turnStateManager == null ||
+                  turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral,
+            "debug_stage_neutral");
         if (ShouldStopAIForMatchEnd("debug_apos_neutral"))
             yield break;
 
