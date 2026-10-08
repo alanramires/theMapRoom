@@ -269,6 +269,10 @@ slot1 SD @flag; slot1 SD @flag       dois soldados: o 2º pega outra, porque a 1
 - Sem `perto=`, é sorteio: com mais bandeiras do que soldados, cada partida sai
   diferente.
 - Nenhuma bandeira livre = ninguém nasce.
+- **Escolher não é bloquear.** Aeronave no ar não **bloqueia** o spawn (helicóptero
+  inimigo pairando não impede reforço), mas na **escolha** da bandeira o jogo prefere
+  uma sem unidade nenhuma. Por isso `slot1 AP @Apache; slot1 AP @Apache` põe cada
+  Apache numa bandeira, mesmo o primeiro tendo nascido no ar.
 
 **Unidade embarcada desde o início:** embarque-a no transporte **na cena de
 autoria** e refaça o bake. O bake guarda o passageiro preso ao transporte, e a
@@ -310,6 +314,61 @@ slot1 SD move 64,33                  sem destino: avança pelo AutomataData
 - **Exige** um `AutomataData` para a unidade e o **Automata Database ligado no
   TutorialManager** da cena.
 - Enquanto o movimento roda, o passar a vez fica travado.
+
+## 5b. Receitas — padrões que já funcionaram
+
+Cada receita combina peças das seções acima. Algumas saíram das aulas que as
+originaram (a extração da Soldado 2 foi para o rascunho da 3), mas o padrão
+continua valendo.
+
+### Gatilho interno
+
+Tarefa que o roteiro usa e o aluno não vê. `isInternal: true`, `isOptional: true`
+quando ela pode nunca acontecer, `startHidden: false` para valer desde o início.
+Ex.: "a captura começou" (`CAPTURE_PROGRESS`), só para disparar o contato.
+
+### O que vier primeiro, uma vez só
+
+Uma tarefa interna faz a coisa (`completeCommand`), e cada gatilho manda completá-la:
+
+```text
+ex_08  (interna)            completeCommand = spawn slot1 AP @Apache; spawn slot1 AP @Apache
+ex_02  embarque completo    completeCommand = complete ex_08
+ex_09  TURN_REACHED 10      completeCommand = complete ex_08   activeUntilKey = ex_08
+```
+
+Tarefa já completa não roda de novo — e o `activeUntilKey` desarma o relógio, para a
+fala dele não tocar depois que os Apaches já chegaram.
+
+### Relógio
+
+`TURN_REACHED N` interno e opcional, com a consequência no `completeCommand` e o
+aviso no `announceText`. Uma alternativa sem número: prédios capturáveis longe da
+ação — a IA rebelde se ocupa capturando e, sem nada mais para capturar, **caça** o
+aluno. O relógio fica legível no mapa.
+
+### Bônus por alcance
+
+`UNITS_NEAR ST && CH && servico` (o Chinook entrou no tático de serviço do caminhão)
+com `completeCommand = money +240` (o custo exato do serviço).
+
+### Recado que pode ou não acontecer
+
+Nunca como fala do roteiro: se o fato não acontecer, o roteiro trava. Tarefa interna
+e opcional com `announceText`. Ex.: `UNIT_DEAD CH || AUT=0 && LANDED` → recado da
+Capitã no pouso forçado.
+
+### Derrota com prazo
+
+`activeUntilKey` numa derrota: perder o caminhão (`UNIT_DEAD ST`) só derrota até o
+reabastecimento (`ex_01`).
+
+### Trava ou consequência?
+
+Antes de travar uma ação (`capturable off`, passar a vez travado), pergunte se o erro
+pode **ensinar**. Na Soldado 1 a trava de captura virou consequência: capturar cedo,
+com um soldado só, faz o contato nascer na hora — e o aluno aprende por que precisava
+de cobertura. Trave só o que deixaria a aula **sem saída**.
 
 ## 6. Configuração geral do `TutorialData`
 
@@ -358,7 +417,9 @@ Fora de aula ele não age.
   Save de outra aula, ou sem aula, recomeça o roteiro. Mudar o roteiro de uma aula
   invalida os saves dela no meio: o índice da fala salva passa a apontar outra fala.
 - A vitória da aula registra o quadrante na Campanha com o motivo "aula concluída"
-  e volta para o mapa. A derrota volta sem registrar.
+  e volta para o mapa. A derrota registra o **oponente** como vencedor, com o motivo
+  "aula perdida" — exceto se a aula já tinha sido vencida por um humano: perder ao
+  refazer não tranca de novo as aulas que ela destravou.
 - `TutorialRules` tem uma regra presa ao id `tutorial 1 - soldado` (restaura o HP
   após atacar na montanha ou na planície). É legado. Não use esse id numa aula nova
   sem querer essa regra.

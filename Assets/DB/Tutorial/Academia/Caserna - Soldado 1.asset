@@ -26,6 +26,9 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    announceText: 
+    completeCommand: 
+    activeUntilKey: 
     hasFailed: 0
   - id: CAPTURE_PROGRESS
     key: op_01
@@ -38,6 +41,10 @@ MonoBehaviour:
     isInternal: 1
     isDefeatCondition: 0
     defeatText: 
+    announceText: "Contato! A captura acordou a guarni\xE7\xE3o da Metalion. [enfase]Quem
+      captura n\xE3o atira[/enfase]: o outro recruta cobre."
+    completeCommand: spawn slot1 SD @flag; spawn slot1 SD @flag; pan PortoFerro
+    activeUntilKey: 
     hasFailed: 0
   - id: CAPTURE_CONSTRUCTION
     key: op_02
@@ -50,6 +57,9 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    announceText: 
+    completeCommand: complete op_11
+    activeUntilKey: 
     hasFailed: 0
   - id: PLAYER_ELIMINATED
     key: op_03
@@ -62,6 +72,9 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 1
     defeatText: "Mais uma derrota para Auridia. Melhor sorte na pr\xF3xima."
+    announceText: 
+    completeCommand: 
+    activeUntilKey: 
     hasFailed: 0
   - id: ENEMY_CAPTURE
     key: op_04
@@ -74,6 +87,9 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 1
     defeatText: "A Metalion recuperou a f\xE1brica, e a vit\xF3ria \xE9 deles."
+    announceText: 
+    completeCommand: 
+    activeUntilKey: 
     hasFailed: 0
   - id: UNIT_DEAD
     key: op_05
@@ -86,6 +102,9 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 1
     defeatText: Poxa, soldado... perdemos nossa carona pra casa.
+    announceText: 
+    completeCommand: 
+    activeUntilKey: 
     hasFailed: 0
   script:
   - advance: 0
@@ -99,7 +118,7 @@ MonoBehaviour:
       que a Metalion joga contra n\xF3s no continente."
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: acted CH; capturable PortoFerro off
+    statCommand: acted CH
     turn: 1
     movement: 1
     interactionType: 0
@@ -198,26 +217,6 @@ MonoBehaviour:
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 1
-    objectiveKey: op_01
-    revealObjective: 0
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: "Dia novo, pernas descansadas. [ordem]Mova um soldado at\xE9 a f\xE1brica
-      e inicie a captura.[/ordem] O n\xFAmero embaixo da f\xE1brica \xE9 a [enfase]resist\xEAncia[/enfase]
-      dela: come\xE7a em 30 e cada turno de captura derruba 10. [enfase]Quando chegar
-      a 0, ela \xE9 nossa.[/enfase]"
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: capturable PortoFerro on; pan PortoFerro
-    turn: 2
-    movement: 0
-    interactionType: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
   - advance: 4
     objectiveKey: 
     revealObjective: 0
@@ -225,12 +224,12 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Contato! A guarni\xE7\xE3o da Metalion acordou. [enfase]Quem captura n\xE3o
-      atira[/enfase]: o outro recruta cobre. [ordem]Segure a f\xE1brica e termine
-      a captura.[/ordem] Soldado ferido captura menos: n\xE3o deixe o capturador
-      apanhar."
+    text: "Dia novo, pernas descansadas. [ordem]Tome a f\xE1brica.[/ordem] O n\xFAmero
+      embaixo dela \xE9 a [enfase]resist\xEAncia[/enfase]: come\xE7a em 30 e cada
+      turno de captura derruba 10. [enfase]Quando chegar a 0, ela \xE9 nossa.[/enfase]
+      Soldado ferido captura menos: n\xE3o deixe o capturador apanhar."
     voice: {fileID: 0}
-    spawnCommand: slot1 SD @flag; slot1 SD @flag
+    spawnCommand: 
     statCommand: pan PortoFerro
     turn: 2
     movement: 0
@@ -286,6 +285,7 @@ MonoBehaviour:
   regras: 3
   forcarDificuldade: 1
   dificuldade: 0
+  semEconomia: 0
   blockCommandService: 1
   blockRemoveUnit: 1
   blockSurrender: 1

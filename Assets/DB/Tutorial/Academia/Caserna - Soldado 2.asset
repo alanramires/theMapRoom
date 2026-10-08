@@ -30,36 +30,6 @@ MonoBehaviour:
     completeCommand: 
     activeUntilKey: 
     hasFailed: 0
-  - id: HAS_EMBARKED_UNIT
-    key: ex_02
-    parameters: CH && SD
-    description: Embarque toda a tropa no Chinook
-    startHidden: 1
-    isVisible: 0
-    isCompleted: 0
-    isOptional: 0
-    isInternal: 0
-    isDefeatCondition: 0
-    defeatText: 
-    announceText: 
-    completeCommand: complete ex_08
-    activeUntilKey: 
-    hasFailed: 0
-  - id: UNIT_AT_HEX
-    key: ex_03
-    parameters: CH && (exit#1 || exit#2 || exit#3)
-    description: "Leve o Chinook at\xE9 a zona de extra\xE7\xE3o"
-    startHidden: 1
-    isVisible: 0
-    isCompleted: 0
-    isOptional: 0
-    isInternal: 0
-    isDefeatCondition: 0
-    defeatText: 
-    announceText: 
-    completeCommand: 
-    activeUntilKey: 
-    hasFailed: 0
   - id: UNIT_DEAD
     key: ex_04
     parameters: CH
@@ -124,37 +94,6 @@ MonoBehaviour:
     completeCommand: 
     activeUntilKey: 
     hasFailed: 0
-  - id: APACHES
-    key: ex_08
-    parameters: 
-    description: Apaches chegam (uma vez)
-    startHidden: 0
-    isVisible: 1
-    isCompleted: 0
-    isOptional: 1
-    isInternal: 1
-    isDefeatCondition: 0
-    defeatText: 
-    announceText: 
-    completeCommand: spawn slot1 AP @Apache; spawn slot1 AP @Apache; pan Apache#1
-    activeUntilKey: 
-    hasFailed: 0
-  - id: TURN_REACHED
-    key: ex_09
-    parameters: 10
-    description: "Rel\xF3gio: Apaches na rodada 10"
-    startHidden: 0
-    isVisible: 1
-    isCompleted: 0
-    isOptional: 1
-    isInternal: 1
-    isDefeatCondition: 0
-    defeatText: 
-    announceText: "[vermelho]Apaches no radar![/vermelho] A Metalion mandou helic\xF3ptero
-      atr\xE1s de voc\xEAs. [enfase]Tropa no ch\xE3o \xE9 presa f\xE1cil para eles.[/enfase]"
-    completeCommand: complete ex_08
-    activeUntilKey: ex_08
-    hasFailed: 0
   - id: UNITS_NEAR
     key: ex_10
     parameters: ST && CH && servico
@@ -180,7 +119,7 @@ MonoBehaviour:
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
     text: "A f\xE1brica caiu, mas a Metalion fechou o cerco. Hora de sair desta ilha.
-      A Capit\xE3 Moura est\xE1 esperando voc\xEAs do outro lado."
+      A Capit\xE3 Moura vem buscar voc\xEAs com o Chinook."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: acted CH; cursor CH
@@ -265,60 +204,6 @@ MonoBehaviour:
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 1
-    objectiveKey: ex_02
-    revealObjective: 1
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: 'Tanque cheio. [ordem]Agora embarque a tropa no Chinook.[/ordem]'
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: cursor CH
-    turn: 0
-    movement: 0
-    interactionType: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
-  - advance: 4
-    objectiveKey: ex_03
-    revealObjective: 1
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: "Rotor ligado! [vermelho]Os Apaches da Metalion est\xE3o vindo.[/vermelho]
-      A zona de extra\xE7\xE3o \xE9 ao norte. [ordem]Leve o Chinook at\xE9 uma das
-      marcas e caia fora.[/ordem]"
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: complete ex_08; victory exit#1 on; victory exit#2 on; victory exit#3
-      on; pan exit#2
-    turn: 0
-    movement: 0
-    interactionType: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
-  - advance: 1
-    objectiveKey: ex_03
-    revealObjective: 0
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: 
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    turn: 0
-    movement: 0
-    interactionType: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
   dialogFlowMigrated: 1
   scoldEndTurnLocked:
     text: 
@@ -356,4 +241,5 @@ MonoBehaviour:
   blockSurrender: 1
   blockStatusSummary: 1
   victoryDialog: {fileID: 0}
-  victoryText: "Rodas fora do ch\xE3o e ilha pra tr\xE1s. Bem-vindos de volta, recrutas."
+  victoryText: "Tanque cheio! O Chinook est\xE1 pronto para tirar voc\xEAs desta
+    ilha. A extra\xE7\xE3o fica para a pr\xF3xima aula."

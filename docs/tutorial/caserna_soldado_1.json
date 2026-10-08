@@ -12,7 +12,10 @@
             "isOptional": false,
             "isDefeatCondition": false,
             "defeatText": "",
-            "isInternal": false
+            "isInternal": false,
+            "announceText": "",
+            "completeCommand": "",
+            "activeUntilKey": ""
         },
         {
             "id": "CAPTURE_PROGRESS",
@@ -23,7 +26,10 @@
             "isOptional": false,
             "isDefeatCondition": false,
             "defeatText": "",
-            "isInternal": true
+            "isInternal": true,
+            "announceText": "Contato! A captura acordou a guarnição da Metalion. [enfase]Quem captura não atira[/enfase]: o outro recruta cobre.",
+            "completeCommand": "spawn slot1 SD @flag; spawn slot1 SD @flag; pan PortoFerro",
+            "activeUntilKey": ""
         },
         {
             "id": "CAPTURE_CONSTRUCTION",
@@ -34,7 +40,10 @@
             "isOptional": false,
             "isDefeatCondition": false,
             "defeatText": "",
-            "isInternal": false
+            "isInternal": false,
+            "announceText": "",
+            "completeCommand": "complete op_11",
+            "activeUntilKey": ""
         },
         {
             "id": "PLAYER_ELIMINATED",
@@ -45,7 +54,10 @@
             "isOptional": false,
             "isDefeatCondition": true,
             "defeatText": "Mais uma derrota para Auridia. Melhor sorte na próxima.",
-            "isInternal": false
+            "isInternal": false,
+            "announceText": "",
+            "completeCommand": "",
+            "activeUntilKey": ""
         },
         {
             "id": "ENEMY_CAPTURE",
@@ -56,7 +68,10 @@
             "isOptional": false,
             "isDefeatCondition": true,
             "defeatText": "A Metalion recuperou a fábrica, e a vitória é deles.",
-            "isInternal": false
+            "isInternal": false,
+            "announceText": "",
+            "completeCommand": "",
+            "activeUntilKey": ""
         },
         {
             "id": "UNIT_DEAD",
@@ -67,7 +82,10 @@
             "isOptional": false,
             "isDefeatCondition": true,
             "defeatText": "Poxa, soldado... perdemos nossa carona pra casa.",
-            "isInternal": false
+            "isInternal": false,
+            "announceText": "",
+            "completeCommand": "",
+            "activeUntilKey": ""
         }
     ],
     "script": [
@@ -81,7 +99,7 @@
             "text": "Atenção, recrutas. A Fábrica de Porto Ferro produz os blindados que a Metalion joga contra nós no continente.",
             "voicePath": "",
             "spawnCommand": "",
-            "statCommand": "acted CH; capturable PortoFerro off"
+            "statCommand": "acted CH"
         },
         {
             "advance": "Immediate",
@@ -144,27 +162,15 @@
             "statCommand": ""
         },
         {
-            "advance": "ObjectiveCompleted",
-            "turn": "Unlocked",
-            "movement": "NoEffect",
-            "interactionType": "Auto",
-            "objectiveKey": "op_01",
-            "revealObjective": false,
-            "text": "Dia novo, pernas descansadas. [ordem]Mova um soldado até a fábrica e inicie a captura.[/ordem] O número embaixo da fábrica é a [enfase]resistência[/enfase] dela: começa em 30 e cada turno de captura derruba 10. [enfase]Quando chegar a 0, ela é nossa.[/enfase]",
-            "voicePath": "",
-            "spawnCommand": "",
-            "statCommand": "capturable PortoFerro on; pan PortoFerro"
-        },
-        {
             "advance": "EnemyTurnStarted",
             "turn": "Unlocked",
             "movement": "NoEffect",
             "interactionType": "Auto",
             "objectiveKey": "",
             "revealObjective": false,
-            "text": "Contato! A guarnição da Metalion acordou. [enfase]Quem captura não atira[/enfase]: o outro recruta cobre. [ordem]Segure a fábrica e termine a captura.[/ordem] Soldado ferido captura menos: não deixe o capturador apanhar.",
+            "text": "Dia novo, pernas descansadas. [ordem]Tome a fábrica.[/ordem] O número embaixo dela é a [enfase]resistência[/enfase]: começa em 30 e cada turno de captura derruba 10. [enfase]Quando chegar a 0, ela é nossa.[/enfase] Soldado ferido captura menos: não deixe o capturador apanhar.",
             "voicePath": "",
-            "spawnCommand": "slot1 SD @flag; slot1 SD @flag",
+            "spawnCommand": "",
             "statCommand": "pan PortoFerro"
         },
         {

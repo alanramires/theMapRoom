@@ -181,6 +181,39 @@ A aula vence ao tomar a Vila.
 
 ---
 
+## Soldado · Aula 3 — Extração (rascunho, sem mapa ainda)
+
+**Pergunta da aula:** como tiro uma força de uma área quente?
+**O que o aluno deve aprender:** a única clareira é o campo de pouso. Helicóptero
+não desce em qualquer lugar; quem decide a rota é o terreno.
+
+Mapa, da esquerda para a direita:
+
+```text
+mar  |  planícies com cidades capturáveis  |  montanhas  |  clareira (LZ)  |  feridos
+```
+
+| faixa | papel |
+|---|---|
+| mar | início seguro: Chinook e 2 Apaches aliados no ar |
+| planícies com cidades | o relógio: rebeldes com bazooka ocupados capturando. Sem nada mais a capturar, caçam (IA rebelde v9.3.2) |
+| montanhas | a parede: bazooka anda **1 hex por turno**; a travessia dá a janela, visível no mapa |
+| clareira | a única LZ — o ponto da aula |
+| feridos | HP baixo (assado no bake), espalhados — **podem estar até na montanha** — e vêm de qualquer lugar até a clareira |
+
+Decisões abertas, para quando pintar:
+
+- **Rota:** direto sobre as planícies (curta, exposta aos bazookas) ou contornando
+  pela borda de baixo do tabuleiro (longa, gasta combustível e tempo). As duas
+  precisam ser **visíveis** como opção.
+- **Dificuldade:** número de cidades e largura da montanha regulam quando os
+  bazookas chegam à clareira.
+- **Feridos andando** até a clareira enquanto o Chinook vem = dois grupos
+  coordenados. Mais rico, mas é ideia nova — decidir se fica nesta aula.
+
+Peças prontas: embarque de toda a tropa com contador, marcas amarelas de saída, os
+Apaches "o que vier primeiro" e as derrotas — em `caserna_soldado_3_rascunho.json`.
+
 ## Ideias para as próximas (por patente)
 
 | patente | aula | a chave |

@@ -1,41 +1,13 @@
 {
     "id": "Caserna - Soldado 2",
-    "description": "Extração: escoltar o suprimento até o Chinook, reabastecer, embarcar e sair antes dos Apaches.",
-    "victoryText": "Rodas fora do chão e ilha pra trás. Bem-vindos de volta, recrutas.",
+    "description": "Combustível: escoltar o caminhão de suprimento até o Chinook e reabastecer.",
+    "victoryText": "Tanque cheio! O Chinook está pronto para tirar vocês desta ilha. A extração fica para a próxima aula.",
     "objectives": [
         {
             "id": "SUPPLY_UNIT",
             "key": "ex_01",
             "parameters": "CH",
             "description": "Escolte o caminhão e reabasteça o Chinook",
-            "startHidden": true,
-            "isOptional": false,
-            "isDefeatCondition": false,
-            "defeatText": "",
-            "isInternal": false,
-            "activeUntilKey": "",
-            "announceText": "",
-            "completeCommand": ""
-        },
-        {
-            "id": "HAS_EMBARKED_UNIT",
-            "key": "ex_02",
-            "parameters": "CH && SD",
-            "description": "Embarque toda a tropa no Chinook",
-            "startHidden": true,
-            "isOptional": false,
-            "isDefeatCondition": false,
-            "defeatText": "",
-            "isInternal": false,
-            "activeUntilKey": "",
-            "announceText": "",
-            "completeCommand": "complete ex_08"
-        },
-        {
-            "id": "UNIT_AT_HEX",
-            "key": "ex_03",
-            "parameters": "CH && (exit#1 || exit#2 || exit#3)",
-            "description": "Leve o Chinook até a zona de extração",
             "startHidden": true,
             "isOptional": false,
             "isDefeatCondition": false,
@@ -102,34 +74,6 @@
             "completeCommand": ""
         },
         {
-            "id": "APACHES",
-            "key": "ex_08",
-            "parameters": "",
-            "description": "Apaches chegam (uma vez)",
-            "startHidden": false,
-            "isOptional": true,
-            "isInternal": true,
-            "isDefeatCondition": false,
-            "defeatText": "",
-            "activeUntilKey": "",
-            "announceText": "",
-            "completeCommand": "spawn slot1 AP @Apache; spawn slot1 AP @Apache; pan Apache#1"
-        },
-        {
-            "id": "TURN_REACHED",
-            "key": "ex_09",
-            "parameters": "10",
-            "description": "Relógio: Apaches na rodada 10",
-            "startHidden": false,
-            "isOptional": true,
-            "isInternal": true,
-            "isDefeatCondition": false,
-            "defeatText": "",
-            "activeUntilKey": "ex_08",
-            "announceText": "[vermelho]Apaches no radar![/vermelho] A Metalion mandou helicóptero atrás de vocês. [enfase]Tropa no chão é presa fácil para eles.[/enfase]",
-            "completeCommand": "complete ex_08"
-        },
-        {
             "id": "UNITS_NEAR",
             "key": "ex_10",
             "parameters": "ST && CH && servico",
@@ -152,7 +96,7 @@
             "interactionType": "Auto",
             "objectiveKey": "ex_05",
             "revealObjective": true,
-            "text": "A fábrica caiu, mas a Metalion fechou o cerco. Hora de sair desta ilha. A Capitã Moura está esperando vocês do outro lado.",
+            "text": "A fábrica caiu, mas a Metalion fechou o cerco. Hora de sair desta ilha. A Capitã Moura vem buscar vocês com o Chinook.",
             "voicePath": "",
             "spawnCommand": "",
             "statCommand": "acted CH; cursor CH"
@@ -204,42 +148,6 @@
             "voicePath": "",
             "spawnCommand": "",
             "statCommand": "victory morro#1 off; victory morro#2 off"
-        },
-        {
-            "advance": "ObjectiveCompleted",
-            "turn": "NoEffect",
-            "movement": "NoEffect",
-            "interactionType": "Auto",
-            "objectiveKey": "ex_02",
-            "revealObjective": true,
-            "text": "Tanque cheio. [ordem]Agora embarque a tropa no Chinook.[/ordem]",
-            "voicePath": "",
-            "spawnCommand": "",
-            "statCommand": "cursor CH"
-        },
-        {
-            "advance": "EnemyTurnStarted",
-            "turn": "NoEffect",
-            "movement": "NoEffect",
-            "interactionType": "Auto",
-            "objectiveKey": "ex_03",
-            "revealObjective": true,
-            "text": "Rotor ligado! [vermelho]Os Apaches da Metalion estão vindo.[/vermelho] A zona de extração é ao norte. [ordem]Leve o Chinook até uma das marcas e caia fora.[/ordem]",
-            "voicePath": "",
-            "spawnCommand": "",
-            "statCommand": "complete ex_08; victory exit#1 on; victory exit#2 on; victory exit#3 on; pan exit#2"
-        },
-        {
-            "advance": "ObjectiveCompleted",
-            "turn": "NoEffect",
-            "movement": "NoEffect",
-            "interactionType": "Auto",
-            "objectiveKey": "ex_03",
-            "revealObjective": false,
-            "text": "",
-            "voicePath": "",
-            "spawnCommand": "",
-            "statCommand": ""
         }
     ]
 }
