@@ -1,15 +1,25 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-07, **depois** da tag `v9.3.2`.
+Ponto de retomada. Atualizado em 2026-10-08, **depois** da tag `v9.4.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.3.2` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+`v9.4.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
 no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.3.2.md`](relatorio_v9.3.2.md).
+[`relatorio_v9.4.0.md`](relatorio_v9.4.0.md).
+
+**A descoberta da v9.4.0: a fórmula de combate não era fonte única — e o DPQ que
+entra nela tinha quatro cópias.** Dia de revisão, a partir de dois textos de um
+consultor externo ([`arquitetura/`](arquitetura/)), cada achado conferido no
+código antes de aceitar. Agora `CombatFormula` é a conta (execução e IA chamam a
+mesma), `PositionDpqResolver` é o DPQ (com a regra da execução), e **em jogo a IA
+só simula o que o `PodeMirar` oferece** — a calculadora por ficha (planície,
+munição cheia) é ferramenta de balanceamento e está marcada assim. Na máquina de
+estados, o Neutral ganhou nome para o segundo momento: `OnBoardSettledAtNeutral`
+dispara **depois** do delta da névoa (o CLAUDE.md explica qual escutar).
 
 **A descoberta da v9.3.2: aula sem prédio é o primeiro mapa em que a IA rebelde não
 tem âncora.** O capturador desistia, o reparo marchava para a bandeira do próprio
@@ -71,6 +81,7 @@ v9.2.2   o primeiro estranho jogou         Configurações, Ação Direta, névo
 v9.3.0   a aula vira um quadrante          Academia, regras de fim da aula, captura/spawn no roteiro
 v9.3.1   a primeira aula fecha             travas só do aluno, atalhos fechados, fala final, volta automática
 v9.3.2   a aula 2 contra IA que briga      save da aula e do mundo, rebelde caça, peças de roteiro
+v9.4.0   revisão do motor                  combate em fonte única, IA só simula o sensor, Neutral em 2 momentos
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -239,6 +250,33 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
+### O que a v9.4.0 deixou — o motor mudou por dentro, o autor testa por fora
+
+Só compilou, exceto o trace de combate (dois combates colados pelo autor
+bateram com a conta à mão). O que falta, com o sinal a procurar no Console:
+
+1. **Os 7 `Retreat` que saem de `*Executing`** — suprimento (2), desembarque (2) e
+   embarque (3, incluindo o "embark failed" *depois* da animação,
+   `TurnStateManager.ScannerPrompt.cs` ~2788). Cada um tem de desfazer tudo o que
+   a execução já tocou. **Tarefa do autor, em Play.** Sinais:
+   `[FSM] Delta confirmado pendente aplicado numa volta ao Neutral por Retreat` e
+   `Retreat chamado a partir de estado reset-only` (este só com
+   `enableTurnStateRuntimeLogs`).
+2. **Cena de caos** (caças, helicópteros, soldados, navios, subs): a IA cruzando
+   todos os pares. Contar `noSensorOption` — muitas num papel só = esse papel monta
+   pares (alvo, célula) que o sensor recusa.
+3. **Teste automático da fórmula.** `CombatFormula.Resolve` roda sem cena; os dois
+   traces da v9.4.0 (relatório §2) são o gabarito. Primeiro teste de gameplay do
+   projeto.
+4. **Migrar** `HexCohabitationVisualManager` e `ConstructionManager` para
+   `OnBoardSettledAtNeutral` (hoje se salvam pelo `OnFogOfWarUpdated`). Não urgente.
+5. **Watchdog:** `[Watchdog] esperando '…' ha Ns` aparecendo = a IA está presa
+   nesse ponto. Ele só avisa; não destrava.
+6. **Fragata com alcance 0** é experimento — decidir na review da Marinha.
+
+O `[Combate] Resolve` só aparece com `enableTurnStateRuntimeLogs` ligado, que está
+**desligado na Campanha e no AI Ground**.
+
 ### O que a v9.3.2 deixou — a caça rebelde ainda não foi vista atirando
 
 1. **Ver a caça em Play.** As duas últimas correções (segunda passada sem
@@ -259,13 +297,11 @@ Importar no asset** — o jogo lê o asset, não o JSON.
 1. **Rejogar a aula 1** depois das últimas mudanças (nenhuma foi vista em Play):
    contador de captura decrescente, `op_01` como gatilho interno, fala de vitória
    com o painel esperando 3,5 s, barra de 6 s voltando à Campanha.
-2. **Jogar a aula 2** (`caserna_soldado_2.json`) com a mesma bateria de atalhos da
-   aula 1: o que o aluno faz sem querer que trava o roteiro?
+2. **A aula 2 encolheu** (só reabastecimento); a extração está em
+   `caserna_soldado_3_rascunho.json`, ainda sem mapa (`aulas_caserna.md`, Aula 3).
 3. O rebelde que nasce **fora da tela** é intencional. Se ele atirar sem nunca ter
    entrado no enquadramento, pôr um `pan` no turno inimigo.
 4. **Abertos conhecidos:**
-   - o save no meio da aula não guarda o passo do roteiro;
-   - um save da Academia carregado pelo menu abre no Fixture;
    - o aluno é sempre o slot 0;
    - o eixo do slot 0 do Fixture mudou (`0,2,3,8 → 2,3,8`) sem autor conhecido:
      conferir.
@@ -568,6 +604,11 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **"fonte única" tomada por suposição** | o autor acreditava que a fórmula de combate era uma só; eram duas cópias, e o DPQ tinha quatro. Antes de dizer "é tudo o mesmo cálculo", procurar quem chama a conta **e** quem monta as entradas (`DivideAndRound`, `PositionDpqResolver`) |
+| **calculadora de balanceamento em decisão de jogo** | `AICombatHpSimulator.Simulate(ficha…)` assume planície, munição cheia, arma pela ficha. Em jogo: opção do `PodeMirar` → `SimulateWithWeapons` com DPQ real |
+| **desligar fallback que cai em permissivo** | sem opção do sensor, `simInvalid` **permite** o ataque. Desligar o fallback sozinho afrouxaria ~40 portões; foi preciso o `BlockedNoSensorOption`. Antes de desligar um caminho, ver o que o "inválido" responde |
+| **"voltou a Neutral" ≠ "o mundo recalculou"** | `OnCursorReturnedToNeutral` chega ANTES do delta da névoa. Estado que deriva de névoa/detecção escuta `OnBoardSettledAtNeutral`. Não inverter a ordem: o índice de ocupação reconcilia no primeiro |
+| **ler a linha e não seguir quem chama** | eu disse que alcance 0 quebrava a IA lendo o `Max(1, dist)`; o caminho canônico nem recebe distância. Antes de afirmar impacto, seguir o chamador até o uso |
 | **Importar com a Unity compilando** | o campo novo chega VAZIO no asset: ele já conhece o campo, o importador ainda é o antigo (a fala da Capitã chegou muda). Importar só sem a rodinha de compilação |
 | **checagem no início do turno** | `OnActiveTeamChanged` dispara ANTES do `ReleaseUnitsForActiveTeam` (upkeep). Quem lê combustível ali vê o valor de antes do consumo; leia no `Neutral` |
 | **"escolher" e "bloquear" com a mesma regra** | aeronave no ar não bloqueia spawn, e a escolha da bandeira herdou isso: dois Apaches na mesma bandeira. Separar a regra de bloqueio da de preferência |
@@ -583,7 +624,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | **árvore limpa tomada como Inspector salvo** | no fechamento da v9.2.1 o `git status` estava limpo e os perfis do Médio e do Difícil **não tinham o campo** em disco: o Inspector marca e não grava. Antes de taguear configuração, conferir o campo no `.asset` (grep) e pedir *File ▸ Save Project* |
 | **afirmar a direção de um movimento lendo meia execução** | eu disse que na fusão o parceiro anda até o receptor; é o contrário — a **selecionada** anda até o parceiro e o consome (`TurnStateManager.Merge.cs`, 592–669). Li a linha que nomeia o receptor, não a que move. Ler a execução até o `SetCurrentCellPosition` |
 | **"o papel X não faz Y" contado só nos arquivos do papel** | a revisão de papéis afirmou que a IA nunca funde; a fusão morava no **reparo**. Comportamento de papel pode estar num handler transversal (Repair, Logistics, Router) |
-| **frente que mistura arquivo no commit** | `git add -p` não roda aqui (interativo). Monta-se o índice do arquivo como HEAD + só os blocos da frente (`git hash-object -w --path` + `update-index --cacheinfo`). Foi assim que a v9.2.1 saiu em cinco commits. **Na v9.2.2 o atalho de aplicar blocos de `git diff -U0` falhou duas vezes:** em modo texto o Python perde o CRLF, e chaves `{` soltas viram blocos que nenhuma palavra-chave pega. O arquivo misto foi inteiro para a frente dominante, com a mensagem dizendo o que ele carrega da outra |
+| **frente que mistura arquivo no commit** | `git add -p` não roda aqui (interativo). Monta-se o índice do arquivo como HEAD + só os blocos da frente (`git hash-object -w --path` + `update-index --cacheinfo`). Foi assim que a v9.2.1 saiu em cinco commits. **Na v9.2.2 o atalho de aplicar blocos de `git diff -U0` falhou duas vezes:** em modo texto o Python perde o CRLF, e chaves `{` soltas viram blocos que nenhuma palavra-chave pega. O arquivo misto foi inteiro para a frente dominante, com a mensagem dizendo o que ele carrega da outra. **Na v9.4.0 tropecei de novo** com `git apply --cached --unidiff-zero`: um `return true;` foi parar dentro de um `for` e entrou no commit (o `compilar.sh` lê o disco, não o índice). Só o caminho do blob (HEAD + substituição exata, assert de 1 ocorrência) é seguro; conferir `git diff --cached` ANTES de comitar |
 | **Toggle que "não navega"** | navegava: o Toggle padrão seleciona com (245,245,245) sobre o quadradinho branco. O `Panel_NewGame` já resolvia com `ApplySelectionHighlight` (`#4A5A43`). Antes de depurar a navegação, conferir se a seleção é **visível** |
 | **texto escrito uma vez, na criação** | os botões do helper gravavam `[helper.action.cancel]` para sempre porque eram montados antes de o banco de mensagens ser achado. Rótulo que depende de banco (ou de idioma) se resolve ao **aparecer**, não ao nascer |
 | **busca de botão presa a um painel** | o `Button_config` mudou do `Panel_options` para o `Panel_gerenciar` e o menu só procurava no primeiro: o botão não abria, sem erro. Quando o autor move um botão de painel, conferir **onde** o código o procura |
@@ -661,6 +702,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.4.0.md`](relatorio_v9.4.0.md) | revisão do motor — veredito de cada achado do consultor, combate em fonte única, Neutral em dois momentos |
+| [`arquitetura/The-Map-Room-reconhecimento-arquitetural.md`](arquitetura/The-Map-Room-reconhecimento-arquitetural.md) | o reconhecimento do consultor (estático, em `3da75fd`) — riscos e sequência sugerida; ler com o veredito do relatório v9.4.0 ao lado |
+| [`arquitetura/revisao_maquina_de_estados.md`](arquitetura/revisao_maquina_de_estados.md) | os cinco estágios do ciclo e as três fronteiras (antes de confirmar, depois de confirmar, depois de recalcular) |
 | [`relatorio_v9.3.2.md`](relatorio_v9.3.2.md) | a aula 2 contra IA que briga — save da aula e do mundo, rebelde caça, fala avulsa, relógio |
 | [`relatorio_v9.3.1.md`](relatorio_v9.3.1.md) | a primeira aula fecha — travas só do aluno, atalhos fechados, fala final, volta automática |
 | [`relatorio_v9.3.0.md`](relatorio_v9.3.0.md) | a aula vira um quadrante — Academia, regras de fim da aula, tarefas de captura, bake embarcado |
