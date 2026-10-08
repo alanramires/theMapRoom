@@ -47,23 +47,6 @@ public static class AICombatHpSimulator
         }
     }
 
-    private readonly struct SkillModifierSummary
-    {
-        public static SkillModifierSummary None => new SkillModifierSummary(0, 0, 0, 0);
-        public readonly int ownerAttack;
-        public readonly int ownerDefense;
-        public readonly int opponentAttack;
-        public readonly int opponentDefense;
-
-        public SkillModifierSummary(int ownerAttack, int ownerDefense, int opponentAttack, int opponentDefense)
-        {
-            this.ownerAttack = ownerAttack;
-            this.ownerDefense = ownerDefense;
-            this.opponentAttack = opponentAttack;
-            this.opponentDefense = opponentDefense;
-        }
-    }
-
     // ---- API publica ----
 
     /// <summary>
@@ -206,69 +189,28 @@ public static class AICombatHpSimulator
         bool attackerIsGroundedAircraft = false,
         bool defenderIsGroundedAircraft = false)
     {
-        WeaponData attackerWeapon = attackPick.weapon;
-        WeaponData defenderWeapon = counterPick.isValid ? counterPick.weapon : null;
-        bool counterExecuted = counterPick.isValid;
+        // Mesma conta da execucao: fonte unica em CombatFormula.
+        CombatFormulaResult f = CombatFormula.Resolve(new CombatFormulaInput
+        {
+            attacker = attacker,
+            defender = defender,
+            attackWeapon = attackPick.weapon,
+            counterWeapon = counterPick.isValid ? counterPick.weapon : null,
+            counterExecuted = counterPick.isValid,
+            attackerHp = attackerHpBefore,
+            defenderHp = defenderHpBefore,
+            attackerDpqPoints = attackerDpqPoints,
+            defenderDpqPoints = defenderDpqPoints,
+            attackerDpqDefenseBonus = attackerDpqDefenseBonus,
+            defenderDpqDefenseBonus = defenderDpqDefenseBonus,
+            attackerIsGroundedAircraft = attackerIsGroundedAircraft,
+            defenderIsGroundedAircraft = defenderIsGroundedAircraft,
+            rpsDatabase = rpsDatabase,
+            dpqMatchupDatabase = dpqMatchupDatabase,
+            buildExplanation = false
+        });
 
-        DPQCombatOutcome attackerOutcome = DPQCombatOutcome.Neutro;
-        DPQCombatOutcome defenderOutcome = DPQCombatOutcome.Neutro;
-        if (dpqMatchupDatabase != null)
-            dpqMatchupDatabase.Resolve(
-                Mathf.Max(0, attackerDpqPoints),
-                Mathf.Max(0, defenderDpqPoints),
-                out attackerOutcome,
-                out defenderOutcome);
-
-        int attackerWeaponPower = attackerWeapon != null ? Mathf.Max(0, attackerWeapon.basicAttack) : 0;
-        int defenderWeaponPower = counterExecuted && defenderWeapon != null ? Mathf.Max(0, defenderWeapon.basicAttack) : 0;
-
-        WeaponCategory attackerCategory = attackerWeapon != null ? attackerWeapon.WeaponCategory : WeaponCategory.AntiInfantaria;
-        WeaponCategory defenderCategory = defenderWeapon != null ? defenderWeapon.WeaponCategory : WeaponCategory.AntiInfantaria;
-        WeaponCategory defenderCategoryForSkill = counterExecuted ? defenderCategory : attackerCategory;
-
-        int attackerAttackRps = ResolveAttackRps(attacker.unitClass, attackerCategory, defender.unitClass, rpsDatabase);
-        int defenderAttackRps = counterExecuted ? ResolveAttackRps(defender.unitClass, defenderCategory, attacker.unitClass, rpsDatabase) : 0;
-        if (defenderIsGroundedAircraft)
-            attackerAttackRps = Mathf.Max(0, attackerAttackRps);
-        if (counterExecuted && attackerIsGroundedAircraft)
-            defenderAttackRps = Mathf.Max(0, defenderAttackRps);
-
-        SkillModifierSummary attackerSkill = ResolveSkillModifiers(attacker, defender, attackerCategory, defenderCategoryForSkill);
-        SkillModifierSummary defenderSkill = ResolveSkillModifiers(defender, attacker, defenderCategoryForSkill, attackerCategory);
-
-        int attackerAttackSkillTotal = attackerSkill.ownerAttack + defenderSkill.opponentAttack;
-        int defenderAttackSkillTotal = defenderSkill.ownerAttack + attackerSkill.opponentAttack;
-        int attackerDefenseSkillTotal = attackerSkill.ownerDefense + defenderSkill.opponentDefense;
-        int defenderDefenseSkillTotal = defenderSkill.ownerDefense + attackerSkill.opponentDefense;
-
-        int attackerAttackTermApplied = Mathf.Max(1, attackerWeaponPower + attackerAttackRps + attackerAttackSkillTotal);
-        int defenderAttackTermApplied = counterExecuted ? Mathf.Max(1, defenderWeaponPower + defenderAttackRps + defenderAttackSkillTotal) : 0;
-
-        int attackerAttackEffective = attackerHpBefore * attackerAttackTermApplied;
-        int defenderAttackEffective = counterExecuted ? defenderHpBefore * defenderAttackTermApplied : 0;
-
-        int attackerDefenseRps = counterExecuted ? ResolveDefenseRps(attacker.unitClass, defender.unitClass, defenderCategory, rpsDatabase) : 0;
-        int defenderDefenseRps = ResolveDefenseRps(defender.unitClass, attacker.unitClass, attackerCategory, rpsDatabase);
-
-        int attackerWoundedPenalty = ResolveWoundedDefensePenalty(attackerHpBefore, attacker.maxHP);
-        int defenderWoundedPenalty = ResolveWoundedDefensePenalty(defenderHpBefore, defender.maxHP);
-
-        int attackerEffectiveDefense = attacker.defense + attackerDpqDefenseBonus + attackerDefenseRps + attackerDefenseSkillTotal + attackerWoundedPenalty;
-        int defenderEffectiveDefense = defender.defense + defenderDpqDefenseBonus + defenderDefenseRps + defenderDefenseSkillTotal + defenderWoundedPenalty;
-
-        int roundedOnDefender = DPQCombatMath.DivideAndRound(
-            attackerAttackEffective, Mathf.Max(1, defenderEffectiveDefense), attackerOutcome);
-        int roundedOnAttacker = counterExecuted
-            ? DPQCombatMath.DivideAndRound(defenderAttackEffective, Mathf.Max(1, attackerEffectiveDefense), defenderOutcome)
-            : 0;
-
-        // HP lock: dano maximo limitado pelo HP do oponente
-        int appliedOnDefender = Mathf.Min(Mathf.Max(0, roundedOnDefender), Mathf.Max(0, attackerHpBefore));
-        int appliedOnAttacker = Mathf.Min(Mathf.Max(0, roundedOnAttacker), Mathf.Max(0, defenderHpBefore));
-
-        return new AICombatHpResult(
-            Mathf.Max(0, attackerHpBefore - appliedOnAttacker),
-            Mathf.Max(0, defenderHpBefore - appliedOnDefender));
+        return new AICombatHpResult(f.attackerHpAfter, f.defenderHpAfter);
     }
 
     // ---- Selecao de armas ----
@@ -315,66 +257,5 @@ public static class AICombatHpSimulator
             return WeaponPick.None;
 
         return new WeaponPick(counterWeapon, counterEmbarkedIndex, true);
-    }
-
-    // ---- Helpers de formula ----
-
-    private static int ResolveAttackRps(GameUnitClass attackerClass, WeaponCategory weaponCategory, GameUnitClass defenderClass, RPSDatabase rpsDatabase)
-    {
-        if (rpsDatabase == null) return 0;
-        rpsDatabase.TryResolveAttackBonus(attackerClass, weaponCategory, defenderClass, out int bonus, out _, out _);
-        return bonus;
-    }
-
-    private static int ResolveDefenseRps(GameUnitClass defenderClass, GameUnitClass attackerClass, WeaponCategory weaponCategory, RPSDatabase rpsDatabase)
-    {
-        if (rpsDatabase == null) return 0;
-        rpsDatabase.TryResolveDefenseBonus(defenderClass, attackerClass, weaponCategory, out int bonus, out _, out _);
-        return bonus;
-    }
-
-    private static SkillModifierSummary ResolveSkillModifiers(
-        UnitData ownerData,
-        UnitData opponentData,
-        WeaponCategory ownerWeaponCategory,
-        WeaponCategory opponentWeaponCategory)
-    {
-        if (ownerData == null || ownerData.combatModifiers == null || ownerData.combatModifiers.Count == 0)
-            return SkillModifierSummary.None;
-
-        int ownerElite = Mathf.Max(0, ownerData.eliteLevel);
-        GameUnitClass opponentClass = opponentData != null ? opponentData.unitClass : GameUnitClass.Infantry;
-        int opponentElite = opponentData != null ? Mathf.Max(0, opponentData.eliteLevel) : 0;
-
-        int ownerAttack = 0, ownerDefense = 0, opponentAttack = 0, opponentDefense = 0;
-
-        for (int i = 0; i < ownerData.combatModifiers.Count; i++)
-        {
-            CombatModifierData modifier = ownerData.combatModifiers[i];
-            if (modifier == null) continue;
-
-            if (!modifier.TryGetCombatRpsModifiers(
-                    ownerElite, ownerWeaponCategory, opponentWeaponCategory,
-                    opponentClass, opponentElite,
-                    out int ownerAtkMod, out int ownerDefMod,
-                    out int opponentAtkMod, out int opponentDefMod, out _))
-                continue;
-
-            ownerAttack += ownerAtkMod;
-            ownerDefense += ownerDefMod;
-            opponentAttack += opponentAtkMod;
-            opponentDefense += opponentDefMod;
-        }
-
-        return new SkillModifierSummary(ownerAttack, ownerDefense, opponentAttack, opponentDefense);
-    }
-
-    private static int ResolveWoundedDefensePenalty(int currentHp, int maxHp)
-    {
-        int safeMaxHp = Mathf.Max(1, maxHp);
-        int safeCurrentHp = Mathf.Clamp(currentHp, 0, safeMaxHp);
-        if (safeCurrentHp >= safeMaxHp) return 0;
-        if (safeCurrentHp <= 5) return -2;
-        return -1;
     }
 }

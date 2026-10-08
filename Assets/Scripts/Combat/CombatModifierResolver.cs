@@ -41,14 +41,31 @@ public static class CombatModifierResolver
         if (!ownerUnit.TryGetUnitData(out UnitData ownerData) || ownerData == null)
             return new CombatModifierSummary(0, 0, 0, 0, 0, "owner sem UnitData");
 
+        UnitData opponentData = null;
+        if (opponentUnit != null)
+            opponentUnit.TryGetUnitData(out opponentData);
+
+        return Resolve(ownerData, opponentData, ownerWeaponCategory, opponentWeaponCategory, buildReason: true);
+    }
+
+    /// <summary>
+    /// Versao por ficha, usada pela formula de combate. Sem <paramref name="buildReason"/>
+    /// nao monta texto: a previsao da IA chama isto em volume.
+    /// </summary>
+    public static CombatModifierSummary Resolve(
+        UnitData ownerData,
+        UnitData opponentData,
+        WeaponCategory ownerWeaponCategory,
+        WeaponCategory opponentWeaponCategory,
+        bool buildReason)
+    {
+        if (ownerData == null)
+            return new CombatModifierSummary(0, 0, 0, 0, 0, "owner sem UnitData");
+
         if (ownerData.combatModifiers == null || ownerData.combatModifiers.Count == 0)
             return new CombatModifierSummary(0, 0, 0, 0, 0, "owner sem combat modifiers");
 
         int ownerElite = Mathf.Max(0, ownerData.eliteLevel);
-
-        UnitData opponentData = null;
-        if (opponentUnit != null)
-            opponentUnit.TryGetUnitData(out opponentData);
 
         GameUnitClass opponentClass = opponentData != null ? opponentData.unitClass : GameUnitClass.Infantry;
         int opponentElite = opponentData != null ? Mathf.Max(0, opponentData.eliteLevel) : 0;
@@ -58,7 +75,7 @@ public static class CombatModifierResolver
         int totalOpponentAttack = 0;
         int totalOpponentDefense = 0;
         int appliedCount = 0;
-        StringBuilder summary = new StringBuilder();
+        StringBuilder summary = buildReason ? new StringBuilder() : null;
 
         for (int i = 0; i < ownerData.combatModifiers.Count; i++)
         {
@@ -86,6 +103,9 @@ public static class CombatModifierResolver
             totalOpponentAttack += opponentAtkMod;
             totalOpponentDefense += opponentDefMod;
             appliedCount++;
+
+            if (summary == null)
+                continue;
 
             if (summary.Length > 0)
                 summary.Append(" || ");
@@ -116,7 +136,7 @@ public static class CombatModifierResolver
             totalOpponentAttack,
             totalOpponentDefense,
             appliedCount,
-            summary.ToString());
+            summary != null ? summary.ToString() : string.Empty);
     }
 
     // Backward compatibility for callers that still provide a single category context.
