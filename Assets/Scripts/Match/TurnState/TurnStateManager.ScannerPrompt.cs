@@ -3973,7 +3973,7 @@ public partial class TurnStateManager
         if (!target.SupportsLayerMode(forcedDomain, forcedHeight))
             return false;
 
-        const int forcedTurns = 2;
+        int forcedTurns = Mathf.Max(1, weapon.forcedEmergeTurns);
 
         Tilemap emergeBoardMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
         Vector3Int emergeCell = target.CurrentCellPosition;

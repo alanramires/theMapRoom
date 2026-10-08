@@ -55,6 +55,9 @@ public class WeaponData : ScriptableObject
     [Header("The Units On The Follow Domain Are Forced To Emerge After Being Hit")]
     [Tooltip("Se o alvo estiver em algum destes domain/height quando for atingido, sera forcado a emergir.")]
     public List<WeaponLayerMode> unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit = new List<WeaponLayerMode>();
+    [Min(1)]
+    [Tooltip("Duracao do lock de emersao forcada, em turnos do alvo.")]
+    public int forcedEmergeTurns = 2;
 
     [Header("Combat")]
     [Tooltip("Ataque base da arma (antes de modificadores).")]
@@ -110,6 +113,7 @@ public class WeaponData : ScriptableObject
             forceOpponentToGoToDomainAfterHit = new List<WeaponForcedLayerAfterHit>();
         if (unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit == null)
             unitsOnTheFollowDomainAreForcedToEmergeAfterBeingHit = new List<WeaponLayerMode>();
+        forcedEmergeTurns = Mathf.Max(1, forcedEmergeTurns);
         for (int i = 0; i < forceOpponentToGoToDomainAfterHit.Count; i++)
         {
             WeaponForcedLayerAfterHit entry = forceOpponentToGoToDomainAfterHit[i];
