@@ -227,21 +227,36 @@ public static class CombatEvaluationService
             targetDamagePercent,
             request.AttackerDpq,
             request.DefenderDpq);
+        CombatDiagnostico.RegistrarPrevisao(request, result);
         return true;
     }
 
+    // As duas portas publicas registram a decisao no diagnostico uma vez cada;
+    // o miolo (DecideWithEvaluation) nao registra, para nao contar em dobro.
     public static AttackDecisionResult EvaluateAttackDecision(CombatEvaluationRequest request)
     {
+        AttackDecisionResult result;
         if (TryEvaluateAttackDecisionPreconditions(request, out AttackDecisionResult terminal))
-            return terminal;
+            result = terminal;
+        else if (!TryEvaluate(request, out CombatEvaluationResult evaluation))
+            result = BuildInvalidEvaluationResult(request);
+        else
+            result = DecideWithEvaluation(request, evaluation);
 
-        if (!TryEvaluate(request, out CombatEvaluationResult evaluation))
-            return BuildInvalidEvaluationResult(request);
-
-        return EvaluateAttackDecision(request, evaluation);
+        CombatDiagnostico.RegistrarDecisao(request, result);
+        return result;
     }
 
     public static AttackDecisionResult EvaluateAttackDecision(
+        CombatEvaluationRequest request,
+        CombatEvaluationResult evaluation)
+    {
+        AttackDecisionResult result = DecideWithEvaluation(request, evaluation);
+        CombatDiagnostico.RegistrarDecisao(request, result);
+        return result;
+    }
+
+    private static AttackDecisionResult DecideWithEvaluation(
         CombatEvaluationRequest request,
         CombatEvaluationResult evaluation)
     {

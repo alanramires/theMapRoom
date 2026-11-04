@@ -140,6 +140,7 @@ public class SaveGameManager : MonoBehaviour
         public long savedAtUtcTicks;
         public bool hasReplay;
         public bool hasJogadas;
+        public bool hasDiagnostico;
         // Hash canonico do estado no momento do save (MatchStateHasher).
         // Saves antigos: vazio. Futuro pacote de turno do multiplayer viaja
         // com este campo como detector de desync.
@@ -152,6 +153,7 @@ public class SaveGameManager : MonoBehaviour
         public string json;
         public string replayJson;
         public string jogadasJson;
+        public string diagnosticoJson;
         public int containerBytes;
         public int uncompressedBytes;
         public string error;
@@ -162,6 +164,7 @@ public class SaveGameManager : MonoBehaviour
     private const string SaveContainerGameEntry = "game.json";
     private const string SaveContainerReplayEntry = "replay.json";
     private const string SaveContainerJogadasEntry = "jogadas.json";
+    private const string SaveContainerDiagnosticoEntry = "diagnostico.json";
 
     private bool loadInProgress;
     private bool lastLoadRoutineSucceeded;
@@ -870,9 +873,10 @@ public class SaveGameManager : MonoBehaviour
             string json = JsonUtility.ToJson(data, false);
             string replayJson = BuildReplayJsonForSave();
             string jogadasJson = BuildJogadasJsonForSave();
+            string diagnosticoJson = BuildDiagnosticoJsonForSave();
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
-            WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson, stateHash);
+            WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson, stateHash, diagnosticoJson);
             if (showSaveLoadLogs)
                 LogSaveDiagnostics(normalizedSlot, json, new FileInfo(path).Length);
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -1447,6 +1451,7 @@ public class SaveGameManager : MonoBehaviour
             LogLoadPerf(normalizedSlot, "restore_jogadas.begin", jogadasRestoreStartMs, jogadasRestoreStartMs - asyncStartMs);
             RestoreJogadasFromContainer(preprocess.jogadasJson);
             LogLoadPerf(normalizedSlot, "restore_jogadas.end", jogadasRestoreStartMs, PerfNowMs() - asyncStartMs);
+            RestoreDiagnosticoFromContainer(preprocess.diagnosticoJson);
             if (lastLoadRoutineSucceeded)
             {
                 matchController?.PrepareFogCachesForTurnPresentation();
@@ -1553,6 +1558,7 @@ public class SaveGameManager : MonoBehaviour
                     out string json,
                     out string replayJson,
                     out string jogadasJson,
+                    out string diagnosticoJson,
                     out int containerBytes,
                     out int uncompressedBytes,
                     out string readError))
@@ -1565,6 +1571,7 @@ public class SaveGameManager : MonoBehaviour
             result.json = json;
             result.replayJson = replayJson;
             result.jogadasJson = jogadasJson;
+            result.diagnosticoJson = diagnosticoJson;
             result.containerBytes = containerBytes;
             result.uncompressedBytes = uncompressedBytes;
             if (string.IsNullOrWhiteSpace(json))
@@ -1643,6 +1650,7 @@ public class SaveGameManager : MonoBehaviour
         out string gameJson,
         out string replayJson,
         out string jogadasJson,
+        out string diagnosticoJson,
         out int containerBytes,
         out int uncompressedBytes,
         out string error)
@@ -1651,6 +1659,7 @@ public class SaveGameManager : MonoBehaviour
         gameJson = string.Empty;
         replayJson = string.Empty;
         jogadasJson = string.Empty;
+        diagnosticoJson = string.Empty;
         containerBytes = 0;
         uncompressedBytes = 0;
         error = string.Empty;
@@ -1665,6 +1674,7 @@ public class SaveGameManager : MonoBehaviour
                 gameJson = ReadRequiredContainerEntry(archive, SaveContainerGameEntry);
                 replayJson = ReadOptionalContainerEntry(archive, SaveContainerReplayEntry);
                 jogadasJson = ReadOptionalContainerEntry(archive, SaveContainerJogadasEntry);
+                diagnosticoJson = ReadOptionalContainerEntry(archive, SaveContainerDiagnosticoEntry);
             }
 
             uncompressedBytes = string.IsNullOrEmpty(gameJson) ? 0 : Encoding.UTF8.GetByteCount(gameJson);
@@ -1689,6 +1699,8 @@ public class SaveGameManager : MonoBehaviour
         public string stateHash;
         public bool hasReplay;
         public bool hasJogadas;
+        public bool hasDiagnostico;
+        public DiagnosticoLog diagnostico;
         public long savedAtUtcTicks;
         public int containerBytes;
         public int gameJsonBytes;
@@ -1736,6 +1748,7 @@ public class SaveGameManager : MonoBehaviour
                 out string gameJson,
                 out string replayJson,
                 out string jogadasJson,
+                out string diagnosticoJson,
                 out int containerBytes,
                 out int uncompressedBytes,
                 out error))
@@ -1760,6 +1773,8 @@ public class SaveGameManager : MonoBehaviour
                 stateHash = manifest.stateHash,
                 hasReplay = manifest.hasReplay && !string.IsNullOrEmpty(replayJson),
                 hasJogadas = manifest.hasJogadas && !string.IsNullOrEmpty(jogadasJson),
+                hasDiagnostico = manifest.hasDiagnostico && !string.IsNullOrEmpty(diagnosticoJson),
+                diagnostico = ParseDiagnostico(diagnosticoJson),
                 savedAtUtcTicks = manifest.savedAtUtcTicks,
                 containerBytes = containerBytes,
                 gameJsonBytes = uncompressedBytes,
@@ -3106,6 +3121,23 @@ public class SaveGameManager : MonoBehaviour
         return replayData != null ? JsonUtility.ToJson(replayData, false) : string.Empty;
     }
 
+    // Vazio quando nada foi registrado: o save nao ganha arquivo a toa.
+    private static string BuildDiagnosticoJsonForSave()
+    {
+        DiagnosticoManager manager = DiagnosticoManager.Instance;
+        if (manager == null || manager.log == null || manager.log.entradas == null || manager.log.entradas.Count == 0)
+            return string.Empty;
+        return JsonUtility.ToJson(manager.log, false);
+    }
+
+    private static DiagnosticoLog ParseDiagnostico(string diagnosticoJson)
+    {
+        if (string.IsNullOrWhiteSpace(diagnosticoJson))
+            return null;
+        try { return JsonUtility.FromJson<DiagnosticoLog>(diagnosticoJson); }
+        catch { return null; }
+    }
+
     private static string BuildJogadasJsonForSave()
     {
         JogadasManager manager = JogadasManager.EnsureInstance();
@@ -3118,7 +3150,8 @@ public class SaveGameManager : MonoBehaviour
         string gameJson,
         string replayJson,
         string jogadasJson,
-        string stateHash = null)
+        string stateHash = null,
+        string diagnosticoJson = null)
     {
         string tempPath = savePath + ".tmp";
         string backupPath = savePath + ".bak";
@@ -3136,6 +3169,7 @@ public class SaveGameManager : MonoBehaviour
                 savedAtUtcTicks = data?.savedAtUtcTicks ?? 0L,
                 hasReplay = !string.IsNullOrWhiteSpace(replayJson),
                 hasJogadas = !string.IsNullOrWhiteSpace(jogadasJson),
+                hasDiagnostico = !string.IsNullOrWhiteSpace(diagnosticoJson),
                 stateHash = stateHash ?? string.Empty
             };
 
@@ -3148,6 +3182,8 @@ public class SaveGameManager : MonoBehaviour
                     WriteContainerEntry(archive, SaveContainerReplayEntry, replayJson);
                 if (manifest.hasJogadas)
                     WriteContainerEntry(archive, SaveContainerJogadasEntry, jogadasJson);
+                if (manifest.hasDiagnostico)
+                    WriteContainerEntry(archive, SaveContainerDiagnosticoEntry, diagnosticoJson);
             }
 
             if (!TryReadContainerManifest(tempPath, out _, out string manifestError))
@@ -3275,6 +3311,14 @@ public class SaveGameManager : MonoBehaviour
             replayManager.ImportReplaySaveData(null);
             replayManager.BeginTurnRecording();
         }
+    }
+
+    // Save sem diagnostico (antigo, ou flag desligada) recomeca o log vazio.
+    private static void RestoreDiagnosticoFromContainer(string diagnosticoJson)
+    {
+        if (string.IsNullOrWhiteSpace(diagnosticoJson) && DiagnosticoManager.Instance == null)
+            return;
+        DiagnosticoManager.EnsureInstance().RestaurarLog(ParseDiagnostico(diagnosticoJson));
     }
 
     private static void RestoreJogadasFromContainer(string jogadasJson)

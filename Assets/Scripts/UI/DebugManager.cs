@@ -31,6 +31,13 @@ public class DebugManager : MonoBehaviour
     [Tooltip("Quando ativo, pula a apresentação do Panel_Rodada em partidas hotseat (pvp), tanto no início da partida quanto na transição entre rodadas.")]
     [SerializeField] private bool panelRodadaDesativadoPvpDebug;
 
+    [Header("Diagnóstico no Save")]
+    [Tooltip("Grava fatos estruturados (combate previsto × realizado, decisões da IA) no diagnostico.json do save. Lido em Tools ▸ Auditoria ▸ Save Inspector. Independe das flags de log do Console.")]
+    [SerializeField] private bool gravarDiagnosticoNoSave = true;
+    [Tooltip("Teto de entradas. Passou, descarta as mais antigas e conta quantas no próprio save.")]
+    [Min(100)]
+    [SerializeField] private int diagnosticoMaxEntradas = 2000;
+
     private void Awake()
     {
         if (instance != null && instance != this)
@@ -90,6 +97,20 @@ public class DebugManager : MonoBehaviour
     {
         DebugManager authority = Resolve();
         return authority != null && authority.panelRodadaDesativadoPvpDebug;
+    }
+
+    // Sem DebugManager na cena, o diagnostico fica LIGADO: e o save de quem testa
+    // (celular, build) que mais precisa dele, e la ninguem tem o Console.
+    public static bool IsDiagnosticoNoSaveAtivo()
+    {
+        DebugManager authority = Resolve();
+        return authority == null || authority.gravarDiagnosticoNoSave;
+    }
+
+    public static int GetDiagnosticoMaxEntradas()
+    {
+        DebugManager authority = Resolve();
+        return authority != null ? authority.diagnosticoMaxEntradas : 2000;
     }
 
     // As flags sao serializadas por cena, entao um DebugManager criado em runtime

@@ -319,6 +319,20 @@ public partial class TurnStateManager
         trace.AppendLine($"- No defensor: {f.attackerAttackEffective} / {f.defenderSafeDefense} = {rawOnDefender:0.###}");
         trace.AppendLine($"- No atacante: {f.defenderAttackEffective} / {f.attackerSafeDefense} = {rawOnAttacker:0.###}");
 
+        // Fato estruturado no save, com a previsao da IA ao lado (diagnostico.json).
+        CombatDiagnostico.RegistrarCombate(
+            option,
+            attacker,
+            defender,
+            attackerHpBefore,
+            defenderHpBefore,
+            f,
+            counterExecuted,
+            attackerDpq.points,
+            defenderDpq.points,
+            attackerDpq.source,
+            defenderDpq.source);
+
         bool defenderDamageContainedByHpLock = f.defenderDamageContainedByHpLock;
         bool attackerDamageContainedByHpLock = f.attackerDamageContainedByHpLock;
         int defenderHpAfter = f.defenderHpAfter;

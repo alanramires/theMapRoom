@@ -45,6 +45,15 @@ public sealed class SaveInspectorWindow : EditorWindow
     private bool foldPlans = true;
     private bool foldProgress = true;
     private bool foldBriefing;
+    private bool foldDiagnostico = true;
+
+    // Filtros do diagnostico (guia de modding §12: o fato estruturado, buscavel).
+    private string diagBusca = string.Empty;
+    private string diagCategoria = string.Empty;
+    private string diagOperacao = string.Empty;
+    private int diagRodada;
+    private bool diagSoAvisos;
+    private const int DiagMaxLinhas = 300;
 
     [MenuItem("Tools/Auditoria/Save Inspector")]
     public static void Open() =>
@@ -190,6 +199,7 @@ public sealed class SaveInspectorWindow : EditorWindow
         DrawConstructions();
         DrawPlans();
         DrawProgress();
+        DrawDiagnostico();
         DrawBriefing();
         EditorGUILayout.EndScrollView();
     }
@@ -231,7 +241,8 @@ public sealed class SaveInspectorWindow : EditorWindow
             : "(sem data)");
         Row("Versão", $"save {read.saveVersion} (dados {d.version}) · container {read.containerVersion}");
         Row("Tamanho", $"{read.containerBytes / 1024f:F1} KB no disco · game.json {read.gameJsonBytes / 1024f:F1} KB");
-        Row("Replay / jogadas", $"{(read.hasReplay ? "sim" : "não")} / {(read.hasJogadas ? "sim" : "não")}");
+        Row("Replay / jogadas / diagnóstico",
+            $"{(read.hasReplay ? "sim" : "não")} / {(read.hasJogadas ? "sim" : "não")} / {(read.hasDiagnostico ? "sim" : "não")}");
         Row("Hash do estado", string.IsNullOrEmpty(read.stateHash) ? "(save antigo, sem hash)" : read.stateHash);
         EditorGUI.indentLevel--;
     }
@@ -444,6 +455,134 @@ public sealed class SaveInspectorWindow : EditorWindow
         EditorGUI.indentLevel--;
     }
 
+    private void DrawDiagnostico()
+    {
+        DiagnosticoLog log = read.diagnostico;
+        int total = log?.entradas?.Count ?? 0;
+        string titulo = log == null
+            ? "Diagnóstico (save sem diagnostico.json)"
+            : $"Diagnóstico ({total} entradas · {log.descartadas} descartadas pelo teto · formato {log.formato})";
+        foldDiagnostico = EditorGUILayout.Foldout(foldDiagnostico, titulo, true);
+        if (!foldDiagnostico || log?.entradas == null)
+            return;
+
+        EditorGUI.indentLevel++;
+        if (log.formato > DiagnosticoLog.FormatoAtual)
+            EditorGUILayout.HelpBox($"Formato {log.formato} é mais novo que o desta ferramenta ({DiagnosticoLog.FormatoAtual}). Campos desconhecidos podem faltar.", MessageType.Warning);
+
+        // Atalhos: os fatos que o roteiro de teste procura.
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Divergências"))
+            SetFiltro(string.Empty, CombatDiagnostico.OpCombateResolvido, avisos: true);
+        if (GUILayout.Button("Sem opção do sensor"))
+            SetFiltro(string.Empty, CombatDiagnostico.OpSemOpcaoSensor, avisos: false);
+        if (GUILayout.Button("Combates"))
+            SetFiltro("combate", string.Empty, avisos: false);
+        if (GUILayout.Button("Decisões"))
+            SetFiltro("decisao", string.Empty, avisos: false);
+        if (GUILayout.Button("Limpar"))
+        {
+            SetFiltro(string.Empty, string.Empty, avisos: false);
+            diagBusca = string.Empty;
+            diagRodada = 0;
+        }
+        EditorGUILayout.EndHorizontal();
+
+        diagBusca = EditorGUILayout.TextField("Busca", diagBusca);
+        EditorGUILayout.BeginHorizontal();
+        diagRodada = EditorGUILayout.IntField("Rodada (0 = todas)", diagRodada);
+        diagSoAvisos = EditorGUILayout.ToggleLeft("Só avisos e erros", diagSoAvisos, GUILayout.Width(150));
+        EditorGUILayout.EndHorizontal();
+        if (!string.IsNullOrEmpty(diagCategoria) || !string.IsNullOrEmpty(diagOperacao))
+            EditorGUILayout.LabelField($"filtro: {diagCategoria}{diagOperacao}", EditorStyles.miniLabel);
+
+        DrawDiagnosticoResumo(log);
+
+        List<DiagnosticoEntrada> linhas = log.entradas.Where(PassaFiltro).ToList();
+        EditorGUILayout.LabelField(
+            linhas.Count > DiagMaxLinhas
+                ? $"{linhas.Count} entradas no filtro — mostrando as {DiagMaxLinhas} mais recentes"
+                : $"{linhas.Count} entradas no filtro",
+            EditorStyles.miniBoldLabel);
+
+        Header(("id", 40), ("R", 25), ("slot", 30), ("sev", 50), ("operação", 160), ("quem", 150), ("hex", 70), ("×", 40), ("motivo", 260));
+        foreach (DiagnosticoEntrada e in linhas.Skip(Mathf.Max(0, linhas.Count - DiagMaxLinhas)))
+        {
+            string quem = e.uid > 0 ? $"{e.sigla}#{e.uid}" : "";
+            if (e.uid2 > 0)
+                quem += $" → {e.sigla2}#{e.uid2}";
+            Color previous = GUI.contentColor;
+            if (e.severidade == DiagnosticoSeveridade.Erro)
+                GUI.contentColor = new Color(1f, 0.45f, 0.45f);
+            else if (e.severidade == DiagnosticoSeveridade.Aviso)
+                GUI.contentColor = new Color(1f, 0.8f, 0.35f);
+            Cells((e.id.ToString(), 40), (e.rodada.ToString(), 25), (e.slot.ToString(), 30),
+                (e.severidade.ToString(), 50), (e.operacao, 160), (quem, 150),
+                (e.cx != 0 || e.cy != 0 ? $"({e.cx},{e.cy})" : "", 70),
+                (e.agregada ? e.contagem.ToString() : "", 40), (e.motivo, 260));
+            GUI.contentColor = previous;
+            if (e.campos != null && e.campos.Count > 0)
+                EditorGUILayout.LabelField("      " + string.Join(" · ", e.campos.Select(c => $"{c.chave}={c.valor}")), EditorStyles.wordWrappedMiniLabel);
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    // Decisoes da IA por rodada e slot: a soma dos contadores decisao.status.
+    private void DrawDiagnosticoResumo(DiagnosticoLog log)
+    {
+        var status = log.entradas
+            .Where(e => e != null && e.operacao == CombatDiagnostico.OpDecisaoStatus
+                        && (diagRodada <= 0 || e.rodada == diagRodada))
+            .ToList();
+        int combates = log.entradas.Count(e => e != null && e.operacao == CombatDiagnostico.OpCombateResolvido
+                                               && (diagRodada <= 0 || e.rodada == diagRodada));
+        int divergentes = log.entradas.Count(e => e != null && e.operacao == CombatDiagnostico.OpCombateResolvido
+                                                  && e.codigo == CombatDiagnostico.CodigoPrevisaoDiverge
+                                                  && (diagRodada <= 0 || e.rodada == diagRodada));
+        int conferem = log.entradas.Count(e => e != null && e.operacao == CombatDiagnostico.OpCombateResolvido
+                                               && e.codigo == CombatDiagnostico.CodigoPrevisaoConfere
+                                               && (diagRodada <= 0 || e.rodada == diagRodada));
+        Row("Combates executados", $"{combates} · previsão confere {conferem} · diverge {divergentes} · sem previsão {combates - conferem - divergentes}");
+
+        if (status.Count == 0)
+            return;
+        foreach (IGrouping<(int rodada, int slot), DiagnosticoEntrada> g in status
+                     .GroupBy(e => (e.rodada, e.slot)).OrderBy(g => g.Key.rodada).ThenBy(g => g.Key.slot))
+        {
+            string partes = string.Join(" · ", g.OrderByDescending(e => e.contagem).Select(e => $"{e.motivo} {e.contagem}"));
+            Row($"rodada {g.Key.rodada} · slot {g.Key.slot}", $"decisões: {partes}");
+        }
+    }
+
+    private void SetFiltro(string categoria, string operacao, bool avisos)
+    {
+        diagCategoria = categoria;
+        diagOperacao = operacao;
+        diagSoAvisos = avisos;
+    }
+
+    private bool PassaFiltro(DiagnosticoEntrada e)
+    {
+        if (e == null)
+            return false;
+        if (diagRodada > 0 && e.rodada != diagRodada)
+            return false;
+        if (diagSoAvisos && e.severidade == DiagnosticoSeveridade.Depuracao)
+            return false;
+        if (!string.IsNullOrEmpty(diagCategoria) && e.categoria != diagCategoria)
+            return false;
+        if (!string.IsNullOrEmpty(diagOperacao) && e.operacao != diagOperacao)
+            return false;
+        if (string.IsNullOrWhiteSpace(diagBusca))
+            return true;
+
+        string termo = diagBusca.Trim();
+        bool Tem(string s) => !string.IsNullOrEmpty(s) && s.IndexOf(termo, StringComparison.OrdinalIgnoreCase) >= 0;
+        return Tem(e.operacao) || Tem(e.categoria) || Tem(e.motivo) || Tem(e.sigla) || Tem(e.sigla2)
+            || Tem(e.origem) || Tem(e.uid.ToString()) || Tem(e.uid2.ToString())
+            || (e.campos != null && e.campos.Any(c => c != null && (Tem(c.chave) || Tem(c.valor))));
+    }
+
     private void DrawBriefing()
     {
         List<TurnBriefingEventSaveData> events = read.data.turnBriefingEvents;
@@ -469,6 +608,8 @@ public sealed class SaveInspectorWindow : EditorWindow
         Directory.CreateDirectory(folder);
         File.WriteAllText(Path.Combine(folder, "manifest.json"), read.manifestJson ?? string.Empty);
         File.WriteAllText(Path.Combine(folder, "game.json"), read.gameJson ?? string.Empty);
+        if (read.diagnostico != null)
+            File.WriteAllText(Path.Combine(folder, "diagnostico.json"), JsonUtility.ToJson(read.diagnostico, true));
         status = $"Exportado em {folder}";
         EditorUtility.RevealInFinder(Path.Combine(folder, "game.json"));
     }

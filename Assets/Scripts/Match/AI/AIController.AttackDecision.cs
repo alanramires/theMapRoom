@@ -146,6 +146,7 @@ public partial class AIController
                 request,
                 out AttackDecisionResult terminal))
         {
+            CombatDiagnostico.RegistrarDecisao(request, terminal);
             return terminal;
         }
 
