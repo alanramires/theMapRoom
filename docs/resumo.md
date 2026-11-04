@@ -288,13 +288,12 @@ Python da máquina quebra no `import json`). Os passos vizinhos ficam em
    deve dizer `stance=Tactical`.
 2. **Ver rodando** as correções da v9.5.0 que ainda não apareceram: sair da produtora
    capturando (`BuildVacateBatch`), papel antes da liberação (`Router`).
-3. **Marcar Blitzkrieg no `AIPreset_Medio`** (Inspector), pendente desde a v9.5.0.
-4. **Instrumentar o carrinho de compras no AI Step:** `BuildBestRoleShoppingCart` é o
+3. **Instrumentar o carrinho de compras no AI Step:** `BuildBestRoleShoppingCart` é o
    caminho em uso, e o `UnitPicker` instrumentado não é. Sem isso, `candidates` vem
    vazio em toda compra.
-5. **Pergunta aberta ao autor:** quanto o anti-infantaria pode furar a prioridade de
+4. **Pergunta aberta ao autor:** quanto o anti-infantaria pode furar a prioridade de
    Assalto ("por que Tanque B?", em [`ai_step_investigacao_2026-11-04.md`](ai_step_investigacao_2026-11-04.md)).
-6. **Depois do núcleo:** a comparação das 3 rodadas Difícil do autor (replay + AI Step),
+5. **Depois do núcleo:** a comparação das 3 rodadas Difícil do autor (replay + AI Step),
    elite, Aeronáutica num mapa pequeno, e a Marinha começando por doutrina.
 
 ### O que a v9.4.0 deixou — o motor mudou por dentro, o autor testa por fora
@@ -460,7 +459,7 @@ perfil, a linha MOTIVO no painel (pode não caber), os perfis Fácil e Difícil.
 
 O catálogo está ligado na Batalha, e **nenhum portão pergunta mais "sou o
 difícil?"**. Os três perfis foram montados a partir das frases do autor (v8.6.1,
-Frente 2): Fácil com ⅓ da renda e sem blitzkrieg, Médio com blitzkrieg, Difícil
+Frente 2): Fácil com ⅓ da renda e sem blitzkrieg, Médio **sem** blitzkrieg (decisão do autor em 2026-11-04: "essa apelação é do difícil") e com conscrição quando perdendo, Difícil
 com spam de soldado e os números do lado hard.
 
 O que falta, em ordem:
