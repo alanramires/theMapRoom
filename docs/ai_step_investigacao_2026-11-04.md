@@ -47,7 +47,16 @@ O arquivo nao foi carregado nem alterado nesta investigacao.
 ## Passo 4, turno 2, slot 1 — por que Metranca?
 
 Marca: `ab9693cf0eee4c878e5b42e277d3862d`.
-**Classificacao: decisao coerente com a demanda registrada.**
+
+> **CLASSIFICAÇÃO SUBSTITUÍDA.** Esta seção ficou fora do escopo pedido (o autor
+> mandou ler só a última marca), e o veredito abaixo está errado. A Metranca **não**
+> era coerente: em `ScoreRoleShoppingCandidate`, um degrau de prioridade vale 3000 e
+> o bônus de encaixe do counter vale até 36000. O counter de prioridade 16 passou por
+> cima do 3º capturador de prioridade 15, com 3 vagas de captura abertas, por mera
+> presença inimiga. Foi corrigido na v9.6.0 (`DeferCounterDuringExpansion`). Ver
+> `relatorio_v9.6.0.md` §3. Descrever a fila explica a intenção, não prova a decisão.
+
+**Classificacao original (errada): decisao coerente com a demanda registrada.**
 
 A fila tinha Counter/Infantry com prioridade 16, origem counter-pressure:
 pressao bruta 2,4, cobertura 1,2, saldo 1,2, seis inimigos visiveis. Metranca

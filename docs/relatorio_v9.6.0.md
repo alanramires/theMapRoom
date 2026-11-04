@@ -87,8 +87,9 @@ outro ângulo. Ele achou um defeito que o Claude também viu: nas compras, o cam
 `candidates` vem vazio. A causa é que a instrumentação está no `UnitPicker`, mas o
 shopping por papéis usa outro caminho (`BuildBestRoleShoppingCart`).
 
-> **A divergência entre os dois agentes é instrutiva.** Para a Metranca, o outro
-> agente concluiu "coerente com a demanda registrada". Isso é verdade e não responde
+> **A divergência entre os dois agentes é instrutiva.** O autor pediu ao outro agente
+> só a última marca. Ele leu as três, e para a Metranca concluiu "coerente com a
+> demanda registrada", um veredito errado e fora do escopo pedido. Isso é verdade e não responde
 > a pergunta. O Claude foi ao código do score e achou o mecanismo: o bônus de encaixe
 > **atravessa** a prioridade. Explicar a intenção não é o mesmo que provar que a
 > decisão é boa. O próprio documento dele diz isso, e foi exatamente ali que estava
