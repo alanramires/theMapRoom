@@ -583,6 +583,19 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log($"[Debug Command] Show AI Step {(visible ? "ON" : "OFF")} (decisao preservada).");
             }
         }
+        else if (TryParseAxisDebugCommand(command, out bool showAxis, out int axisSlot))
+        {
+            TurnStateManager tsm = turnStateManager != null ? turnStateManager : FindAnyObjectByType<TurnStateManager>();
+            if (tsm == null)
+                Debug.Log("[Debug Command] TurnStateManager nao encontrado.");
+            else
+            {
+                string summary = tsm.SetAxisDebugVisible(showAxis, axisSlot);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] {summary}");
+            }
+        }
         else if (command == "AI PAUSE" || command == "PAUSE AI")
         {
             AIController aiController = FindAnyObjectByType<AIController>();
@@ -641,6 +654,25 @@ public class PanelDebugController : MonoBehaviour
                 executed = true;
                 cursorController?.PlayDoneSfx();
                 Debug.Log("[Debug Command] AI SHOPPING RESUME.");
+            }
+        }
+        else if (command == "AI REPLAN" || command == "AI REPLAN RESET"
+            || command == "AI REPLANEJAR" || command == "AI REPLANEJAR RESET")
+        {
+            // Save do meio do turno traz o plano JA DECIDIDO (handoffs, vagas) e a retomada no
+            // stage 2 o reusa sem replanejar: uma mudanca de IA nao aparece. Este comando refaz o
+            // plano da IA ativa a partir do tabuleiro de agora e volta ao loop de unidades, sem
+            // repetir o Servico do Comando. Nao desfaz jogadas ja feitas. RESET apaga o plano
+            // antes (perde a aderencia ao objetivo anterior — nao e o que um turno real faz).
+            AIController aiController = FindAnyObjectByType<AIController>();
+            bool reset = command.EndsWith(" RESET");
+            if (aiController == null)
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            else if (aiController.TryStartDebugStage(2, reset))
+            {
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] AI REPLAN{(reset ? " RESET" : "")}.");
             }
         }
         else if (TryParseAIStageCommand(command, out int aiStage))
@@ -1060,13 +1092,41 @@ public class PanelDebugController : MonoBehaviour
             "fow on|off|partial | set fow <0-100>\n" +
             "panelrodada on|off - controla somente a cortina de privacidade\n" +
             "show ai step [on|off] - alterna/abre/fecha a revisao sem aprovar\n" +
+            "show axis | show eixos [slot] - eixos da base ao rally (1 vermelho, 2 laranja, 3 grafite); sem slot segue a vez\n" +
+            "hide axis | hide eixos\n" +
             "ai pause | pause ai\n" +
             "ai resume | resume ai\n" +
             "ai shopping pause | pause ai shopping\n" +
             "ai shopping resume | resume ai shopping\n" +
             "ai stage <1-3> (reinicia a IA no bloco escolhido)\n" +
+            "ai replan [reset] | ai replanejar [reset] - refaz o plano da IA ativa (use apos carregar save do meio do turno)\n" +
             "tutorial help | help tutorial - lista os comandos de roteiro do tutorial (spawn/stat das falas)\n" +
             "help";
+    }
+
+    // "SHOW AXIS", "SHOW EIXOS", "SHOW EIXO" (+ slot opcional) e os HIDE correspondentes.
+    private static bool TryParseAxisDebugCommand(string command, out bool show, out int slot)
+    {
+        show = false;
+        slot = -1;
+        if (string.IsNullOrWhiteSpace(command))
+            return false;
+
+        string[] parts = command.Trim().Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2 || parts.Length > 3)
+            return false;
+        if (parts[0] != "SHOW" && parts[0] != "HIDE")
+            return false;
+        if (parts[1] != "AXIS" && parts[1] != "EIXOS" && parts[1] != "EIXO")
+            return false;
+
+        show = parts[0] == "SHOW";
+        if (parts.Length == 3)
+        {
+            if (!show || !int.TryParse(parts[2], out slot) || slot < 0)
+                return false;
+        }
+        return true;
     }
 
     private static bool TryParseAIStageCommand(string normalizedCommand, out int stage)
