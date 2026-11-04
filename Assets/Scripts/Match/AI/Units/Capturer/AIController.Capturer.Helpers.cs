@@ -398,15 +398,27 @@ public partial class AIController
             ? SensorMovementMode.MoveuParado
             : SensorMovementMode.MoveuAndando;
 
-        return PodeCapturarSensor.TryGetCaptureTargetAtCell(
+        bool allowed = PodeCapturarSensor.TryGetCaptureTargetAtCell(
             unit,
             boardTilemap,
             simulatedCell,
             movementMode,
             out targetConstruction,
             out _,
-            out _,
+            out string captureReason,
             matchController);
+        if (!allowed && IsCollectingAIReview)
+        {
+            foreach (var building in ConstructionManager.AllActive)
+                if (building != null && building.CurrentCellPosition.x == simulatedCell.x && building.CurrentCellPosition.y == simulatedCell.y
+                    && matchController != null && matchController.IsCellKnownForActiveTeam(simulatedCell))
+                {
+                    TraceAIReviewCandidate("Captura.Sensor", "Capture", simulatedCell, null, false,
+                        "capture_sensor_rejected", captureReason, scoreScope: "capture_sensor");
+                    break;
+                }
+        }
+        return allowed;
     }
 
     public static ConstructionManager FindCapturableInSector(ConstructionSector sector, TeamId aiTeam, Vector3Int? unitPos = null)

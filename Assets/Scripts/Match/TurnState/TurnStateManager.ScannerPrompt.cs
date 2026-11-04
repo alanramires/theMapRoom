@@ -924,6 +924,8 @@ public partial class TurnStateManager
 
     private void ProcessScannerPromptInput()
     {
+        if (UiInputBlocker.IsTextInputFocused()) return;
+
         if (IsMovementAnimationRunning() || embarkExecutionInProgress || landingExecutionInProgress || combatExecutionInProgress || captureExecutionInProgress || mergeExecutionInProgress || supplyExecutionInProgress || transferExecutionInProgress)
             return;
 
@@ -5612,6 +5614,94 @@ public partial class TurnStateManager
         SetMirandoSpotterPreviewsVisible(false);
         RestoreMirandoInvalidUnitTint();
     }
+
+    // Apresentacao isolada: nao seleciona unidade, move cursor, chama sensores ou revela FOW.
+    private readonly List<LineRenderer> aiReviewPairLines = new List<LineRenderer>();
+    private Material aiReviewPairFallbackMaterial;
+
+    public void ClearAIReviewPairs()
+    {
+        foreach (var line in aiReviewPairLines) if (line != null) line.enabled = false;
+    }
+
+    public void ReleaseAIReviewPairs()
+    {
+        foreach (var line in aiReviewPairLines) if (line != null) Destroy(line.gameObject);
+        aiReviewPairLines.Clear();
+        if (aiReviewPairFallbackMaterial != null) Destroy(aiReviewPairFallbackMaterial);
+        aiReviewPairFallbackMaterial = null;
+    }
+
+    public void ShowAIReviewPairs(IReadOnlyList<AIController.AIReviewVisualPair> pairs)
+    {
+        ClearAIReviewPairs();
+        Tilemap map = terrainTilemap != null ? terrainTilemap : (cursorController != null ? cursorController.BoardTilemap : null);
+        if (map == null || pairs == null) return;
+        int used = 0;
+        float width = Mathf.Max(0.02f, GetMirandoPreviewWidth() * GetMirandoSpotterPreviewMultiplier());
+        float dash = Mathf.Clamp(GetMirandoPreviewSegmentLength() * GetMirandoSpotterPreviewMultiplier() * 0.5f, 0.08f, 0.3f);
+        void Segment(Vector3 from, Vector3 to, Color color)
+        {
+            LineRenderer line;
+            if (used < aiReviewPairLines.Count) line = aiReviewPairLines[used];
+            else
+            {
+                var go = new GameObject("AIReviewPairDash");
+                go.transform.SetParent(transform, false);
+                line = go.AddComponent<LineRenderer>();
+                line.useWorldSpace = true;
+                line.numCapVertices = 2;
+                line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                line.receiveShadows = false;
+                Material material = GetMirandoPreviewMaterial();
+                if (material == null)
+                {
+                    if (aiReviewPairFallbackMaterial == null)
+                        aiReviewPairFallbackMaterial = new Material(Shader.Find("Sprites/Default"));
+                    material = aiReviewPairFallbackMaterial;
+                }
+                line.sharedMaterial = material;
+                line.sortingLayerID = GetMirandoPreviewSortingLayerId();
+                line.sortingOrder = GetMirandoPreviewSortingOrder();
+                aiReviewPairLines.Add(line);
+            }
+            used++;
+            line.startWidth = line.endWidth = width;
+            line.startColor = line.endColor = color;
+            line.positionCount = 2;
+            line.SetPosition(0, from);
+            line.SetPosition(1, to);
+            line.enabled = true;
+        }
+        foreach (var pair in pairs)
+        {
+            Vector3 from = HexCoordinates.GetCellCenterWorld(map, pair.From);
+            Vector3 to = HexCoordinates.GetCellCenterWorld(map, pair.To);
+            from.z = to.z;
+            float distance = Vector3.Distance(from, to);
+            if (distance < 0.001f)
+            {
+                // Captura/pouso no proprio hex: um anel tracejado evita uma linha de comprimento zero.
+                for (int i = 0; i < 12; i++)
+                {
+                    float a = i * Mathf.PI * 2f / 12f;
+                    float b = a + Mathf.PI / 12f;
+                    Segment(to + new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0f) * 0.23f,
+                        to + new Vector3(Mathf.Cos(b), Mathf.Sin(b), 0f) * 0.23f, pair.Color);
+                }
+                continue;
+            }
+            Vector3 direction = (to - from) / distance;
+            float spacing = Mathf.Max(dash * 1.8f, distance / 128f);
+            for (float at = 0; at < distance; at += spacing)
+                Segment(from + direction * at, from + direction * Mathf.Min(at + dash, distance), pair.Color);
+            Vector3 side = new Vector3(-direction.y, direction.x, 0f);
+            float arrow = Mathf.Min(0.18f, distance * 0.25f);
+            Segment(to - direction * arrow + side * arrow * 0.6f, to, pair.Color);
+            Segment(to - direction * arrow - side * arrow * 0.6f, to, pair.Color);
+        }
+    }
+
 
     public bool TryShowAIDebugStepPreview(PlayerAction action, out string message)
     {

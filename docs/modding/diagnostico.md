@@ -32,6 +32,7 @@ fora, §15 — limite não fica escondido).
 |---|---|---|
 | `decisao.status` | cada decisão de ataque da IA, agregada por rodada, slot e status | ver o funil: quanto foi permitido, bloqueado, sem opção |
 | `decisao.sem_opcao_sensor` | a IA avaliou atacar de uma célula que o `PodeMirar` recusa; agregada por atacante, com o 1º exemplo | um papel que monta pares (alvo, célula) inválidos aparece aqui |
+| `ai_step.marked` | autor marca uma revisao AI Step como estranha | guarda sessionId, stepId, nota e caminho do ai_step_marcas.jsonl na raiz; registro completo nessa linha, no arquivo AIReviews e no replay da acao executada. Ver `../ai_step.md` |
 | `combate.resolvido` | cada combate executado, com a **previsão da IA** para o mesmo par e célula ao lado | previsto ≠ realizado vira `Aviso` com o que divergiu (hp, dpq, arma, revide) |
 
 A previsão vive só em memória até a execução: decisão avaliada e não executada não

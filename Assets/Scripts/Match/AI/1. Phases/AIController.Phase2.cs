@@ -202,7 +202,7 @@ public partial class AIController
                 // Idempotente e barato: sai cedo para quem nao tem carga, e
                 // para quem tem, so reescreve se a ancora mudou.
                 PublishInheritedMissionIntent(unit, activePlan, current);
-                action = DecideUnitAction(unit, current);
+                action = DecideUnitActionForReview(unit, current);
             }
             catch (System.Exception ex)
             {

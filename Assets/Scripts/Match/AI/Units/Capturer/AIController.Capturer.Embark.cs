@@ -62,6 +62,8 @@ public partial class AIController
         // continua valendo. (Caso: 63 segurando Foxtrot em Assembling pegou carona no APC 19.)
         if (ShouldHoldRallyAssemblyInsteadOfEmbark(unit, assigned))
         {
+            TraceAIReviewCandidate("Embarque", "Embark", fromCell, null, false,
+                "hold_rally_assembly", "Unidade deve manter presenca na montagem do rally.");
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} NAO embarca: montando massa no rally "
                 + $"{assigned.Sector} (state={assigned.RallyState}) dentro do raio {RallyAssemblyForceRadius}h");
             return null;
@@ -72,7 +74,11 @@ public partial class AIController
         QueroCaronaResult rideNeed =
             EvaluateCapturerRideNeed(unit, assigned);
         if (!rideNeed.wantsRide)
+        {
+            TraceAIReviewCandidate("Embarque", "Embark", fromCell, null, false,
+                "ride_not_needed", "QueroCarona recusou a necessidade de iniciar scans de embarque.");
             return null;
+        }
 
         // Pass 1: sensor padrão — encontra transporters adjacentes (1h).
         // Só varre depois de o passageiro confirmar que precisa de carona.
@@ -98,7 +104,13 @@ public partial class AIController
             {
                 if (!TryGetCapturerEmbarkPreference(unit, assigned, opt, plan, snapshot, snapshot.AITeam,
                         out int priority, out float distance))
+                {
+                    TraceAIReviewCandidate("Embarque", "Embark", opt.transporterUnit.CurrentCellPosition, opt.transporterUnit.InstanceId.ToString(), false,
+                        "embark_preference_rejected", "A preferencia de embarque recusou esta opcao.");
                     continue;
+                }
+                TraceAIReviewCandidate("Embarque", "Embark", opt.transporterUnit.CurrentCellPosition, opt.transporterUnit.InstanceId.ToString(), true,
+                    "preference", "Menor prioridade vence; distancia desempata.", hasPreference: true, priority: priority, distance: distance);
 
                 if (priority < bestPriority
                     || (priority == bestPriority && distance < bestDistance))

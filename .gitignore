@@ -63,3 +63,6 @@ output/
 
 # Standalone checks for the panel message formatter.
 !tools/tests/MessageTemplateChecks/MessageTemplateChecks.csproj
+
+# Marcas locais do AI Step (append-only; nao sao fontes do projeto).
+/ai_step_marcas.jsonl

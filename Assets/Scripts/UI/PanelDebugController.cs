@@ -568,6 +568,21 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log($"[Debug Command] PanelRodada {(panelRodadaEnabled ? "ON" : "OFF")}.");
             }
         }
+        else if (command == "SHOW AI STEP" || command == "SHOW AI STEP ON" || command == "SHOW AI STEP OFF")
+        {
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            else
+            {
+                bool visible = command == "SHOW AI STEP ON"
+                    || (command == "SHOW AI STEP" && !aiController.AIReviewVisible);
+                aiController.SetAIReviewVisible(visible);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] Show AI Step {(visible ? "ON" : "OFF")} (decisao preservada).");
+            }
+        }
         else if (command == "AI PAUSE" || command == "PAUSE AI")
         {
             AIController aiController = FindAnyObjectByType<AIController>();
@@ -1044,6 +1059,7 @@ public class PanelDebugController : MonoBehaviour
             "landing | emerge | submerge | take off | fast take off\n" +
             "fow on|off|partial | set fow <0-100>\n" +
             "panelrodada on|off - controla somente a cortina de privacidade\n" +
+            "show ai step [on|off] - alterna/abre/fecha a revisao sem aprovar\n" +
             "ai pause | pause ai\n" +
             "ai resume | resume ai\n" +
             "ai shopping pause | pause ai shopping\n" +

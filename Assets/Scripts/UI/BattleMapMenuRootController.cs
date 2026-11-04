@@ -389,6 +389,8 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     public bool TryToggleMenuFromShortcut()
     {
+        if (AIController.Instance != null && AIController.Instance.IsAIReviewNoteEditing) return false;
+
         CampaignSelectionController campaign = FindAnyObjectByType<CampaignSelectionController>();
         if (campaign != null)
             return campaign.TryToggleCampaignMenuFromShortcut();
@@ -545,6 +547,8 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     public bool TryHandleMenuInput(CursorController cursor, TurnStateManager stateManager)
     {
+        if (AIController.Instance != null && AIController.Instance.IsAIReviewNoteEditing) return false;
+
         if (PanelRodadaController.IsGameplayInputBlocked)
             return false;
 

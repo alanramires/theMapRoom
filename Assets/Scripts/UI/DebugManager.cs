@@ -149,6 +149,8 @@ public class DebugManager : MonoBehaviour
 
     private void HandleAIDebugShortcuts()
     {
+        if (UiInputBlocker.IsTextInputFocused()) return;
+
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current == null) return;
         bool f12 = Keyboard.current.f12Key.wasPressedThisFrame;

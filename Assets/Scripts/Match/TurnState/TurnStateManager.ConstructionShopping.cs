@@ -84,6 +84,8 @@ public partial class TurnStateManager
 
     private void ProcessConstructionShoppingInput()
     {
+        if (UiInputBlocker.IsTextInputFocused()) return;
+
         if (CurrentCursorState != CursorState.ShoppingAndServices)
             return;
 

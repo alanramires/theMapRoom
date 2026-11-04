@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 // Seleção de unidade por edifício: PickUnit, PickAirUnit e helpers de classificação.
@@ -71,6 +71,9 @@ public partial class AIShoppingPlanner
                 $"urgentCacaB={urgentCacaB} bomba={wantsBomba} " +
                 $"vigilancia={wantsAirSurveillance && IsDedicatedAirSurveillancePurchase(u)} " +
                 $"score={score}");
+            AIController.Instance?.TraceAIReviewCandidate("Shopping.Air", "Shopping", building.CurrentCellPosition,
+                string.IsNullOrWhiteSpace(u.id) ? u.name : u.id, true, "scored", u.displayName,
+                hasScore: true, score: score, scoreScope: "shopping_air_" + building.InstanceId);
             if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
@@ -158,8 +161,23 @@ public partial class AIShoppingPlanner
 
         foreach (UnitData u in building.OfferedUnits)
         {
-            if (u == null || u.cost > budget) { if (u != null) Debug.Log($"[AI PickUnit] SKIP {u.displayName} ${u.cost} — custo>{budget}"); continue; }
-            if (IsHardModeBannedForAI(u)) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — banida no Hard Mode"); continue; }
+            if (u == null) continue;
+            if (u.cost > budget)
+            {
+                AIController.Instance?.TraceAIReviewCandidate("Shopping.Unit", "Shopping", building.CurrentCellPosition,
+                    string.IsNullOrWhiteSpace(u.id) ? u.name : u.id, false, "insufficient_budget", u.displayName + " cost=" + u.cost + " budget=" + budget,
+                    scoreScope: "shopping_unit_" + building.InstanceId);
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} ${u.cost} — custo>{budget}");
+                continue;
+            }
+            if (IsHardModeBannedForAI(u))
+            {
+                AIController.Instance?.TraceAIReviewCandidate("Shopping.Unit", "Shopping", building.CurrentCellPosition,
+                    string.IsNullOrWhiteSpace(u.id) ? u.name : u.id, false, "hard_mode_banned", u.displayName,
+                    scoreScope: "shopping_unit_" + building.InstanceId);
+                Debug.Log($"[AI PickUnit] SKIP {u.displayName} — banida no Hard Mode");
+                continue;
+            }
             if (u.domain != Domain.Land) { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — domain={u.domain} (não Land)"); continue; }
             bool isAntiAirOnly = IsAntiAirOnlyUnit(u);
             bool isSAMType = isAntiAirOnly && IsPrimaryRole(u, UnitRole.FogoIndireto);
@@ -409,6 +427,9 @@ public partial class AIShoppingPlanner
                 $"fire={openFireSupportSlots} " +
                 $"fireDef={preferDefensiveFireSupport} " +
                 $"defThreat={defensiveBaseThreat}");
+            AIController.Instance?.TraceAIReviewCandidate("Shopping.Unit", "Shopping", building.CurrentCellPosition,
+                string.IsNullOrWhiteSpace(u.id) ? u.name : u.id, true, "scored", u.displayName,
+                hasScore: true, score: score, scoreScope: "shopping_unit_" + building.InstanceId);
             if (score > bestScore) { bestScore = score; best = u; }
         }
 

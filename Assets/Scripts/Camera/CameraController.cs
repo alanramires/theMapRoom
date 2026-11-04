@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -81,6 +81,8 @@ public class CameraController : MonoBehaviour
 
     void Update()
     {
+        if (UiInputBlocker.IsTextInputFocused()) return;
+
         HandleQuickZoomToggle();
         HandleZoom();
         HandlePinchZoom();
@@ -189,7 +191,8 @@ public class CameraController : MonoBehaviour
 #endif
 
         // Sobre o painel de ajuda o scroll rola o texto do painel, nao da zoom no mapa.
-        if (PanelHelperController.IsPointerOverHelperPanel(GetMousePosition()))
+        if ((AIController.Instance != null && AIController.Instance.IsPointerOverAIReview(GetMousePosition()))
+            || PanelHelperController.IsPointerOverHelperPanel(GetMousePosition()))
             return;
 
         float target = _cam.orthographicSize - scroll * zoomSpeed * Time.unscaledDeltaTime * 10f;
@@ -278,6 +281,8 @@ public class CameraController : MonoBehaviour
     {
         if (PanStartPressed())
         {
+            if (AIController.Instance != null && AIController.Instance.IsPointerOverAIReview(GetMousePosition()))
+                return;
             _dragging = true;
             _dragStartWorld = MouseWorld();
         }

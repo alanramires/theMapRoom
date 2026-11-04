@@ -21,6 +21,17 @@ public sealed class AIControllerEditor : Editor
 
         var controller = (AIController)target;
         EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("AI Step", EditorStyles.boldLabel);
+        if (Application.isPlaying)
+        {
+            if (GUILayout.Button("Mostrar revisao AI Step")) controller.ShowAIReview();
+            using (new EditorGUI.DisabledScope(!controller.HasPendingAIReview))
+                if (GUILayout.Button("Executar decisao pendente")) controller.ApproveAIReview();
+            if (GUILayout.Button("Copiar relatorio AI Step (JSON)"))
+                EditorGUIUtility.systemCopyBuffer = controller.GetAIReviewJson();
+        }
+        EditorGUILayout.HelpBox("Ative AI Step para revisar cada decisao antes da execucao. F11 aprova a decisao pendente. Fechar a janela conserva a decisao; reabra aqui. F12 sozinho nao aprova uma revisao.", MessageType.Info);
+        EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Perfil em uso", EditorStyles.boldLabel);
 
         if (Application.isPlaying)

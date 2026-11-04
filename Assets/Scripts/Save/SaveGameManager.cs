@@ -114,6 +114,75 @@ public class SaveGameManager : MonoBehaviour
         LoadSelectSlot = 3
     }
 
+    [Serializable]
+    public sealed class AIReviewSaveReference
+    {
+        public bool found;
+        public int saveSlot, turn, activeSlot, replayActionCount = -1, replayActionsToStep;
+        public string path, savedAtUtc, stateHash, source, relation, explanation;
+        public long fileLength, fileWriteUtcTicks;
+    }
+
+    private readonly List<AIReviewSaveReference> aiReviewCheckpoints = new List<AIReviewSaveReference>();
+
+    // Observes only successful saves/loads from this scene/match lineage. Never creates a save.
+    private void RememberAIReviewCheckpoint(int slot, string path, string source, bool resetLineage = false)
+    {
+        try
+        {
+            if (resetLineage) aiReviewCheckpoints.Clear();
+            if (!File.Exists(path)) return;
+            var file = new FileInfo(path);
+            TryReadContainerManifest(path, out SaveContainerManifest manifest, out _);
+            var replay = replayManager != null ? replayManager : FindAnyObjectByType<ReplayManager>();
+            var reference = new AIReviewSaveReference
+            {
+                found = true, saveSlot = slot, path = path, source = source,
+                turn = matchController != null ? matchController.CurrentTurn : -1,
+                activeSlot = matchController != null ? matchController.ActiveSlotId.Value : -1,
+                replayActionCount = replay?.ActionStack?.Actions != null ? replay.ActionStack.Actions.Count : -1,
+                savedAtUtc = manifest != null && manifest.savedAtUtcTicks > 0
+                    ? new DateTime(manifest.savedAtUtcTicks, DateTimeKind.Utc).ToString("O") : file.LastWriteTimeUtc.ToString("O"),
+                stateHash = manifest?.stateHash, fileLength = file.Length, fileWriteUtcTicks = file.LastWriteTimeUtc.Ticks
+            };
+            aiReviewCheckpoints.RemoveAll(x => string.Equals(x.path, path, StringComparison.OrdinalIgnoreCase));
+            aiReviewCheckpoints.Add(reference);
+            if (aiReviewCheckpoints.Count > 12) aiReviewCheckpoints.RemoveAt(0);
+        }
+        catch (Exception ex) { Debug.LogWarning("[AI Step] Nao foi possivel observar o checkpoint: " + ex.Message); }
+    }
+
+    public AIReviewSaveReference GetClosestAIReviewSave(int replayActionIndex)
+    {
+        AIReviewSaveReference best = null;
+        long bestDistance = long.MaxValue;
+        bool bestPrecedes = false;
+        foreach (var candidate in aiReviewCheckpoints)
+        {
+            var file = new FileInfo(candidate.path);
+            if (!file.Exists || file.Length != candidate.fileLength || file.LastWriteTimeUtc.Ticks != candidate.fileWriteUtcTicks)
+                continue; // Slot overwritten or removed since it was observed.
+            bool comparable = replayActionIndex >= 0 && candidate.replayActionCount >= 0;
+            bool precedes = comparable && candidate.replayActionCount <= replayActionIndex;
+            long distance = comparable ? Math.Abs((long)replayActionIndex - candidate.replayActionCount) : long.MaxValue - 1;
+            if (best == null || (precedes && !bestPrecedes) || (precedes == bestPrecedes && distance < bestDistance))
+            { best = candidate; bestDistance = distance; bestPrecedes = precedes; }
+        }
+        if (best == null) return new AIReviewSaveReference
+        {
+            found = false, relation = "unavailable",
+            explanation = "Nenhum save/carregamento bem-sucedido observado nesta partida ainda esta disponivel."
+        };
+        var result = JsonUtility.FromJson<AIReviewSaveReference>(JsonUtility.ToJson(best));
+        bool hasIndex = replayActionIndex >= 0 && result.replayActionCount >= 0;
+        result.replayActionsToStep = hasIndex ? replayActionIndex - result.replayActionCount : 0;
+        result.relation = !hasIndex ? "unknown_order" : result.replayActionsToStep == 0 ? "same_replay_boundary"
+            : result.replayActionsToStep > 0 ? "before_step" : "after_step";
+        result.explanation = "Referencia de partida para reproducao, nao garantia de estado identico ao passo. Verifique hash, turno, slot e replayActionsToStep; o slot pode ser sobrescrito depois desta marca.";
+        return result;
+    }
+
+
     private sealed class SaveSlotMetadata
     {
         public int slotIndex;
@@ -243,6 +312,7 @@ public class SaveGameManager : MonoBehaviour
             return;
         }
 
+        RememberAIReviewCheckpoint(slot, path, "save");
         cursorController?.PlayLoadSfx();
         string savedText = ResolveDialog(
             "dialog.save_status.success_webgl",
@@ -877,6 +947,9 @@ public class SaveGameManager : MonoBehaviour
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
             WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson, stateHash, diagnosticoJson);
+#if !UNITY_WEBGL || UNITY_EDITOR
+            RememberAIReviewCheckpoint(normalizedSlot, path, "save");
+#endif
             if (showSaveLoadLogs)
                 LogSaveDiagnostics(normalizedSlot, json, new FileInfo(path).Length);
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -1454,6 +1527,7 @@ public class SaveGameManager : MonoBehaviour
             RestoreDiagnosticoFromContainer(preprocess.diagnosticoJson);
             if (lastLoadRoutineSucceeded)
             {
+                RememberAIReviewCheckpoint(normalizedSlot, path, "load", resetLineage: true);
                 matchController?.PrepareFogCachesForTurnPresentation();
                 int playerNumber = matchController != null ? matchController.ActivePlayerListIndex + 1 : 1;
                 double presentationStartMs = PerfNowMs();

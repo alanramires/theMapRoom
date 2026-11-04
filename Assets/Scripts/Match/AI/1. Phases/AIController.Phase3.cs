@@ -41,7 +41,7 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("phase3_apos_snapshot"))
             yield break;
 
-        List<AIShoppingPlanner.ShoppingOrder> orders = AIShoppingPlanner.Decide(freshSnap);
+        List<AIShoppingPlanner.ShoppingOrder> orders = DecideShoppingForReview(freshSnap);
         // A Phase3 NAO mexe em currentAIStage: ele fica em 3 durante todo o shopping e só vira 4
         // quando a fase termina (em RunAITurn, apos Phase3_Shopping). Assim um save/load no meio
         // das compras RETOMA a Phase3 e compra o que falta — Decide e deficit-aware (unidades ja

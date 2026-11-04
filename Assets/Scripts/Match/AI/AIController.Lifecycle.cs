@@ -33,6 +33,7 @@ public partial class AIController
 
     private void StopAIForMatchEnd(string context)
     {
+        InvalidateAIReview();
         isActive = false;
         aiTurnBatchExecuting = false;
         currentAIStage = 0;
@@ -50,6 +51,7 @@ public partial class AIController
 
     private void OnGUI()
     {
+        if (DrawAIReview()) return;
         if (matchController == null || matchController.HasVictoryWinner ||
             !matchController.IsActiveTeamAI())
             return;
@@ -244,6 +246,8 @@ public partial class AIController
 
     {
 
+        InvalidateAIReview();
+        turnStateManager?.ReleaseAIReviewPairs();
         MatchController.OnActiveTeamChanged -= HandleTeamChanged;
         SaveGameManager.OnAfterLoadSuccess -= HandleAfterLoadSuccess;
 
@@ -264,6 +268,7 @@ public partial class AIController
 
     private void HandleAfterLoadSuccess()
     {
+        InvalidateAIReview();
         postLoadReadyBeepPending =
             matchController != null &&
             matchController.IsActiveTeamAI();
@@ -324,6 +329,7 @@ public partial class AIController
 
     {
 
+        if (!aiTurnBatchExecuting) InvalidateAIReview();
         TeamId newTeam = (TeamId)teamIndex;
 
         bool aiCheck = matchController != null && matchController.IsActiveTeamAI();

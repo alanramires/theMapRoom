@@ -2321,6 +2321,11 @@ public class ReplayManager : MonoBehaviour
         if (!action.HasTargetHex && (action.TargetHex != Vector3Int.zero || !string.IsNullOrWhiteSpace(action.TargetInstanceId) || !string.IsNullOrWhiteSpace(action.TargetConstructionId)))
             action.HasTargetHex = true;
 
+        if (isLiveAIBatchExecution && liveAIReview != null && !action.IsTurnMarker)
+        {
+            action.AIReview = liveAIReview;
+            action.AIReviewJson = JsonUtility.ToJson(liveAIReview);
+        }
         actionStack.Actions.Add(action);
 
         if (!isRecording || currentRecord == null || currentRecord.StartSnapshot == null)
@@ -2488,10 +2493,19 @@ public class ReplayManager : MonoBehaviour
         actionStepExecutionRoutine = StartCoroutine(ExecuteLiveAIBatchRoutine(action));
     }
 
+    private AIController.AIReviewRecord liveAIReview;
+
+    public string GetCurrentAIReviewJson()
+    {
+        var action = TryResolveCurrentRecordActionByIndex(currentStepIndex);
+        return action?.AIReview != null ? JsonUtility.ToJson(action.AIReview, true) : (!string.IsNullOrEmpty(action?.AIReviewJson) ? action.AIReviewJson : "null");
+    }
+
     private IEnumerator ExecuteLiveAIBatchRoutine(PlayerAction action)
     {
         replayBatchAbortRequested = false;
         isLiveAIBatchExecution = true;
+        liveAIReview = action?.AIReview;
         try
         {
             bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
@@ -2506,6 +2520,7 @@ public class ReplayManager : MonoBehaviour
                 lastLiveAIBatchSucceeded = false;
             actionStepExecutionRoutine = null;
             isLiveAIBatchExecution = false;
+            liveAIReview = null;
             liveAIFastMode = true;
         }
     }
@@ -3081,7 +3096,8 @@ public class ReplayManager : MonoBehaviour
             IsAIGenerated = source.IsAIGenerated,
             Snapshot = RequiresPostActionCheckpoint(source) ? source.Snapshot : null,
             IsTurnMarker = source.IsTurnMarker,
-            DebugLabel = source.DebugLabel
+            DebugLabel = source.DebugLabel,
+            AIReviewJson = source.AIReview != null ? JsonUtility.ToJson(source.AIReview) : source.AIReviewJson
         };
 
         clone.SubSteps = new List<PlayerActionSubStep>();

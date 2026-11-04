@@ -648,6 +648,9 @@ public class CursorController : MonoBehaviour
             return;
 
         Vector2 pointerScreenPosition = GetMousePosition();
+        // AI Step e IMGUI: o raycast do Canvas nao enxerga sua area.
+        if (AIController.Instance != null && AIController.Instance.IsPointerOverAIReview(pointerScreenPosition))
+            return;
         TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
         bool traceNeutralPointer = state == TurnStateManager.CursorState.Neutral && turnStateManager.ShowClickSpikeLogs;
         double pointerPerfStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
@@ -1868,6 +1871,12 @@ public class CursorController : MonoBehaviour
     {
         rightClickCancelTapThisFrame = false;
         if (!rightClickActsAsCancel)
+        {
+            rightClickTracking = false;
+            return;
+        }
+
+        if (AIController.Instance != null && AIController.Instance.IsPointerOverAIReview(GetMousePosition()))
         {
             rightClickTracking = false;
             return;

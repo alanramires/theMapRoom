@@ -60,4 +60,8 @@ public class PlayerAction
 
     public bool IsTurnMarker;
     public string DebugLabel;
+
+    // Runtime reference carries completion/marking updates; only versioned JSON is persisted.
+    [NonSerialized] public AIController.AIReviewRecord AIReview;
+    public string AIReviewJson;
 }

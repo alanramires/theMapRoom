@@ -24,6 +24,8 @@ public static class UiInputBlocker
 
     public static bool IsTextInputFocused()
     {
+        if (AIController.Instance != null && AIController.Instance.IsAIReviewNoteEditing)
+            return true;
         if (explicitTextInputFocused)
             return true;
 

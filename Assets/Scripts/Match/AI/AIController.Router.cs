@@ -61,9 +61,13 @@ public partial class AIController
                 if (roleTo != vacateFrom)
                 {
                     Debug.Log($"{TL("Base")} {unit.InstanceId} libera produtora pela acao do papel ({roleAction.DebugLabel})");
+                    TraceAIReviewCandidate("Router.Production", regularProductionUnlockAction.SensorAction.ToString(), regularProductionUnlockAction.MoveTo, regularProductionUnlockAction.TargetInstanceId,
+                        false, "role_already_vacates", "A acao do papel ja libera a produtora; a saida generica foi descartada.");
                     return roleAction;
                 }
             }
+            if (roleAction != null) TraceAIReviewCandidate("Router.Production", roleAction.SensorAction.ToString(), roleAction.MoveTo, roleAction.TargetInstanceId,
+                false, "production_must_be_vacated", "A acao do papel deixaria a produtora ocupada.");
             return regularProductionUnlockAction;
         }
 

@@ -146,11 +146,16 @@ public partial class AIController
                 request,
                 out AttackDecisionResult terminal))
         {
+            TraceAIReviewCandidate("Ataque.Policy", "Attack", attackCell, target != null ? target.InstanceId.ToString() : null,
+                terminal.IsAllowed, terminal.Status.ToString(), terminal.Reason);
             CombatDiagnostico.RegistrarDecisao(request, terminal);
             return terminal;
         }
 
         PopulateCombatEvaluationInputs(request);
-        return CombatEvaluationService.EvaluateAttackDecision(request);
+        var evaluated = CombatEvaluationService.EvaluateAttackDecision(request);
+        TraceAIReviewCandidate("Ataque.Policy", "Attack", attackCell, target != null ? target.InstanceId.ToString() : null,
+            evaluated.IsAllowed, evaluated.Status.ToString(), evaluated.Reason);
+        return evaluated;
     }
 }

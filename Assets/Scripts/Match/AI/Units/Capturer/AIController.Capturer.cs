@@ -53,12 +53,20 @@ public partial class AIController
                 if (!isOtherTarget)
                 {
                     Debug.Log($"{TL("Oportunista")} {unit.InstanceId} captura célula atual {currentCell} antes de embarcar");
+                    TraceAIReviewCandidate("Capturador.Prioridade", "Capture", currentCell, null, true,
+                        "capture_current_cell", "Captura da celula atual tem prioridade sobre embarque.");
+                    TraceAIReviewCandidate("Capturador.Prioridade", "Embark", currentCell, null, false,
+                        "capture_before_embark", "Etapa nao avaliada por prioridade da captura atual.", evaluated: false);
                     return BuildCaptureBatch(unit, snapshot.AITeam, currentCell, currentCell);
                 }
             }
 
             if (TryDecideNearbyRallyCaptureBeforeEmbark(unit, snapshot, plan, currentCell, out PlayerAction nearbyRallyAction))
+            {
+                TraceAIReviewCandidate("Capturador.Prioridade", "Embark", currentCell, null, false,
+                    "capture_before_embark", "Embarque nao avaliado: a captura local retorna antes desta etapa.", evaluated: false);
                 return nearbyRallyAction;
+            }
 
             if (TryDecideCapturerOwnedBuildingDefenseBeforeEmbark(unit, snapshot, currentCell, out PlayerAction ownedBuildingDefenseAction))
                 return ownedBuildingDefenseAction;
@@ -147,6 +155,8 @@ public partial class AIController
                 continue;
             if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, snapshot.AITeam, captureCell, paths, out UnitManager reservedFor))
             {
+                TraceAIReviewCandidate("Oportunista", "Capture", captureCell, captureTarget.InstanceId.ToString(), false,
+                    "reserved_for_closer_unit", "Captura reservada para unidade " + reservedFor.InstanceId, scoreScope: "nearby_capture");
                 Debug.Log($"{TL("Oportunista")} {unit.InstanceId} cede captura local perto @ {captureCell} para {reservedFor.InstanceId}");
                 continue;
             }
@@ -158,6 +168,10 @@ public partial class AIController
                 + (rallyLike ? 3000f : 0f)
                 - CalculateThreatLevel(captureCell, snapshot.AITeam) * 45f
                 - captureTarget.InstanceId * 0.001f;
+            TraceAIReviewCandidate("Oportunista", "Capture", captureCell, captureTarget.InstanceId.ToString(), true,
+                "scored", "Captura local: distancia, captura faltante, rally e ameaca.",
+                hasScore: true, score: score, hasRally: true, rally: captureTarget.IsRallyPoint,
+                scoreScope: "nearby_capture");
             if (score <= bestScore)
                 continue;
 
