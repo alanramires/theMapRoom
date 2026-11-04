@@ -153,6 +153,16 @@ public class AIWorldSnapshot
         foreach (UnitManager u in snap.MyUnits)    myHp    += u.CurrentHP;
         foreach (UnitManager u in snap.EnemyUnits) enemyHp += u.CurrentHP;
 
+        // As duas fotos no MESMO ponto do ciclo. O inimigo já comprou na vez dele; eu ainda
+        // não — sem isto, quem joga em segundo vê 3 contra 6 no T2 de toda partida (razão 0,33)
+        // e cai em Defensiva por ordem de turno, não por desvantagem. Marca do AI Step, 2026-11-04.
+        // Depois da compra a projeção zera sozinha: a unidade nova ocupa o produtor e o caixa cai.
+        // SÓ para quem joga DEPOIS de algum inimigo na rodada: para quem abre a rodada as fotos
+        // já estão no mesmo ponto (os dois compraram N-1 vezes), e projetar daria vantagem de
+        // graça — slot 0 viraria Ofensivo no T1 com 30 contra 0.
+        if (HasEnemyActedBeforeMeThisRound(snap))
+            myHp += ProjectOwnProductionHp(snap);
+
         if (myHp + enemyHp > 0)
         {
             float ratio = (float)myHp / (myHp + enemyHp);
@@ -161,6 +171,56 @@ public class AIWorldSnapshot
         }
 
         return AIStance.Tactical;
+    }
+
+    /// <summary>
+    /// A rodada passa pelos slots em ordem de índice: um inimigo de índice menor já jogou (e
+    /// comprou) nesta rodada. Lê o slot das unidades inimigas vistas — o mesmo universo que a
+    /// razão de HP usa, então a correção nunca considera um inimigo que a conta não contou.
+    /// </summary>
+    private static bool HasEnemyActedBeforeMeThisRound(AIWorldSnapshot snap)
+    {
+        if (snap == null || snap.EnemyUnits == null)
+            return false;
+        foreach (UnitManager enemy in snap.EnemyUnits)
+            if (enemy != null && enemy.SlotIndex >= 0 && enemy.SlotIndex < snap.AISlotIndex)
+                return true;
+        return false;
+    }
+
+    /// <summary>
+    /// HP que a IA ainda vai pôr no tabuleiro neste turno: cada produtor livre (célula de spawn
+    /// desocupada) leva o corpo mais barato que ele oferece, enquanto o caixa pagar. É estimativa
+    /// de massa, não previsão do carrinho — o shopping pode comprar mais caro; a postura só precisa
+    /// saber que a resposta existe. É conserto de MEDIDA, por isso vale em toda dificuldade.
+    /// </summary>
+    private static int ProjectOwnProductionHp(AIWorldSnapshot snap)
+    {
+        if (snap == null || snap.MyBuildings == null || snap.Budget <= 0)
+            return 0;
+
+        int budget = snap.Budget;
+        int hp = 0;
+        foreach (ConstructionManager building in snap.MyBuildings)
+        {
+            if (building == null || building.OfferedUnits == null
+                || !building.CanProduceUnitsForSlot(snap.AISlotIndex))
+                continue;
+            Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+            if (snap.OccupiedCells.Contains(cell))
+                continue;
+
+            UnitData cheapest = null;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && unit.cost > 0 && (cheapest == null || unit.cost < cheapest.cost))
+                    cheapest = unit;
+            if (cheapest == null || cheapest.cost > budget)
+                continue;
+
+            budget -= cheapest.cost;
+            hp += Mathf.Max(1, cheapest.maxHP);
+        }
+        return hp;
     }
 
     private static bool HasBlindIntelPressure(AIWorldSnapshot snap)
