@@ -1042,8 +1042,8 @@ MonoBehaviour:
   - teamId: 2
     flipX: 0
     flipXOverride: 0
-    isAI: 0
-    isLocal: 1
+    isAI: 1
+    isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
@@ -1054,8 +1054,8 @@ MonoBehaviour:
   - teamId: 3
     flipX: 1
     flipXOverride: 0
-    isAI: 0
-    isLocal: 1
+    isAI: 1
+    isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
@@ -9118,14 +9118,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c977c91d2fbf50646aae73f411153f05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AIController
+  aiStep: 1
   matchController: {fileID: 327617512}
   replayManager: {fileID: 1679592218}
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   showAILogs: 1
-  showAIUnitHUD: 0
-  startOnPause: 0
+  showAIUnitHUD: 1
+  startOnPause: 1
   iaRapida: 0
   hardMode: 1
   easyMode: 0
@@ -10525,7 +10526,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 376536317023229975, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4294944936
       objectReference: {fileID: 0}
     - target: {fileID: 3803312006916396853, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Pivot.x
@@ -10613,7 +10614,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4294944936
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -11980,6 +11981,7 @@ MonoBehaviour:
         victoryStars: []
     IsTurnMarker: 0
     DebugLabel: 
+    AIReviewJson: 
   currentRecord:
     TurnNumber: 0
     ActingTeam: 0
