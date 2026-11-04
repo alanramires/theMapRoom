@@ -107,7 +107,8 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         if (paths.ContainsKey(targetCell) && !occupied.Contains(targetCell))
         {
-            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> captura {advanceSector}");
+            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> captura {advanceSector}"
+                + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell));
             action = SimulateCaptureSensor(unit, targetCell, out _)
                 ? BuildCaptureBatch(unit, snapshot.AITeam, from, targetCell, paths)
                 : BuildMoveBatch(unit, snapshot.AITeam, from, targetCell, paths);
@@ -134,11 +135,46 @@ public partial class AIController
         if (best == from)
             return false;
 
-        Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> {advanceSector} via {best}");
+        Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> {advanceSector} via {best}"
+            + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell)
+            + " | alvo fora de alcance: avanca pelo hex mais perto dele");
         action = SimulateCaptureSensor(unit, best, out _)
             ? BuildCaptureBatch(unit, snapshot.AITeam, from, best, paths)
             : BuildMoveBatch(unit, snapshot.AITeam, from, best, paths);
         return true;
+    }
+
+    // O handoff é uma decisão de DUAS unidades, e a linha antiga só nomeava uma: "1 hard handoff
+    // Alpha -> Echo via (7,11)". No AI Step isso parecia movimento aleatório — não dizia que prédio
+    // a ponta largou, em que ponto da captura, quem fica para terminar, nem para onde ela vai.
+    // Herdeiro = os outros capturadores do objetivo de origem no plano. Handoff sem plano
+    // (só a memória do prédio aberto) não tem herdeiro nomeado, e a linha diz isso.
+    private string DescribeBlitzkriegHandoff(
+        UnitManager unit, ConstructionManager origin, SectorObjective handoffObjective,
+        bool plannedHandoff, ConstructionManager target, Vector3Int targetCell)
+    {
+        string larga = "sem predio aberto";
+        if (origin != null)
+        {
+            Vector3Int oc = origin.CurrentCellPosition;
+            larga = $"{origin.name} ({oc.x},{oc.y}) {origin.CurrentCapturePoints}/{origin.CapturePointsMax}";
+        }
+
+        var herdeiros = new List<string>();
+        if (handoffObjective != null && handoffObjective.Slots != null)
+            foreach (SlotNeed slot in handoffObjective.Slots)
+                if (slot != null && slot.Filled && slot.AssignedUnitId >= 0
+                    && slot.AssignedUnitId != unit.InstanceId)
+                    herdeiros.Add("#" + slot.AssignedUnitId);
+        string herdeiro = herdeiros.Count > 0
+            ? string.Join(",", herdeiros)
+            : plannedHandoff ? "nenhum no plano" : "fora do plano (memoria do predio)";
+
+        string alvo = target != null
+            ? $"{target.name} ({targetCell.x},{targetCell.y})"
+            : $"setor ({targetCell.x},{targetCell.y})";
+
+        return $" | larga {larga} | herdeiro {herdeiro} | vai para {alvo}";
     }
 
     private static bool TryGetPlannedHardHandoff(
