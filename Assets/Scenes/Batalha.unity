@@ -1067,12 +1067,12 @@ MonoBehaviour:
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
-  gameSetup: 4
+  gameSetup: 3
   enableLdtValidation: 1
   enableLosValidation: 1
   enableSpotter: 1
-  enableStealthValidation: 1
-  enableTotalWar: 1
+  enableStealthValidation: 0
+  enableTotalWar: 0
   atalhoContextual: 0
   atalhoRPassarTurnoUsaConfirmacao: 1
   allowDefeatForZeroUnits: 1
@@ -9123,11 +9123,11 @@ MonoBehaviour:
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  showAILogs: 0
+  showAILogs: 1
   showAIUnitHUD: 0
   startOnPause: 0
   iaRapida: 0
-  hardMode: 0
+  hardMode: 1
   easyMode: 0
   strongWeakSidePolitic: 0
   conscriptionDoctrine: 0
@@ -10810,10 +10810,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugManager
-  aiDebugShortcutsEnabled: 0
-  debugShortcutsEnabled: 0
+  aiDebugShortcutsEnabled: 1
+  debugShortcutsEnabled: 1
   resetPlanOnDebugStage: 0
   panelRodadaDesativadoPvpDebug: 0
+  gravarDiagnosticoNoSave: 1
+  diagnosticoMaxEntradas: 2000
 --- !u!1 &1213214726
 GameObject:
   m_ObjectHideFlags: 0
