@@ -125,6 +125,7 @@ As duas tarefas de captura mostram na lista a **resistência** do prédio, `(20/
 o mesmo número da plaquinha, **decrescente** (o prédio cai quando chega a 0). O
 contador acha o prédio dentro de `SD && PortoFerro` sozinho.
 | `ENEMY_CAPTURE` | um slot **que não é o aluno** toma um prédio (muda de dono). Use como derrota | igual ao `CAPTURE_CONSTRUCTION` |
+| `CONTROL_CONSTRUCTIONS` | o aluno **controla agora** todos os prédios cujo nome contém o token. **Estado**, não evento: se o inimigo recaptura, o contador `(2/5)` **desce**. Completa quando todos são dele ao mesmo tempo (checado no `Neutral`) | `base` (casa `base#1`, `base#2`…) |
 | `PLAYER_ELIMINATED` | o aluno (slot 0) fica **sem nenhuma unidade**, contando as embarcadas. Avaliado só quando uma unidade morre. Use como derrota | — |
 | `ENEMY_ELIMINATED` | não sobra **nenhuma unidade viva fora do slot do aluno** (embarcadas contam). Avaliado quando uma unidade morre. Inimigo que o roteiro ainda vai fazer nascer não conta | — |
 | `UNITS_NEAR` | `… && 2`: duas unidades a no máximo N hexes. `… && servico`: B está no **tático de serviço** de A — o que A alcança neste turno, movimento + raio de serviço (envelope, não número fixo). Checado no `Neutral` | `ST && CH && 2`, `ST && CH && servico` |
@@ -369,6 +370,16 @@ Antes de travar uma ação (`capturable off`, passar a vez travado), pergunte se
 pode **ensinar**. Na Soldado 1 a trava de captura virou consequência: capturar cedo,
 com um soldado só, faz o contato nascer na hora — e o aluno aprende por que precisava
 de cobertura. Trave só o que deixaria a aula **sem saída**.
+
+### Prova de patente
+
+Aula **sem roteiro**: uma fala de abertura que revela a tarefa e libera turno e
+movimento, e o Sargento cala. Tarefa `CONTROL_CONSTRUCTIONS` (tomar e segurar),
+derrota `PLAYER_ELIMINATED`, IA de verdade. O que limita a prova é a **autoria** —
+o que cada prédio vende e quanto rende, assado por instância. Ser aula (e não um
+quadrante comum) é o que faz as tarefas decidirem o fim: contra rebeldes, que não
+perdem pelas regras normais, a partida comum nunca acabaria.
+Rascunho: `caserna_prova_soldado_rascunho.json`.
 
 ## 6. Configuração geral do `TutorialData`
 

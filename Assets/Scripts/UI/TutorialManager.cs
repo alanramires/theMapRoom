@@ -229,6 +229,7 @@ public class TutorialManager : MonoBehaviour
             CheckFuelObjectives();
             CheckUnitsNearObjectives();
             CheckTurnReachedObjectives();
+            CheckControlConstructionsObjectives();
         }
     }
 
@@ -2103,6 +2104,9 @@ public class TutorialManager : MonoBehaviour
             return $" ({aboard}/{total})";
         if (obj.id == "CAPTURE_CONSTRUCTION" || obj.id == "CAPTURE_PROGRESS")
             return activeInstance.BuildCaptureProgressSuffix(obj);
+        if (obj.id == "CONTROL_CONSTRUCTIONS" &&
+            activeInstance.TryCountControlled(obj, out int controlled, out int controlTotal))
+            return $" ({controlled}/{controlTotal})";
         return string.Empty;
     }
 
@@ -2705,6 +2709,69 @@ public class TutorialManager : MonoBehaviour
             }
 
             if (near)
+                MarkObjectiveComplete(obj);
+        }
+    }
+
+    // CONTROL_CONSTRUCTIONS base: o aluno CONTROLA AGORA todos os predios cujo
+    // nome contem o token (base#1, base#2...). Estado, nao evento: o rebelde
+    // recaptura, e o contador DESCE — tomar e metade, segurar e a outra metade.
+    // Completa quando todos sao do aluno ao mesmo tempo, no Neutral.
+    private readonly Dictionary<TutorialObjective, List<ConstructionManager>> controlTargets =
+        new Dictionary<TutorialObjective, List<ConstructionManager>>();
+
+    private bool TryCountControlled(TutorialObjective obj, out int owned, out int total)
+    {
+        owned = 0;
+        total = 0;
+        if (obj == null || obj.id != "CONTROL_CONSTRUCTIONS")
+            return false;
+        string token = obj.parameters != null ? obj.parameters.Trim() : string.Empty;
+        if (token.Length == 0)
+            return false;
+
+        if (!controlTargets.TryGetValue(obj, out List<ConstructionManager> targets) || targets == null)
+        {
+            // Predio nao nasce no meio da partida: a lista e resolvida uma vez por tarefa.
+            targets = new List<ConstructionManager>();
+            ConstructionManager[] all = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i].name.Contains(token, System.StringComparison.OrdinalIgnoreCase))
+                    targets.Add(all[i]);
+            }
+            controlTargets[obj] = targets;
+        }
+
+        const int studentSlot = 0;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            ConstructionManager c = targets[i];
+            if (c == null)
+                continue;
+            total++;
+            if (c.SlotIndex == studentSlot)
+                owned++;
+        }
+        return total > 0;
+    }
+
+    private void CheckControlConstructionsObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || obj.id != "CONTROL_CONSTRUCTIONS" || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+            if (TryCountControlled(obj, out int owned, out int total) && owned == total)
                 MarkObjectiveComplete(obj);
         }
     }

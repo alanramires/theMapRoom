@@ -1,0 +1,49 @@
+{
+    "id": "Caserna - Prova de Soldado",
+    "description": "Prova de Soldado: tome e segure as bases da guarnição rebelde. Sem ordens — o que fazer e como é com vocês.",
+    "victoryText": "Todas as bases são nossas. Isso não foi uma aula, recruta: foi uma operação. Bem-vindo a Soldado.",
+    "objectives": [
+        {
+            "id": "CONTROL_CONSTRUCTIONS",
+            "key": "pv_01",
+            "parameters": "base",
+            "description": "Tome e segure todas as bases inimigas",
+            "startHidden": false,
+            "isOptional": false,
+            "isInternal": false,
+            "isDefeatCondition": false,
+            "defeatText": "",
+            "activeUntilKey": "",
+            "announceText": "",
+            "completeCommand": ""
+        },
+        {
+            "id": "PLAYER_ELIMINATED",
+            "key": "pv_02",
+            "parameters": "",
+            "description": "Não perca todas as unidades",
+            "startHidden": false,
+            "isOptional": false,
+            "isInternal": false,
+            "isDefeatCondition": true,
+            "defeatText": "Fomos varridos da ilha. Volte quando estiver pronto, recruta.",
+            "activeUntilKey": "",
+            "announceText": "",
+            "completeCommand": ""
+        }
+    ],
+    "script": [
+        {
+            "advance": "Immediate",
+            "turn": "Unlocked",
+            "movement": "Unlocked",
+            "interactionType": "Auto",
+            "objectiveKey": "pv_01",
+            "revealObjective": true,
+            "text": "Prova de Soldado. A guarnição rebelde tem bases espalhadas pela ilha. [ordem]Tome todas e segure.[/ordem] Vocês têm uma fábrica, um aeroporto a conquistar e o que aprenderam. Daqui em diante, eu só assisto.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": ""
+        }
+    ]
+}
