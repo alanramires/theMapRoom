@@ -1,15 +1,24 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-08, **depois** da tag `v9.4.0`.
+Ponto de retomada. Atualizado em 2026-11-03, **depois** da tag `v9.5.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.4.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+`v9.5.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
 no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.4.0.md`](relatorio_v9.4.0.md).
+[`relatorio_v9.5.0.md`](relatorio_v9.5.0.md).
+
+**A descoberta da v9.5.0: o Claude joga, e jogando acha o que lendo não achava.** O
+Unity CLI (`com.unity.pipeline`, guia em [`indie/unity_cli_mcp.md`](indie/unity_cli_mcp.md))
+liga o agente ao editor aberto: ele lê o tabuleiro pelos sensores (`script eval`),
+pergunta à IA no mesmo estado (`DecideUnitAction`, uma unidade por vez) e age pelo
+batch no automata, como a IA e o humano. Em 3 turnos achou: liberar produtora
+atropelando a captura **e** mandando a unidade para trás (escondendo o revezamento
+do blitzkrieg), e vaga de captura do plano que não virava compra. Registro em
+[`playtest_claude.md`](playtest_claude.md). **Nada das correções foi visto rodando.**
 
 **A descoberta da v9.4.0: a fórmula de combate não era fonte única — e o DPQ que
 entra nela tinha quatro cópias.** Dia de revisão, a partir de dois textos de um
@@ -82,6 +91,7 @@ v9.3.0   a aula vira um quadrante          Academia, regras de fim da aula, capt
 v9.3.1   a primeira aula fecha             travas só do aluno, atalhos fechados, fala final, volta automática
 v9.3.2   a aula 2 contra IA que briga      save da aula e do mundo, rebelde caça, peças de roteiro
 v9.4.0   revisão do motor                  combate em fonte única, IA só simula o sensor, Neutral em 2 momentos
+v9.5.0   uma IA validando a IA             Claude joga pelo Unity CLI; produtora e compra corrigidas; fatos de medalha
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -249,6 +259,21 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v9.5.0 deixou — o validador achou, falta ver as correções rodando
+
+1. **Ver rodando** as 3 correções da IA (`Capturer.Vacate`, `Router`, `AIShoppingPlanner.Demand`):
+   um cenário no Exército com produtoras ocupadas, revezamento no Difícil e setor sem
+   capturador. O save do playtest foi sobrescrito.
+2. **Marcar Blitzkrieg no `AIPreset_Medio`** (Inspector). O código registra que a Média
+   devia fazer revezamento; o asset está com 0.
+3. **Autor × IA Difícil:** o autor jogou 3 rodadas em Neblina Leve (todos veem todos;
+   referência justa) com a doutrina "formiga + caro sob demanda". Plano: um script
+   único no editor percorre o replay em modo rápido (`StartReplayFromTurnAndSlot`,
+   `ExecuteNextReplayBatch`) e grava a decisão da IA antes de cada batch dele num
+   arquivo — ~3 chamadas, não 30.
+4. **Depois do Exército:** Aeronáutica num mapa pequeno (validar), Marinha começando
+   por **doutrina**, sem mapa (sem doutrina não há o que validar).
 
 ### O que a v9.4.0 deixou — o motor mudou por dentro, o autor testa por fora
 
@@ -604,6 +629,15 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **`unity recompile` com o jogo em Play** | recarrega o domínio e **derruba a partida** (voltou ao turno 1). Em Play, só `tools/compilar.sh`; a Unity recompila quando sai do Play |
+| **validar a IA chamando funções por dentro** | `TryAIDirectPurchase` faz a jogada valer mas não testa menu nem automata. Agir por batch → `ExecuteLiveAIBatch` |
+| **perguntar à IA todas as unidades de uma vez** | ela é sequencial: sem a reserva da anterior, o ensaio manda todos ao mesmo hex. Uma unidade, executa, a próxima |
+| **ensaio de compra sem o plano montado** | a IA monta o plano (`BuildObjectivePlan`) antes de comprar; sem ele o shopping responde outra coisa |
+| **"base preset" não é a dificuldade** | quem decide é o contrato (ou `hardMode` da cena aberta direto); o catálogo mapeia para o perfil |
+| **`script eval` com aspas pelo PowerShell** | quebra os argumentos; mandar o código num arquivo (`--file`) |
+
+| armadilha | regra |
+|---|---|
 | **"fonte única" tomada por suposição** | o autor acreditava que a fórmula de combate era uma só; eram duas cópias, e o DPQ tinha quatro. Antes de dizer "é tudo o mesmo cálculo", procurar quem chama a conta **e** quem monta as entradas (`DivideAndRound`, `PositionDpqResolver`) |
 | **calculadora de balanceamento em decisão de jogo** | `AICombatHpSimulator.Simulate(ficha…)` assume planície, munição cheia, arma pela ficha. Em jogo: opção do `PodeMirar` → `SimulateWithWeapons` com DPQ real |
 | **desligar fallback que cai em permissivo** | sem opção do sensor, `simInvalid` **permite** o ataque. Desligar o fallback sozinho afrouxaria ~40 portões; foi preciso o `BlockedNoSensorOption`. Antes de desligar um caminho, ver o que o "inválido" responde |
@@ -702,6 +736,8 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.5.0.md`](relatorio_v9.5.0.md) | uma IA validando a IA — Claude joga pelo Unity CLI, produtora e compra corrigidas, fatos de medalha, diagnóstico no save |
+| [`playtest_claude.md`](playtest_claude.md) | o playtest turno a turno: IA × Claude, cada divergência com tipo e arquivo |
 | [`relatorio_v9.4.0.md`](relatorio_v9.4.0.md) | revisão do motor — veredito de cada achado do consultor, combate em fonte única, Neutral em dois momentos |
 | [`arquitetura/The-Map-Room-reconhecimento-arquitetural.md`](arquitetura/The-Map-Room-reconhecimento-arquitetural.md) | o reconhecimento do consultor (estático, em `3da75fd`) — riscos e sequência sugerida; ler com o veredito do relatório v9.4.0 ao lado |
 | [`arquitetura/revisao_maquina_de_estados.md`](arquitetura/revisao_maquina_de_estados.md) | os cinco estágios do ciclo e as três fronteiras (antes de confirmar, depois de confirmar, depois de recalcular) |
