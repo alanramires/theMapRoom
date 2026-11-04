@@ -59,7 +59,11 @@ public partial class AIController
         if (plannedHandoff)
         {
             origin = FindCapturableInSector(handoffObjective.Sector, snapshot.AITeam);
-            advanceSector = ComputeBlitzkriegForwardSector(handoffObjective.Sector, snapshot.AITeam);
+            // A ponta pode ser de OUTRO objetivo (passou pelo predio a caminho do dela): ela
+            // segue para o proprio objetivo. A ponta da casa perdeu a vaga ao ceder, nao tem
+            // objetivo, e avanca pelo eixo — o mesmo de antes.
+            SectorObjective ownObjective = plan != null ? ResolveAssignedObjective(unit, plan) : null;
+            advanceSector = ResolveBlitzkriegAdvanceSector(handoffObjective.Sector, ownObjective, snapshot.AITeam);
         }
         else
         {
@@ -105,13 +109,32 @@ public partial class AIController
             return false;
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        if (paths.ContainsKey(targetCell) && !occupied.Contains(targetCell))
+        bool targetReachable = paths.ContainsKey(targetCell) && !occupied.Contains(targetCell);
+        if (targetReachable && SimulateCaptureSensor(unit, targetCell, out _))
         {
             Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> captura {advanceSector}"
                 + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell));
-            action = SimulateCaptureSensor(unit, targetCell, out _)
-                ? BuildCaptureBatch(unit, snapshot.AITeam, from, targetCell, paths)
-                : BuildMoveBatch(unit, snapshot.AITeam, from, targetCell, paths);
+            action = BuildCaptureBatch(unit, snapshot.AITeam, from, targetCell, paths);
+            return true;
+        }
+
+        // SAIR NAO E SER EXPULSO. A ponta que reveza volta a ser um capturador com o turno
+        // inteiro pela frente: se nao abre o proximo predio agora, antes de andar ela faz o que
+        // um capturador faria — atira em quem esta capturando (atrasa a captura dele) ou em quem
+        // ameaca um predio nosso (defesa). Andar e o fallback, quando acabam as opcoes.
+        // AI Step 2026-11-04: o #6 largou Delta e so andou, com um soldado inimigo capturando
+        // Charlie e outro subindo em Echo, ambos ao alcance.
+        Vector3Int originCell = origin != null ? origin.CurrentCellPosition : new Vector3Int(int.MinValue, 0, 0);
+        originCell.z = 0;
+        if (TryDecideBlitzkriegTipAttack(unit, snapshot, from, originCell, paths, occupied, out action))
+            return true;
+
+        if (targetReachable)
+        {
+            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> {advanceSector} (move)"
+                + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell)
+                + " | sem ataque util: anda ate o alvo");
+            action = BuildMoveBatch(unit, snapshot.AITeam, from, targetCell, paths);
             return true;
         }
 
@@ -137,7 +160,7 @@ public partial class AIController
 
         Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> {advanceSector} via {best}"
             + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell)
-            + " | alvo fora de alcance: avanca pelo hex mais perto dele");
+            + " | alvo fora de alcance e sem ataque util: avanca pelo hex mais perto dele");
         action = SimulateCaptureSensor(unit, best, out _)
             ? BuildCaptureBatch(unit, snapshot.AITeam, from, best, paths)
             : BuildMoveBatch(unit, snapshot.AITeam, from, best, paths);
@@ -175,6 +198,116 @@ public partial class AIController
             : $"setor ({targetCell.x},{targetCell.y})";
 
         return $" | larga {larga} | herdeiro {herdeiro} | vai para {alvo}";
+    }
+
+    // Ataque da ponta que acabou de revezar. So ataques que servem a captura:
+    //   inimigo EM CIMA de um capturavel que nao e dele -> esta capturando; atirar atrasa.
+    //   inimigo perto (2h) de um predio NOSSO           -> defesa do que ja temos.
+    // Briga sem relacao com predio nao entra: isso e papel do assalto, e o capturador que sai
+    // para trocar tiro a toa deixa de capturar. A celula do predio largado nao serve de base de
+    // tiro — ela e do herdeiro. O valor do ataque em si fica com o PassesAttackDecision.
+    private bool TryDecideBlitzkriegTipAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int handedOffCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null || paths == null)
+            return false;
+
+        MatchController mc = GetMatchController();
+        int mySlot = snapshot.AISlotIndex;
+        var ownBuildingCells = new List<Vector3Int>();
+        foreach (ConstructionManager building in ConstructionManager.AllActive)
+        {
+            if (building == null || !building.IsCapturable) continue;
+            Vector3Int c = building.CurrentCellPosition; c.z = 0;
+            // Nosso = ja e nosso OU tem capturador nosso em cima (captura em andamento). Sem o
+            // segundo caso, o inimigo de HP 7 colado na cidade de Echo que o #4 esta capturando
+            // nem entrava no loop (AI Step 2026-11-04): a cidade ainda era neutra.
+            if (building.SlotIndex != mySlot && FindOwnCapturerAtCell(c, snapshot.AITeam) == null) continue;
+            ownBuildingCells.Add(c);
+        }
+
+        var attackCells = new List<Vector3Int>(paths.Keys);
+        if (!paths.ContainsKey(fromCell)) attackCells.Add(fromCell);
+
+        UnitManager bestTarget = null;
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        string bestReason = "";
+
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.SlotIndex == mySlot || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(mySlot)))
+                continue;
+            if (mc != null && mc.GetTeamIdForSlot(enemy.SlotIndex) == snapshot.AITeam)
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition; enemyCell.z = 0;
+            string motivo = null;
+            float motive = 0f;
+            ConstructionManager under = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
+            if (under != null && under.IsCapturable && under.SlotIndex != enemy.SlotIndex)
+            {
+                bool ours = under.SlotIndex == mySlot;
+                motive = ours ? 9000f : 6000f;
+                motivo = ours ? $"capturando predio nosso {under.name}" : $"capturando {under.name}";
+            }
+            else
+            {
+                foreach (Vector3Int own in ownBuildingCells)
+                    if (SectorManager.HexDistance(own, enemyCell) <= 2)
+                    {
+                        motive = 4000f;
+                        motivo = $"ameaca predio nosso ({own.x},{own.y})";
+                        break;
+                    }
+            }
+            if (motivo == null) continue;
+
+            BazookaTargetPriority preference = ResolveCapturerTargetPreference(unit, enemy);
+            foreach (Vector3Int raw in attackCells)
+            {
+                Vector3Int cell = raw; cell.z = 0;
+                if (cell == handedOffCell) continue;
+                if (cell != fromCell && occupied != null && occupied.Contains(cell)) continue;
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
+                if (!PassesAttackDecision(unit, enemy, cell, true, out string decisionReason)) continue;
+
+                float dpq = GetTerrainDpqPontos(cell);
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                float score = motive
+                    + GetCapturerTargetPreferenceScore(preference) * 0.1f
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 100f
+                    + dpq * 400f
+                    - threat * 80f
+                    - GetPathStepCount(paths, cell) * 20f;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestTarget = enemy;
+                    bestCell = cell;
+                    bestReason = $"{motivo} | hp={enemy.CurrentHP} dpq={dpq:F1} threat={threat:F1} score={score:F0} {decisionReason}";
+                }
+            }
+        }
+
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int targetCell = bestTarget.CurrentCellPosition; targetCell.z = 0;
+        Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} revezou e ataca {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} " +
+                  $"via {bestCell} em vez de so andar ({bestReason})");
+        action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestCell,
+            bestTarget.InstanceId.ToString(), targetCell, paths);
+        return true;
     }
 
     private static bool TryGetPlannedHardHandoff(
@@ -224,9 +357,9 @@ public partial class AIController
         if (assigned != null && assigned.Sector != ConstructionSector.None && assigned.Sector != originSector)
             return assigned.Sector;
 
-        InvasionAxisMap axisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)), boardTilemap);
-        int axisIndex = axisMap.GetEixo(originSector);
-        return axisIndex > 0 ? axisMap.GetTransportTargetSector(axisIndex) : ConstructionSector.None;
+        // Mesmo caminho do plano: eixo, e sem eixo o vizinho a frente. Antes, sem eixo, este
+        // ramo devolvia None e a ponta ficava parada — os dois caminhos do blitz discordavam.
+        return ComputeBlitzkriegForwardSector(originSector, team);
     }
 
     private ConstructionSector ComputeBlitzkriegForwardSector(ConstructionSector sector, TeamId team)
