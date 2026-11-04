@@ -18,10 +18,11 @@ MonoBehaviour:
     respeitarListaBanida: 0
     projetarProducaoInimiga: 0
     aberturaBlindadoPrimeiro: 0
+    expansaoAntesDoCounter: 1
     limitarLogistica: 0
     dobrarSlotsCapturadorPorSetor: 0
     conscricaoSempre: 0
-    conscricaoQuandoPerdendo: 0
+    conscricaoQuandoPerdendo: 1
     poupaPraElite: 1
     politicaLadoForteFraco: 0
     gateNucleoSuave: 1

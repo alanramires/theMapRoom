@@ -15,9 +15,10 @@ MonoBehaviour:
   nomeExibido: Dificil
   doutrina: 'AI Dificil: Ela spama soldados e usa o caixa restante para unidades'
   capacidades:
-    respeitarListaBanida: 1
+    respeitarListaBanida: 0
     projetarProducaoInimiga: 1
     aberturaBlindadoPrimeiro: 0
+    expansaoAntesDoCounter: 1
     limitarLogistica: 1
     dobrarSlotsCapturadorPorSetor: 1
     conscricaoSempre: 1
@@ -34,6 +35,11 @@ MonoBehaviour:
       cacarAlvoPreferido: 1
     fogoDeSuporte:
       fogoDePreparacao: 1
+    transportador:
+      ataqueOportunistaVazio: 1
+      desembarcaCapturadorNoCaminho: 1
+      atenderEvac: 1
+      modoHospital: 1
   missoes:
     reparo:
       fusaoEmReparo: 2
