@@ -1,15 +1,31 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-03, **depois** da tag `v9.5.0`.
+Ponto de retomada. Atualizado em 2026-11-04, **depois** da tag `v9.6.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.5.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+`v9.6.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
 no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.5.0.md`](relatorio_v9.5.0.md).
+[`relatorio_v9.6.0.md`](relatorio_v9.6.0.md).
+
+**A descoberta da v9.6.0: o jogo grava o pensamento da IA, o autor marca, o agente lê.**
+A tela **AI Step** ([`ai_step.md`](ai_step.md)) para a IA antes de cada execução e
+mostra decisão, missão, motivos e alternativas. O autor marca o passo estranho com
+uma pergunta, que vira uma linha em `ai_step_marcas.jsonl` na raiz. Responder pelo
+registro custa uma fração de reconstruir a partida pelo código.
+
+Três marcas no mapa sem elite (o **núcleo** das decisões) renderam três mudanças:
+
+- **grana antes do counter** no Médio e no Difícil: o bônus de encaixe atravessava
+  a prioridade da fila. **Visto rodando.**
+- **postura medida no mesmo ponto do ciclo:** quem joga em segundo caía em
+  Defensive no T2 de toda partida, por ordem de turno.
+- **log do handoff do blitz:** a decisão estava certa; o log é que não contava.
+
+O método completo, com scripts, está em [`ai_test.md`](ai_test.md).
 
 **A descoberta da v9.5.0: o Claude joga, e jogando acha o que lendo não achava.** O
 Unity CLI (`com.unity.pipeline`, guia em [`indie/unity_cli_mcp.md`](indie/unity_cli_mcp.md))
@@ -260,20 +276,26 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
-### O que a v9.5.0 deixou — o validador achou, falta ver as correções rodando
+### O que a v9.6.0 deixou — revisão lance a lance do núcleo, em andamento
 
-1. **Ver rodando** as 3 correções da IA (`Capturer.Vacate`, `Router`, `AIShoppingPlanner.Demand`):
-   um cenário no Exército com produtoras ocupadas, revezamento no Difícil e setor sem
-   capturador. O save do playtest foi sobrescrito.
-2. **Marcar Blitzkrieg no `AIPreset_Medio`** (Inspector). O código registra que a Média
-   devia fazer revezamento; o asset está com 0.
-3. **Autor × IA Difícil:** o autor jogou 3 rodadas em Neblina Leve (todos veem todos;
-   referência justa) com a doutrina "formiga + caro sob demanda". Plano: um script
-   único no editor percorre o replay em modo rápido (`StartReplayFromTurnAndSlot`,
-   `ExecuteNextReplayBatch`) e grava a decisão da IA antes de cada batch dele num
-   arquivo — ~3 chamadas, não 30.
-4. **Depois do Exército:** Aeronáutica num mapa pequeno (validar), Marinha começando
-   por **doutrina**, sem mapa (sem doutrina não há o que validar).
+O fluxo: o autor joga com AI Step ligado e marca. "Adicionei um estranho" = ler a
+**última linha** de `ai_step_marcas.jsonl` (PowerShell `ConvertFrom-Json`; o
+Python da máquina quebra no `import json`). Os passos vizinhos ficam em
+`persistentDataPath/AIReviews/<sessionId>/`.
+
+1. **Ver rodando** a postura (`AIWorldSnapshot.CalculateStance`) e o log novo do
+   handoff (`DescribeBlitzkriegHandoff`). Save do slot 2 da 1ª marca, T2, slot 1: a fila
+   deve dizer `stance=Tactical`.
+2. **Ver rodando** as correções da v9.5.0 que ainda não apareceram: sair da produtora
+   capturando (`BuildVacateBatch`), papel antes da liberação (`Router`).
+3. **Marcar Blitzkrieg no `AIPreset_Medio`** (Inspector), pendente desde a v9.5.0.
+4. **Instrumentar o carrinho de compras no AI Step:** `BuildBestRoleShoppingCart` é o
+   caminho em uso, e o `UnitPicker` instrumentado não é. Sem isso, `candidates` vem
+   vazio em toda compra.
+5. **Pergunta aberta ao autor:** quanto o anti-infantaria pode furar a prioridade de
+   Assalto ("por que Tanque B?", em [`ai_step_investigacao_2026-11-04.md`](ai_step_investigacao_2026-11-04.md)).
+6. **Depois do núcleo:** a comparação das 3 rodadas Difícil do autor (replay + AI Step),
+   elite, Aeronáutica num mapa pequeno, e a Marinha começando por doutrina.
 
 ### O que a v9.4.0 deixou — o motor mudou por dentro, o autor testa por fora
 
@@ -635,6 +657,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | **ensaio de compra sem o plano montado** | a IA monta o plano (`BuildObjectivePlan`) antes de comprar; sem ele o shopping responde outra coisa |
 | **"base preset" não é a dificuldade** | quem decide é o contrato (ou `hardMode` da cena aberta direto); o catálogo mapeia para o perfil |
 | **`script eval` com aspas pelo PowerShell** | quebra os argumentos; mandar o código num arquivo (`--file`) |
+| **"prioridade" no score do carrinho** | um degrau vale 3.000; o bônus de encaixe do counter, até 36.000. A prioridade ordena a lista, mas quem decide é o encaixe. Antes de dizer "a demanda X tem prioridade", somar os bônus |
+| **comparar os dois lados com fotos de momentos diferentes** | quem joga em segundo vê o inimigo já depois da compra e a si mesmo antes dela. Qualquer razão de força precisa igualar o ponto do ciclo, e só para quem joga depois |
+| **"coerente com a demanda" não responde "por que"** | explicar a intenção não prova que a decisão é boa. Ir ao código do score: foi ali que estava o defeito da Metranca |
+| **resposta que não está no registro do AI Step** | o defeito é o log não contar a decisão (o handoff dizia só "via (7,11)"). Consertar o log também é correção |
 
 | armadilha | regra |
 |---|---|
