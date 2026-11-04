@@ -53,6 +53,10 @@ public partial class AIController
     public bool AbreComBlindado =>
         activePreset != null ? activePreset.capacidades.aberturaBlindadoPrimeiro : hardMode;
 
+    /// <summary>Na expansão, com vaga de captura aberta, counter não urgente espera: o produtor vira capturador.</summary>
+    public bool ExpandeAntesDoCounter =>
+        activePreset != null ? activePreset.capacidades.expansaoAntesDoCounter : !easyMode;
+
     public bool LimitaLogistica =>
         activePreset != null ? activePreset.capacidades.limitarLogistica : hardMode;
 

@@ -64,6 +64,13 @@ public class AICapabilityPreset
              "(código: ApplyHardModeArmorFirst + ComputeBlitzFirstArmorReserve)")]
     public bool aberturaBlindadoPrimeiro = false;
 
+    [Header("Expansão — a grana antes do counter")]
+    [Tooltip("LIGADO: enquanto o mapa ainda está em expansão (muito neutro) e o plano tem vaga de captura aberta, a IA NÃO compra counter por simples presença inimiga — o produtor vai para capturador, que vira renda. Counter URGENTE (a pressão passou do limiar de escalada) continua passando.\n" +
+             "DESLIGADO: a IA responde a qualquer inimigo visto com counter desde o turno 2, mesmo deixando vaga de captura aberta (ex.: Metranca contra soldados que só estão capturando).\n" +
+             "Ligado é o jogo de quem sabe que prédio é dinheiro; desligado é o erro de iniciante.\n\n" +
+             "(código: DeferCounterDuringExpansion no AIShoppingPlanner.Demand)")]
+    public bool expansaoAntesDoCounter = false;
+
     [Header("Logística")]
     [Tooltip("LIGADO: limita quantos caminhões/supridores terrestres a IA mantém em campo (o teto está na seção Composição).\n" +
              "DESLIGADO: compra logística conforme a demanda, sem limite fixo.\n" +
@@ -495,6 +502,7 @@ public class AIPresetData : ScriptableObject
         target.capacidades.respeitarListaBanida = hard;
         target.capacidades.projetarProducaoInimiga = hard;
         target.capacidades.aberturaBlindadoPrimeiro = hard;
+        target.capacidades.expansaoAntesDoCounter = !easy;
         target.capacidades.limitarLogistica = hard;
         target.capacidades.dobrarSlotsCapturadorPorSetor = hard;
         target.papeis.capturador.blitzkrieg = hard;

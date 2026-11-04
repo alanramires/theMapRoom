@@ -1465,6 +1465,7 @@ public partial class AIShoppingPlanner
         // ApplyHardModeLogisticsCap. Precisa vir antes do log da fila pra ela anunciar o número
         // que vai ser realmente comprado.
         ApplyHardModeLogisticsCap(snapshot, demands);
+        DeferCounterDuringExpansion(snapshot, demands);
         LogRoleShoppingQueue(snapshot, demands, remaining);
         if (expansionCapturerTarget > 0)
         {
@@ -1750,6 +1751,63 @@ public partial class AIShoppingPlanner
             if (compare != 0) return compare;
         }
         return a.Items.Count.CompareTo(b.Items.Count);
+    }
+
+    // A GRANA ANTES DO COUNTER (capacidade expansaoAntesDoCounter — Médio e Difícil).
+    //
+    // Por que existe: o score do carrinho começa em 200000 − prioridade×3000, e o counter ganha
+    // até ~36000 de bônus de encaixe (classe-alvo + counterFit). Um degrau de prioridade vale 3000,
+    // então o bônus atravessa a fila: no T2, com 3 vagas de captura abertas, a Metranca (counter
+    // pri 16, score 202210) passou por cima do 3º Soldado (capturador pri 15, score 155500) só
+    // porque havia 6 soldados inimigos à vista — soldados que estavam capturando, não ameaçando.
+    // Marca do AI Step "porque metranca?", 2026-11-04.
+    //
+    // A regra: na EarlyExpansion, com vaga de captura aberta no plano, counter NÃO urgente sai
+    // da fila deste turno. Prédio é renda; o counter cedo é pago com a renda que deixou de entrar.
+    // Passa o que é urgente (forceBasicResponse: a categoria passou do limiar de escalada) e a
+    // escalada estratégica — esses são ameaça, não presença. Não mexe nos pesos: mudar o degrau
+    // de prioridade reordenaria a fila inteira para resolver um caso só da abertura.
+    private static void DeferCounterDuringExpansion(
+        AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (snapshot == null || demands == null
+            || AIController.Instance == null || !AIController.Instance.ExpandeAntesDoCounter)
+            return;
+
+        AIController.MacroTerritoryInspection macro =
+            AIController.GetMacroTerritoryForInspection(snapshot.AITeam);
+        if (!string.Equals(macro.PhaseRaw, "EarlyExpansion", System.StringComparison.Ordinal))
+            return;
+
+        int openCaptureSlots = CountOpenSlots(snapshot.AITeam, UnitRole.Capturador);
+        if (openCaptureSlots <= 0)
+            return;
+
+        for (int i = demands.Count - 1; i >= 0; i--)
+        {
+            AIShoppingDemand demand = demands[i];
+            if (demand == null || demand.Count <= 0 || demand.Urgent || demand.StrategicEscalation
+                || !IsPureCounterPressureOrigin(demand.Origin))
+                continue;
+
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] expansão antes do "
+                + $"counter: adiado {FormatDemandCapability(demand)} x{demand.Count} origem={demand.Origin} "
+                + $"({demand.Reason}) — {openCaptureSlots} vaga(s) de captura abertas, não é urgente");
+            demands.RemoveAt(i);
+        }
+    }
+
+    // MergeRoleDemand junta origens com "+": uma demanda de outra fonte com a mesma arma pode ter
+    // absorvido o counter (ou vice-versa). Só sai da fila o que é counter de ponta a ponta — senão
+    // adiar o counter apagaria junto uma demanda que não tem nada a ver com ele.
+    private static bool IsPureCounterPressureOrigin(string origin)
+    {
+        if (string.IsNullOrEmpty(origin))
+            return false;
+        foreach (string part in origin.Split('+'))
+            if (!part.StartsWith("counter-pressure", System.StringComparison.Ordinal))
+                return false;
+        return true;
     }
 
     private static int ComputeExpansionCapturerCartTarget(
