@@ -75,7 +75,7 @@ public partial class AIController
         if (TryFindHomeProductionVacateMove(unit, snapshot, aiTeam, fromCell, paths, occupied, out Vector3Int moveCell, out string moveReason))
         {
             Debug.Log($"{TL("Base")} {unit.InstanceId} libera producao ({threatReason}) - reposiciona via {moveCell} ({moveReason})");
-            action = BuildMoveBatch(unit, aiTeam, fromCell, moveCell, paths);
+            action = BuildVacateBatch(unit, aiTeam, fromCell, moveCell, paths);
             return true;
         }
 
@@ -107,8 +107,24 @@ public partial class AIController
             return false;
 
         Debug.Log($"{TL("Base")} {unit.InstanceId} libera produtora travada ({occupiedProducers}/{totalProducers} ocupadas, cheapest=${cheapestOffer}) via {moveCell} ({reason})");
-        action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        action = BuildVacateBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
         return true;
+    }
+
+    // Sair de cima da produtora para um predio que a unidade PODE capturar e mover
+    // E capturar — ela vai parar la de qualquer jeito. Com BuildMoveBatch puro, o
+    // capturador chegava ao proprio alvo da missao e nao capturava: um turno de
+    // captura perdido no comeco da partida (playtest do Claude, turno 2:
+    // "4 libera produtora travada ... via (10,5)" com a missao "Capture -> (10,5)").
+    private PlayerAction BuildVacateBatch(UnitManager unit, TeamId team, Vector3Int fromCell, Vector3Int moveCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        if (SimulateCaptureSensor(unit, moveCell, out _))
+        {
+            Debug.Log($"{TL("Base")} {unit.InstanceId} sai da produtora capturando {moveCell}");
+            return BuildCaptureBatch(unit, team, fromCell, moveCell, paths);
+        }
+        return BuildMoveBatch(unit, team, fromCell, moveCell, paths);
     }
 
     private bool AreAllAffordableHomeProducersOccupied(

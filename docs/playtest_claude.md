@@ -108,3 +108,117 @@ Mesmo padrão do turno 1 (decisão discutível). Ainda há neutros sem ninguém 
 (9,8 e 10,12), e a IA prefere guardar 3000 a pôr mais 2 capturadores em campo.
 Reforça a hipótese do turno 1: o número de capturadores não acompanha o número de
 prédios a capturar.
+
+---
+
+## Correções e verificações depois do turno 2
+
+### Corrigido: sair da produtora captura quando dá
+
+`AIController.Capturer.Vacate.cs`: as duas saídas de produtora (travada e ameaçada)
+passam por `BuildVacateBatch`. Se a célula de saída é um prédio que a unidade pode
+capturar (`SimulateCaptureSensor`), o batch é de **mover e capturar**; senão, de
+mover, como antes.
+
+### Compra: o que o código mostra
+
+O shopping em uso é o por papéis (`UseRoleBasedShopping = true`). Nele, o número de
+capturadores vem do **pacote de composição** (`AIShoppingPlanner.Demand.cs`,
+"pacote 2/2/1"):
+
+```text
+packages   = max(1, ceil(core / 5))
+capturador = packages * 2 - capturadores_em_campo
+```
+
+Com 0 a 4 unidades de núcleo, o pacote pede **2 capturadores**, não importa quantos
+prédios neutros existam. Os slots abertos de captura do plano (`CountOpenSlots`) só
+entram no shopping **legado**. No por papéis, o Echo sem capturador no turno 2 não
+gerou pedido de capturador, e a IA comprou o tanque.
+
+Isto mexe na doutrina de composição e no gate de elite (decisões do autor). Fica
+como proposta, sem alteração: a demanda de capturador seria
+`max(pacote, slots de captura abertos no plano)`, limitada pelos produtores livres.
+
+### Falha do ensaio do Claude no turno 1
+
+No turno 1 a compra da IA foi simulada **sem o plano montado** (`BuildObjectivePlan`
+só passou a ser chamado no ensaio do turno 2). A IA de verdade monta o plano antes de
+comprar. O resultado do turno 1 (2 Soldados) pode ser diferente do que ela faria. O
+padrão se repetiu no turno 2, já com plano, então a conclusão se mantém; mas o
+turno 1 sozinho não prova nada.
+
+---
+
+## Turno 3 (slot 1)
+
+Partida retomada do save (o `unity recompile` em Play tinha derrubado a sessão — erro
+do Claude, anotado na memória: em Play, só `tools/compilar.sh`).
+
+| unidade | IA | Claude | |
+|---|---|---|---|
+| Unit4 (10,5) | captura no lugar | igual | fábrica 20 → 10 |
+| Unit6 (12,7) | move e captura 11,9 | igual | |
+| Unit5 (9,4) | **move** para 6,4 | igual | ver abaixo: regra, não bug |
+| Unit11 (QG 12,4) | move para **12,3** (para trás) | move para 10,7, rumo à cidade 9,8 | **bug** |
+| Unit12 (13,4) | move para 12,7 | igual | melhor célula rumo a 10,12 |
+| Tanque (11,3) | move para 11,7 (escolta do Charlie) | igual | |
+| compra (7000) | Tanque Leve, sobram 1000 | Tanque Leve + 1 Soldado | o plano tem Bravo com 2 vagas de capturador vazias |
+
+### Regra, não bug: capturar no escuro
+
+O Unit5 alcança a cidade 6,4 mas o sensor recusa a captura: **"Terreno ainda
+desconhecido."** Sem névoa, a captura passaria. O hex está no escuro, e destino
+provisório na névoa só libera o ataque (os outros sensores esperam o compromisso).
+Vale igual para humano e IA: entrar e capturar no mesmo turno um prédio inexplorado
+custa um turno. A IA está certa em só mover.
+
+### Bug: liberar produtora ignora a missão da unidade
+
+Mesma regra do turno 2, outro defeito:
+
+```text
+[Base] 11 libera produtora travada (3/3 ocupadas, cheapest=$1000) via (12, 3, 0) (score=11 dpq=1,0 threat=0,0 path=2)
+```
+
+A célula de saída é escolhida por pontuação local (terreno, ameaça, distância), **sem
+olhar para onde a unidade quer ir**. O Unit11 tem missão no plano (Golf) e sai do QG
+para trás. A correção do turno 2 (capturar se a saída cai num prédio) não cobre isto.
+A correção que cobre os dois casos: **o papel decide primeiro**; a liberação só
+entra quando a ação do papel deixaria a unidade parada em cima da produtora.
+
+---
+
+## Considerações do autor e correções (depois do turno 3)
+
+### Blitzkrieg desligado no Médio
+
+A partida está em **Médio** (`AppliedDifficulty`). O revezamento em profundidade
+(`papeis.capturador.blitzkrieg`) está ligado só no `AIPreset_Dificil`; o
+`AIPreset_Medio` está com 0. O próprio código registra a intenção contrária ("a média
+faz blitzkrieg MAS não respeita a lista banida", em `AIController.Preset.cs` e
+`AIPresetCatalog.cs`). Correção de autoria, no Inspector do `AIPreset_Medio`.
+
+E o blitzkrieg dependia da outra correção: o plano já tinha o Golf em
+`PartialReadyForHandoff` com o Unit11 escalado para assumir a fábrica 10,5, mas a
+liberação de produtora mandou o Unit11 para trás.
+
+### Corrigido: o papel decide antes da liberação de produtora
+
+`AIController.Router.cs`: quando a liberação se aplica, o roteador pede a decisão do
+papel (`DecideUnitAction` com a liberação suprimida). Se ela tira a unidade de cima
+da produtora, vale; senão, entra a liberação como antes. Junto com o
+`BuildVacateBatch` (turno 2), cobre os dois defeitos: sair sem capturar e sair para
+o lado errado.
+
+Cuidado conhecido: a decisão do papel roda e pode ser descartada (quando deixa a
+unidade parada). Se algum papel registrar reserva ao decidir, essa reserva fica.
+
+### Corrigido: vaga de captura do plano vira compra
+
+`AIShoppingPlanner.Demand.cs`: a demanda de capturador do shopping por papéis passa
+a ser `max(pacote 2/2/1, vagas de capturador abertas no plano)`, com prioridade 30
+(antes do assalto). No turno 3 isso dá exatamente a compra do Claude: Soldado (1000)
+para a vaga do Bravo e Tanque Leve (6000) com o resto.
+
+**Nada disto foi visto rodando ainda.** Compila fora e dentro da Unity.

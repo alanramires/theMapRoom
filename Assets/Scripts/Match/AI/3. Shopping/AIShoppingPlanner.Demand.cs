@@ -2625,8 +2625,15 @@ public partial class AIShoppingPlanner
         int fireSupport = CountCompositionRole(snapshot, UnitRole.FogoIndireto);
         int core = capturers + assaults + fireSupport;
         int packages = Mathf.Max(1, Mathf.CeilToInt(core / 5f));
-        EnsureRoleDemand(demands, UnitRole.Capturador, Mathf.Max(0, packages * 2 - capturers), 30,
-            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+        // Vaga de captura ABERTA no plano tambem e demanda de capturador. O pacote 2/2/1
+        // sozinho pede 2 capturadores ate o nucleo passar de 5, nao importa quantos
+        // predios ha para tomar: com setor sem capturador (Bravo vazio no playtest do
+        // Claude, turno 3), a IA comprava tanque e guardava o resto com produtor parado.
+        // Prioridade 30 (antes do assalto, 31): com caixa para os dois, compra os dois.
+        int openCapturerSlots = CountOpenSlots(snapshot.AITeam, UnitRole.Capturador);
+        int capturerDemand = Mathf.Max(Mathf.Max(0, packages * 2 - capturers), openCapturerSlots);
+        EnsureRoleDemand(demands, UnitRole.Capturador, capturerDemand, 30,
+            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport} vagasPlano={openCapturerSlots}");
         EnsureRoleDemand(demands, UnitRole.Assalto, Mathf.Max(0, packages * 2 - assaults), 31,
             "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
         // Fire support de composição espera a massa inicial de capturadores se formar (igual ao

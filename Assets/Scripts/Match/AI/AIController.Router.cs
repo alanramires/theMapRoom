@@ -15,6 +15,10 @@ public partial class AIController
 
     // -------------------------------------------------------------------------
 
+    // Guarda da recursao: enquanto o papel decide "por cima" de uma liberacao de
+    // produtora, a propria liberacao nao roda de novo.
+    private bool suppressProductionUnlockVacate;
+
     private PlayerAction DecideUnitAction(UnitManager unit, AIWorldSnapshot snapshot)
 
     {
@@ -26,11 +30,40 @@ public partial class AIController
         // Preserva a ordem historica para os demais papeis. Somente a
         // Vigilancia aerea antepoe emergencia ao desbloqueio da construcao.
         if (!isAirSurveillance
+            && !suppressProductionUnlockVacate
             && TryFindProductionUnlockVacateAction(
                 unit,
                 snapshot,
                 out PlayerAction regularProductionUnlockAction))
         {
+            // O PAPEL DECIDE PRIMEIRO. A liberacao escolhe a saida por pontuacao local
+            // (terreno, ameaca), sem saber para onde a unidade quer ir: no playtest do
+            // Claude (turno 3) ela tirou um capturador com missao do QG para TRAS. Se a
+            // acao do papel ja tira a unidade de cima da produtora, ela vale; a
+            // liberacao so entra quando o papel a deixaria parada ali.
+            PlayerAction roleAction;
+            suppressProductionUnlockVacate = true;
+            try
+            {
+                roleAction = DecideUnitAction(unit, snapshot);
+            }
+            finally
+            {
+                suppressProductionUnlockVacate = false;
+            }
+
+            Vector3Int vacateFrom = unit.CurrentCellPosition;
+            vacateFrom.z = 0;
+            if (roleAction != null && roleAction.HasMoveTo)
+            {
+                Vector3Int roleTo = roleAction.MoveTo;
+                roleTo.z = 0;
+                if (roleTo != vacateFrom)
+                {
+                    Debug.Log($"{TL("Base")} {unit.InstanceId} libera produtora pela acao do papel ({roleAction.DebugLabel})");
+                    return roleAction;
+                }
+            }
             return regularProductionUnlockAction;
         }
 
