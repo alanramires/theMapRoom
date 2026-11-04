@@ -149,8 +149,6 @@ public class DebugManager : MonoBehaviour
 
     private void HandleAIDebugShortcuts()
     {
-        if (UiInputBlocker.IsTextInputFocused()) return;
-
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current == null) return;
         bool f12 = Keyboard.current.f12Key.wasPressedThisFrame;
@@ -161,7 +159,22 @@ public class DebugManager : MonoBehaviour
         bool f10 = Input.GetKeyDown(KeyCode.F10);
         bool f11 = Input.GetKeyDown(KeyCode.F11);
 #endif
+        HandleAIDebugShortcutRequest(f10, f11, f12);
+    }
+
+    private void HandleAIDebugShortcutRequest(bool f10, bool f11, bool f12)
+    {
         if (!f12 && !f10 && !f11) return;
+        // Emergency pause always wins, including while typing in AI Step or the console.
+        if (f10)
+        {
+            AIController pauseAI = FindAnyObjectByType<AIController>();
+            if (pauseAI != null) pauseAI.SetDebugPaused(true);
+            else Debug.Log("[AI Shortcuts] AIController nao encontrado.");
+            Debug.Log("[AI Shortcuts] F10 — AI Pause");
+            return;
+        }
+        if (UiInputBlocker.IsTextInputFocused()) return;
 
         AIController ai = FindAnyObjectByType<AIController>();
         MatchController match = FindAnyObjectByType<MatchController>();
@@ -179,12 +192,6 @@ public class DebugManager : MonoBehaviour
                 else Debug.Log("[AI Shortcuts] AIController não encontrado.");
                 Debug.Log("[AI Shortcuts] F12 — AI Resume");
             }
-        }
-        if (f10)
-        {
-            if (ai != null) ai.SetDebugPaused(true);
-            else Debug.Log("[AI Shortcuts] AIController não encontrado.");
-            Debug.Log("[AI Shortcuts] F10 — AI Pause");
         }
         if (f11)
         {

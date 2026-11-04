@@ -109,6 +109,7 @@ public partial class AIController
         Debug.Log($"[AI Perf] CommitAIWorldHeavy: {(Time.realtimeSinceStartup - tCommit) * 1000f:F0}ms");
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiSlot, matchController);
+        RememberAIReviewStance(snapshot, "turn_snapshot");
         yield return null;
         aiTurnNumber = snapshot.TurnNumber;
         aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
@@ -339,6 +340,7 @@ public partial class AIController
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(
             PlayerSlotId.FromIndex(currentAISlotIndex), matchController);
+        RememberAIReviewStance(snapshot, "debug_stage_snapshot");
         aiTurnNumber = snapshot.TurnNumber;
         aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
         Debug.Log($"{TL("Stage")} Inicio debug stage {stage} | Stance: {snapshot.Stance} " +

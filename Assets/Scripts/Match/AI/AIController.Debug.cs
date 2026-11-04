@@ -15,10 +15,12 @@ public partial class AIController
     {
         public int id, turn, slot, stage, boardRevision, moneyBefore, moneyAfter;
         public string status, decision, mission, reasons, commands, result;
+        public string current_stance, stanceSource;
         public int schemaVersion;
         public string sessionId, recordedUtc, actionJson, rawReasons, coverage, filePath, markNote;
         public bool markedStrange, hasStateBeforeDecision, hasStateBeforeExecution;
-        public string snapshotWarning;
+        public string snapshotWarning, markClassification;
+        public bool marked;
         public int candidatesObserved, replayActionIndex = -1;
         public SaveGameManager.AIReviewSaveReference nearestSave;
         public AIReviewState stateBeforeDecision, stateBeforeExecution;
@@ -241,6 +243,8 @@ public partial class AIController
     {
         var record = pendingAIReview;
         record.schemaVersion = 2;
+        record.current_stance = aiReviewCurrentStance;
+        record.stanceSource = aiReviewStanceSource;
         record.sessionId = aiReviewSession ??= System.Guid.NewGuid().ToString("N");
         record.recordedUtc = System.DateTime.UtcNow.ToString("O");
         record.replayActionIndex = replayManager?.ActionStack?.Actions != null ? replayManager.ActionStack.Actions.Count : -1;
@@ -270,7 +274,25 @@ public partial class AIController
     {
         public int format = 1;
         public string markId, markedAtUtc;
+        public string classification = "estranho";
         public AIReviewRecord step;
+    }
+
+    private static readonly string[] aiReviewMarkClassLabels = { "Dúvida", "Estranho", "Possível bug", "Sugestão", "Observação" };
+    private static readonly string[] aiReviewMarkClassCodes = { "duvida", "estranho", "possivel_bug", "sugestao", "observacao" };
+    private int aiReviewMarkClassIndex;
+
+    public static string NormalizeAIReviewClassification(string classification)
+    {
+        string code = (classification ?? "").Trim().ToLowerInvariant().Replace(' ', '_');
+        switch (code)
+        {
+            case "dúvida": case "duvida": return "duvida";
+            case "possível_bug": case "possivel_bug": return "possivel_bug";
+            case "sugestão": case "sugestao": return "sugestao";
+            case "observação": case "observacao": return "observacao";
+            default: return "estranho";
+        }
     }
 
     private string aiReviewNote = "";
@@ -305,8 +327,8 @@ public partial class AIController
 
     public static string NormalizeAIReviewNote(string note)
     {
-        note = (note ?? "").Replace('\r', ' ').Replace('\n', ' ').Trim();
-        return note.Length > 512 ? note.Substring(0, 512) : note;
+        note = (note ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+        return note.Length > 2048 ? note.Substring(0, 2048) : note;
     }
 
     private static void WriteAIReviewMarkLine(string path, AIReviewMark mark)
@@ -325,7 +347,8 @@ public partial class AIController
         {
             var mark = new AIReviewMark
             {
-                markId = System.Guid.NewGuid().ToString("N"), markedAtUtc = System.DateTime.UtcNow.ToString("O"), step = record
+                markId = System.Guid.NewGuid().ToString("N"), markedAtUtc = System.DateTime.UtcNow.ToString("O"),
+                classification = record.markClassification, step = record
             };
             WriteAIReviewMarkLine(AIReviewMarksPath, mark);
             aiReviewFileMessage = "Marca adicionada: " + AIReviewMarksPath;
@@ -367,11 +390,15 @@ public partial class AIController
         }
     }
 
-    public bool MarkAIReviewStrange(string note = "")
+    // Compatibility for callers that explicitly mark a step as strange.
+    public bool MarkAIReviewStrange(string note = "") => MarkAIReview(note, "estranho");
+
+    public bool MarkAIReview(string note = "", string classification = "duvida")
     {
         var record = pendingAIReview ?? (aiReviewHistory.Count > 0 ? aiReviewHistory[aiReviewHistory.Count - 1] : null);
         if (record == null) return false;
-        record.markedStrange = true;
+        record.marked = record.markedStrange = true; // markedStrange is retained for old readers.
+        record.markClassification = NormalizeAIReviewClassification(classification);
         record.markNote = NormalizeAIReviewNote(note);
         CaptureAIReviewSaveReference(record);
         PersistAIReviewRecord(record);
@@ -379,8 +406,9 @@ public partial class AIController
         if (saved) DiagnosticoManager.Registrar(new DiagnosticoEntrada
         {
             rodada = record.turn, slot = record.slot, categoria = "ai_step", operacao = "ai_step.marked",
-            severidade = DiagnosticoSeveridade.Aviso, motivo = record.decision
-        }.Campo("sessionId", record.sessionId).Campo("stepId", record.id).Campo("filePath", AIReviewMarksPath).Campo("note", record.markNote));
+            severidade = record.markClassification == "estranho" || record.markClassification == "possivel_bug"
+                ? DiagnosticoSeveridade.Aviso : DiagnosticoSeveridade.Depuracao, motivo = record.decision
+        }.Campo("sessionId", record.sessionId).Campo("stepId", record.id).Campo("filePath", AIReviewMarksPath).Campo("note", record.markNote).Campo("classification", record.markClassification));
         return saved;
     }
 
@@ -554,6 +582,15 @@ public partial class AIController
     private readonly List<AIReviewRecord> aiReviewHistory = new List<AIReviewRecord>();
     private readonly System.Text.StringBuilder aiReviewLogs = new System.Text.StringBuilder();
     private AIReviewRecord pendingAIReview;
+    private string aiReviewCurrentStance;
+    private string aiReviewStanceSource;
+
+    private void RememberAIReviewStance(AIWorldSnapshot snapshot, string source)
+    {
+        aiReviewCurrentStance = snapshot != null ? snapshot.Stance.ToString() : null;
+        aiReviewStanceSource = source;
+    }
+
     private string aiDecisionReasons = "";
     private string aiShoppingSummary = "";
     private int aiReviewSequence;
@@ -566,6 +603,7 @@ public partial class AIController
     {
         aiStep = enabled;
         if (enabled) aiReviewVisible = true;
+        else aiReviewNoteFocused = false;
         // Desligar a ferramenta nao aprova uma decisao que ja esta pendente.
     }
 
@@ -577,7 +615,11 @@ public partial class AIController
         aiReviewVisible = visible;
         // Abrir deve reativar a revisao apos Continuar automaticamente, sem aprovar acao.
         if (visible) SetAIStepEnabled(true);
-        else SetDebugPaused(true);
+        else
+        {
+            aiReviewNoteFocused = false;
+            SetDebugPaused(true);
+        }
     }
 
     [System.Serializable]
@@ -585,7 +627,7 @@ public partial class AIController
     {
         public int id, turn, slot;
         public bool marked;
-        public string status, decision, filePath;
+        public string status, decision, filePath, classification;
     }
     [System.Serializable]
     private sealed class AIReviewIndex
@@ -598,7 +640,7 @@ public partial class AIController
         var index = new AIReviewIndex { directory = AIReviewDirectory, marksPath = AIReviewMarksPath };
         foreach (var record in aiReviewHistory)
             index.steps.Add(new AIReviewIndexEntry { id = record.id, turn = record.turn, slot = record.slot,
-                marked = record.markedStrange, status = record.status, decision = record.decision, filePath = record.filePath });
+                marked = record.marked || record.markedStrange, classification = record.markClassification, status = record.status, decision = record.decision, filePath = record.filePath });
         return JsonUtility.ToJson(index, true);
     }
 
@@ -665,6 +707,7 @@ public partial class AIController
 
     private List<AIShoppingPlanner.ShoppingOrder> DecideShoppingForReview(AIWorldSnapshot snapshot)
     {
+        RememberAIReviewStance(snapshot, "shopping_snapshot");
         if (!aiStep) return AIShoppingPlanner.Decide(snapshot);
         BeginAIReviewCapture();
         aiReviewActorId = null;
@@ -894,7 +937,7 @@ public partial class AIController
             aiReviewNoteFocused = false;
         }
         Color previousColor = GUI.color;
-        GUI.color = new Color(0.025f, 0.035f, 0.05f, 0.98f);
+        GUI.color = new Color(0.025f, 0.035f, 0.05f, 0.88f);
         GUI.DrawTexture(windowRect, Texture2D.whiteTexture);
         GUI.color = previousColor;
         aiReviewWindowRect = GUI.Window(0x41495354, windowRect,
@@ -908,8 +951,11 @@ public partial class AIController
     private void DrawAIReviewWindowContents(int windowId)
     {
         GUILayout.BeginArea(new Rect(8f, 28f, aiReviewWindowRect.width - 16f, aiReviewWindowRect.height - 36f));
-        aiReviewScroll = GUILayout.BeginScrollView(aiReviewScroll);
         var record = pendingAIReview ?? (aiReviewHistory.Count > 0 ? aiReviewHistory[aiReviewHistory.Count - 1] : null);
+        string stance = record != null ? record.current_stance : aiReviewCurrentStance;
+        GUILayout.Label("current_stance: " + (string.IsNullOrEmpty(stance) ? "nao registrada neste passo" : stance),
+            new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, wordWrap = true });
+        aiReviewScroll = GUILayout.BeginScrollView(aiReviewScroll);
         GUIStyle textStyle = new GUIStyle(GUI.skin.label) { wordWrap = true };
         if (record == null)
             GUILayout.Label("Aguardando a proxima decisao da IA.", textStyle);
@@ -932,29 +978,38 @@ public partial class AIController
         if (!string.IsNullOrWhiteSpace(aiReviewFileMessage)) GUILayout.Label(aiReviewFileMessage, textStyle);
         GUILayout.EndScrollView();
         GUI.enabled = record != null;
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Nota opcional:", GUILayout.Width(100f));
+        GUILayout.Label("Classificação da nota:");
+        aiReviewMarkClassIndex = GUILayout.Toolbar(aiReviewMarkClassIndex, aiReviewMarkClassLabels);
+        GUILayout.Label("Nota opcional:");
+        var noteStyle = new GUIStyle(GUI.skin.textArea) { wordWrap = true };
+        float noteWidth = Mathf.Max(40f, aiReviewWindowRect.width - 24f);
+        float noteMaxHeight = Mathf.Max(56f, Mathf.Min(150f, aiReviewWindowRect.height * 0.25f));
+        float noteHeight = Mathf.Clamp(noteStyle.CalcHeight(new GUIContent(aiReviewNote + "\n"), noteWidth), 56f, noteMaxHeight);
         GUI.SetNextControlName("AIReviewNote");
-        aiReviewNote = GUILayout.TextField(aiReviewNote, 512);
+        aiReviewNote = GUILayout.TextArea(aiReviewNote, 2048, noteStyle, GUILayout.Height(noteHeight), GUILayout.ExpandWidth(true));
         aiReviewNoteFocused = GUI.GetNameOfFocusedControl() == "AIReviewNote";
         if (aiReviewNoteFocused && Event.current.type == EventType.KeyDown
-            && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter || Event.current.keyCode == KeyCode.Escape))
+            && Event.current.keyCode == KeyCode.Escape)
         {
             GUI.FocusControl(null);
             aiReviewNoteFocused = false;
             UiInputBlocker.SuppressGameplayInputForFrames(1);
             Event.current.Use();
         }
-        GUILayout.EndHorizontal();
-        if (GUILayout.Button(record != null && record.markedStrange ? "Adicionar outra marca" : "Marcar como estranho"))
-            MarkAIReviewStrange(aiReviewNote);
+        if (GUILayout.Button(record != null && (record.marked || record.markedStrange) ? "Adicionar outra marca" : "Salvar marca"))
+            MarkAIReview(aiReviewNote, aiReviewMarkClassCodes[aiReviewMarkClassIndex]);
         GUI.enabled = true;
         GUILayout.BeginHorizontal();
         GUI.enabled = HasPendingAIReview && !aiReviewApproved;
         if (GUILayout.Button("Executar decisao")) ApproveAIReview();
         if (GUILayout.Button("Continuar automaticamente"))
         {
-            if (ApproveAIReview()) { aiStep = false; SetDebugPaused(false); }
+            if (ApproveAIReview())
+            {
+                GUI.FocusControl(null);
+                SetAIStepEnabled(false);
+                SetDebugPaused(false);
+            }
         }
         GUI.enabled = true;
         if (GUILayout.Button("Fechar e manter pausada"))

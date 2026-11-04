@@ -51,9 +51,11 @@ try
     };
     record.stateBeforeDecision.units.Add(new AIController.AIReviewUnitState { id = 88, hp = 7 });
     type.GetField("pendingAIReview", flags).SetValue(ai, record);
-    record.markedStrange = true;
+    record.marked = record.markedStrange = true;
+    record.markClassification = AIController.NormalizeAIReviewClassification("Dúvida");
+    if (record.markClassification != "duvida") throw new System.Exception("Classificacao nao normalizada.");
     record.markNote = AIController.NormalizeAIReviewNote("por que nao embarcou?\r\nnota");
-    if (record.markNote.Contains("\n") || record.markNote.Contains("\r")) throw new System.Exception("Nota deixou mais de uma linha.");
+    if (record.markNote != "por que nao embarcou?\nnota") throw new System.Exception("Nota multilinha nao foi preservada.");
     if (!(bool)type.GetMethod("PersistAIReviewRecord", flags).Invoke(ai, new object[] { record })) throw new System.Exception("Falha ao persistir.");
     string marked = System.IO.Path.Combine(directory, "step-000901.json");
     var disk = UnityEngine.JsonUtility.FromJson<AIController.AIReviewRecord>(System.IO.File.ReadAllText(marked));
@@ -65,16 +67,19 @@ try
     report.AppendLine("PASS arquivo marcado e atualizacao de resultado preservam a foto anterior");
     string marksFile = System.IO.Path.Combine(directory, "test-marks.jsonl");
     var append = type.GetMethod("WriteAIReviewMarkLine", BindingFlags.Static | BindingFlags.NonPublic);
-    append.Invoke(null, new object[] { marksFile, new AIController.AIReviewMark { markId = "first", markedAtUtc = "test", step = record } });
+    append.Invoke(null, new object[] { marksFile, new AIController.AIReviewMark { markId = "first", markedAtUtc = "test", classification = record.markClassification, step = record } });
     record.markNote = "segunda marca";
-    append.Invoke(null, new object[] { marksFile, new AIController.AIReviewMark { markId = "second", markedAtUtc = "test", step = record } });
+    record.markClassification = "possivel_bug";
+    append.Invoke(null, new object[] { marksFile, new AIController.AIReviewMark { markId = "second", markedAtUtc = "test", classification = record.markClassification, step = record } });
     var lines = System.IO.File.ReadAllLines(marksFile);
     if (lines.Length != 2) throw new System.Exception("JSONL nao acumulou uma linha por marca.");
     var firstMark = UnityEngine.JsonUtility.FromJson<AIController.AIReviewMark>(lines[0]);
     var secondMark = UnityEngine.JsonUtility.FromJson<AIController.AIReviewMark>(lines[1]);
-    if (firstMark.step.markNote == secondMark.step.markNote || firstMark.step.stateBeforeDecision.units[0].hp != 7)
+    if (firstMark.classification != "duvida" || firstMark.step.markClassification != "duvida"
+        || secondMark.classification != "possivel_bug" || secondMark.step.markClassification != "possivel_bug"
+        || firstMark.step.markNote == secondMark.step.markNote || firstMark.step.stateBeforeDecision.units[0].hp != 7)
         throw new System.Exception("Marca antiga foi alterada ou perdeu snapshot.");
-    report.AppendLine("PASS nota de uma linha e JSONL acumulado preservam as marcas anteriores");
+    report.AppendLine("PASS classificacao, nota multilinha e JSONL acumulado preservam as marcas anteriores");
     action.AIReview = record;
     var clone = (PlayerAction)typeof(ReplayManager).GetMethod("CloneActionForCompactSave", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { action });
     var loaded = UnityEngine.JsonUtility.FromJson<PlayerAction>(UnityEngine.JsonUtility.ToJson(clone));

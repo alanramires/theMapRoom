@@ -11,7 +11,7 @@ janela nao selecionam hexagonos, cancelam acoes ou iniciam pan/zoom do mapa.
 ## Controles
 
 - **Executar decisao** / F11: executa exatamente a acao exibida, sem recalcular.
-- **Marcar como estranho**: acrescenta uma linha completa em `ai_step_marcas.jsonl`.
+- **Salvar marca**: acrescenta uma linha completa em `ai_step_marcas.jsonl`.
   Nao executa, aprova nem recalcula nada. O caminho aparece na janela.
 - **Continuar automaticamente**: aprova a atual, desliga AI Step e libera a pausa.
 - **Fechar e manter pausada**: conserva a decisao pendente.
@@ -29,9 +29,12 @@ Cada passo e salvo automaticamente em:
 
 `Application.persistentDataPath/AIReviews/<sessionId>/step-000001.json`
 
-O campo **Nota opcional** aceita uma linha de ate 512 caracteres, por exemplo
-"por que nao embarcou?". Enquanto ele tem foco, os atalhos de gameplay ficam
-bloqueados; Enter/Escape sai da edicao sem executar a decisao.
+O campo **Nota opcional** e uma TextArea de ate 2048 caracteres, com quebra
+automatica de linha e altura que cresce de tres linhas ate um limite para
+preservar os botoes. Enter insere uma nova linha; Escape sai da edicao sem
+executar a decisao. Enquanto tem foco, os atalhos externos ficam bloqueados.
+As quebras sao preservadas no registro e escapadas no JSON: cada marca continua
+ocupando uma unica linha fisica do arquivo JSONL.
 
 Todas as marcas ficam em **um arquivo acumulado**, `ai_step_marcas.jsonl`, na raiz
 do projeto no Editor (em build, no persistentDataPath). Cada clique acrescenta
@@ -159,3 +162,34 @@ caminho ou permissao legal.
 Teste de dados sinteticos, sem executar jogadas:
 
 `unity command script eval --file tools/ai_test/verificar_ai_candidate_preview.cs`
+
+## Postura no cabecalho
+
+`current_stance` aparece acima da area rolavel. O valor e a postura estrategica
+capturada no snapshot do turno (ou no snapshot de compras para a fase de shopping).
+Fica guardado no registro junto com `stanceSource`; nao e recalculado ao abrir a
+janela ou consultar uma marca antiga. Registros anteriores sem o campo mostram
+"nao registrada neste passo". O fundo escuro foi suavizado para maior transparencia.
+
+## Classificacao da nota
+
+Antes da TextArea ha cinco opcoes: Duvida, Estranho, Possivel bug, Sugestao e
+Observacao. A selecao inicial e Duvida e a ultima escolha e mantida entre passos.
+Salvar marca grava `classification` na linha JSONL e `step.markClassification`
+no registro/replay, com codigos estaveis: `duvida`, `estranho`, `possivel_bug`,
+`sugestao`, `observacao`. A classificacao expressa a intencao do autor; Possivel
+bug nao afirma que o jogo tem um defeito confirmado. O texto da nota e independente.
+
+Marcas antigas sem o campo devem ser lidas como Estranho, sem reescrever o arquivo.
+`markedStrange` continua como alias legado de marcado; novos leitores devem usar
+`marked` e `markClassification`. A API antiga MarkAIReviewStrange continua
+registrando Estranho. A API geral e MarkAIReview(note, classification).
+
+## F10: pausa com prioridade
+
+F10 sempre tem prioridade no handler de atalhos da IA, mesmo com foco na nota ou
+no console. F11/F12 continuam bloqueados enquanto se digita. Se chegarem juntos,
+F10 vence. Continuar automaticamente limpa o foco da nota ao desligar AI Step.
+A pausa aguarda o ponto seguro do batch em andamento; nao e cancelamento/rollback.
+
+Teste fora de Play: `unity command script eval --file tools/ai_test/verificar_ai_f10.cs`.
