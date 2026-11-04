@@ -570,6 +570,8 @@ public partial class TurnStateManager
         }
 
         int resultHp = Mathf.Min(10, baseHp + participantsHp);
+        // Fato 9: HP de cada um antes da fusao (depois dela o doador ja morreu).
+        JogadasManager.SetUltimaFusaoHp(receiver, participants, resultHp);
         int totalSteps = baseSteps + participantsSteps;
         int resultAutonomy = resultHp > 0 ? Mathf.Max(0, totalSteps / resultHp) : 0;
 

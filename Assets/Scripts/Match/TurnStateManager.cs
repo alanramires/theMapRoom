@@ -1896,8 +1896,15 @@ public partial class TurnStateManager : MonoBehaviour
                 // autonomia > 0) ate ser reabastecida ou removida. A decisao e
                 // tomada AQUI, por unidade, para que o replay (que re-enfileira
                 // os mesmos alvos) re-resolva deterministicamente pousar-ou-cair.
+                // Fato para as medalhas. O replay re-enfileira os mesmos alvos para
+                // re-resolver o desfecho; registrar de novo duplicaria o fato.
+                bool registrarFato = replayManager == null || !replayManager.IsReplaying;
+                int fatoTurno = matchController != null ? matchController.CurrentTurn : 0;
+
                 if (CanEmergencyLandAtTurnStart(target))
                 {
+                    if (registrarFato)
+                        JogadasManager.EnsureInstance()?.RegistrarPousoEmergencia(fatoTurno, target);
                     turnStartFuelDepletionReplaySubSteps.Add(new PlayerActionSubStep
                     {
                         TargetHex = targetCell,
@@ -1923,6 +1930,8 @@ public partial class TurnStateManager : MonoBehaviour
                     Label = "TurnStartFuelDepletionQueueConfirm"
                 });
 
+                if (registrarFato)
+                    JogadasManager.EnsureInstance()?.RegistrarPaneSeca(fatoTurno, target);
                 target.SetCurrentHP(0);
                 target.MarkDead("morto por falta de combustivel/ queda aerea");
                 KillEmbarkedChildrenChain(target);

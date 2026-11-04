@@ -3633,6 +3633,10 @@ public partial class TurnStateManager
             attackerTrajectory,
             attackerVisibleToDefender,
             combatCargoSnapshot);
+        if (combat.hasDpq && attacker != null)
+            JogadasManager.SetUltimoAtaqueDpq(attacker.InstanceId,
+                combat.attackerDpqPoints, combat.attackerPosition,
+                combat.defenderDpqPoints, combat.defenderPosition);
         planningManager?.NotifyUnitInvolvedInCombat(attacker);
         planningManager?.NotifyUnitInvolvedInCombat(defender);
         RecordAttackReplayCommand(

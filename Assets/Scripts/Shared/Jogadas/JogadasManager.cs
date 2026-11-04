@@ -39,6 +39,110 @@ public class JogadasManager : MonoBehaviour
         return Instance;
     }
 
+    void OnEnable()
+    {
+        MatchController.OnMatchConcluded += HandleMatchConcluded;
+    }
+
+    void OnDisable()
+    {
+        MatchController.OnMatchConcluded -= HandleMatchConcluded;
+    }
+
+    // ---- Fatos de partida (medalhas) ----
+
+    public static string ResolverModoPartida(MatchController match)
+    {
+        if (match != null && match.IsTutorialMode)
+            return "aula";
+        QuadranteController board = QuadranteController.Active;
+        return board != null && board.RecordsCampaignResult ? "campanha" : "avulsa";
+    }
+
+    public void RegistrarPartidaIniciada(MatchController match)
+    {
+        if (match == null)
+            return;
+        var jogada = new Jogada
+        {
+            turno = match.CurrentTurn,
+            team = -1,
+            acao = "PartidaIniciada",
+            modo = ResolverModoPartida(match),
+            regras = match.GameSetup.ToString(),
+        };
+        AIController ai = FindFirstObjectByType<AIController>();
+        jogada.dificuldade = ai != null ? ai.AppliedDifficulty.ToString() : string.Empty;
+        for (int i = 0; i < match.SlotCount; i++)
+        {
+            PlayerSlotId slot = PlayerSlotId.FromIndex(i);
+            jogada.slotsTime.Add((int)match.GetTeamIdForSlot(i));
+            jogada.slotsIA.Add(match.IsPlayerAI(slot));
+        }
+        log.Registrar(jogada);
+    }
+
+    private void HandleMatchConcluded(PlayerSlotId winnerSlot, TeamId winnerTeam, TeamId defeatedTeam,
+        MatchController.VictoryReason reason, int turn)
+    {
+        MatchController match = FindFirstObjectByType<MatchController>();
+        log.Registrar(new Jogada
+        {
+            turno = turn,
+            team = winnerSlot.IsValid ? winnerSlot.Value : -1,
+            acao = "PartidaEncerrada",
+            motivo = reason.ToString(),
+            modo = ResolverModoPartida(match),
+        });
+    }
+
+    // ---- Fatos de inicio de turno (medalhas) ----
+
+    public void RegistrarRenda(int turno, int slot, int credito)
+    {
+        log.Registrar(new Jogada { turno = turno, team = slot, acao = "Renda", valor = credito });
+    }
+
+    public void RegistrarAutonomia(int turno, UnitManager unit, int fuelAntes, int fuelDepois)
+    {
+        RegistrarFatoDeUnidade(turno, unit, "Autonomia", jogada =>
+        {
+            jogada.hasFuelState = true;
+            jogada.fuelAntes = fuelAntes;
+            jogada.fuelDepois = fuelDepois;
+        });
+    }
+
+    public void RegistrarPousoEmergencia(int turno, UnitManager unit)
+    {
+        RegistrarFatoDeUnidade(turno, unit, "PousoEmergencia", null);
+    }
+
+    public void RegistrarPaneSeca(int turno, UnitManager unit)
+    {
+        RegistrarFatoDeUnidade(turno, unit, "PaneSeca", null);
+    }
+
+    private void RegistrarFatoDeUnidade(int turno, UnitManager unit, string acao, Action<Jogada> preencher)
+    {
+        if (unit == null)
+            return;
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        var jogada = new Jogada
+        {
+            turno = turno,
+            team = unit.SlotIndex,
+            acao = acao,
+            cx = cell.x,
+            cy = cell.y,
+            unidadeSigla = unit.TryGetUnitData(out UnitData data) && data != null ? data.apelido : "-",
+            uid = unit.InstanceId,
+        };
+        preencher?.Invoke(jogada);
+        log.Registrar(jogada);
+    }
+
     public void RegistrarServicoComando(int turno, int team)
     {
         log.Registrar(new Jogada { turno = turno, team = team, acao = "ServicoComando" });
@@ -75,6 +179,13 @@ public class JogadasManager : MonoBehaviour
             ? UnitManager.AllActive.Find(u => u != null && u.InstanceId == uid)
             : null;
         int hp = purchased != null ? Mathf.Max(0, purchased.CurrentHP) : 0;
+        // Fato 8: o custo cobrado (com economia desligada, 0 — o que de fato saiu do caixa).
+        int custo = 0;
+        if (purchased != null && purchased.TryGetUnitData(out UnitData purchasedData) && purchasedData != null)
+        {
+            MatchController match = FindFirstObjectByType<MatchController>();
+            custo = match != null ? match.ResolveEconomyCost(purchasedData.cost) : Mathf.Max(0, purchasedData.cost);
+        }
         log.Registrar(new Jogada
         {
             turno = turno, team = team, acao = "Compra",
@@ -82,6 +193,7 @@ public class JogadasManager : MonoBehaviour
             hasHpState = purchased != null,
             hpAntes = hp,
             hpDepois = hp,
+            valor = custo,
         });
     }
 
@@ -175,14 +287,47 @@ public class JogadasManager : MonoBehaviour
         });
     }
 
+    // Fato 9: HP de cada participante ANTES da fusao e o resultado, guardados na
+    // execucao (TurnStateManager.Merge) — depois dela o doador ja morreu.
+    private static readonly Dictionary<int, int> _fusaoHpAntes = new Dictionary<int, int>();
+    private static readonly Dictionary<int, int> _fusaoHpResultado = new Dictionary<int, int>();
+
+    public static void SetUltimaFusaoHp(UnitManager receiver, IReadOnlyList<UnitManager> participants, int resultHp)
+    {
+        if (receiver == null)
+            return;
+        _fusaoHpAntes[receiver.InstanceId] = Mathf.Max(0, receiver.CurrentHP);
+        _fusaoHpResultado[receiver.InstanceId] = resultHp;
+        if (participants == null)
+            return;
+        for (int i = 0; i < participants.Count; i++)
+        {
+            if (participants[i] == null)
+                continue;
+            _fusaoHpAntes[participants[i].InstanceId] = Mathf.Max(0, participants[i].CurrentHP);
+            _fusaoHpResultado[participants[i].InstanceId] = resultHp;
+        }
+    }
+
     public void RegistrarFusao(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid, int uidAlvo)
     {
-        log.Registrar(new Jogada
+        var jogada = new Jogada
         {
             turno = turno, team = team, acao = "Fusao",
             cx = cx, cy = cy, dx = dx, dy = dy,
             unidadeSigla = sigla, uid = uid, uid2 = uidAlvo
-        });
+        };
+        if (_fusaoHpAntes.TryGetValue(uid, out int hpA) && _fusaoHpAntes.TryGetValue(uidAlvo, out int hpB))
+        {
+            jogada.hasHpState = true;
+            jogada.hpAntes = hpA;
+            jogada.hp2Antes = hpB;
+            jogada.hpDepois = _fusaoHpResultado.TryGetValue(uid, out int result) ? result : hpA + hpB;
+            jogada.hp2Depois = 0;
+        }
+        _fusaoHpAntes.Remove(uid); _fusaoHpAntes.Remove(uidAlvo);
+        _fusaoHpResultado.Remove(uid); _fusaoHpResultado.Remove(uidAlvo);
+        log.Registrar(jogada);
     }
 
     public void RegistrarDesembarque(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid)
@@ -234,6 +379,11 @@ public class JogadasManager : MonoBehaviour
             jogada.defenderCost = combatResult.DefenderCost;
             jogada.defenderEliteLevel = combatResult.DefenderEliteLevel;
             jogada.combatCargo = combatResult.CargoResults ?? new List<CombatCargoResult>();
+            jogada.hasDpq = combatResult.HasDpq;
+            jogada.dpqAtacante = combatResult.AttackerDpqPoints;
+            jogada.dpqDefensor = combatResult.DefenderDpqPoints;
+            jogada.posicaoAtacante = combatResult.AttackerPosition;
+            jogada.posicaoDefensor = combatResult.DefenderPosition;
             jogada.obs = combatResult.ToString();
         }
         log.Registrar(jogada);
@@ -261,12 +411,21 @@ public class JogadasManager : MonoBehaviour
 
     public void RegistrarCapturar(int turno, int team, int cx, int cy, int dx, int dy, string sigla, int uid, string obs = null)
     {
-        log.Registrar(new Jogada
+        var jogada = new Jogada
         {
             turno = turno, team = team, acao = "Capturar",
             cx = cx, cy = cy, dx = dx, dy = dy,
             unidadeSigla = sigla, uid = uid, obs = obs
-        });
+        };
+        if (uid > 0 && _capturaFatoPorUnidade.TryGetValue(uid, out CapturaFato fato))
+        {
+            _capturaFatoPorUnidade.Remove(uid);
+            jogada.predioId = fato.predioId;
+            jogada.predioQG = fato.predioQG;
+            jogada.donoAnterior = fato.donoAnterior;
+            jogada.capturaConcluida = fato.concluida;
+        }
+        log.Registrar(jogada);
     }
 
     public List<Jogada> UltimasRodadas(int n)
@@ -443,6 +602,11 @@ public class JogadasManager : MonoBehaviour
         public int DefenderCost;
         public int DefenderEliteLevel;
         public List<CombatCargoResult> CargoResults = new List<CombatCargoResult>();
+        public bool HasDpq;
+        public int AttackerDpqPoints;
+        public int DefenderDpqPoints;
+        public string AttackerPosition;
+        public string DefenderPosition;
 
         public override string ToString()
         {
@@ -509,6 +673,19 @@ public class JogadasManager : MonoBehaviour
             });
             CollectCargoSnapshotRecursive(child, rootUid, child.InstanceId, depth + 1, result);
         }
+    }
+
+    // Fato 5: a posicao dos dois lados, vinda da resolucao do combate.
+    public static void SetUltimoAtaqueDpq(int attackerUid, int attackerPoints, string attackerPosition,
+        int defenderPoints, string defenderPosition)
+    {
+        if (attackerUid <= 0 || !_combatResultPorAtacante.TryGetValue(attackerUid, out CombatLogResult result))
+            return;
+        result.HasDpq = true;
+        result.AttackerDpqPoints = attackerPoints;
+        result.DefenderDpqPoints = defenderPoints;
+        result.AttackerPosition = attackerPosition;
+        result.DefenderPosition = defenderPosition;
     }
 
     public static void SetUltimoAtaqueResultado(
@@ -586,6 +763,29 @@ public class JogadasManager : MonoBehaviour
         => unit != null && unit.TryGetUnitData(out UnitData data) && data != null
             ? data.apelido
             : "-";
+
+    private sealed class CapturaFato
+    {
+        public string predioId;
+        public bool predioQG;
+        public int donoAnterior;
+        public bool concluida;
+    }
+    private static readonly Dictionary<int, CapturaFato> _capturaFatoPorUnidade = new Dictionary<int, CapturaFato>();
+
+    // Fato 4: chamado na execucao da captura, ANTES de o predio trocar de dono.
+    public static void SetUltimaCapturaFato(int capturerUid, ConstructionManager predio, bool concluida)
+    {
+        if (capturerUid <= 0 || predio == null)
+            return;
+        _capturaFatoPorUnidade[capturerUid] = new CapturaFato
+        {
+            predioId = predio.ConstructionId,
+            predioQG = predio.IsPlayerHeadQuarter,
+            donoAnterior = predio.SlotIndex,
+            concluida = concluida,
+        };
+    }
 
     public static void SetUltimaCapturaObs(int capturerUid, string obs)
     {

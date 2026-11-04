@@ -131,6 +131,8 @@ public class QuadranteController : MonoBehaviour
     private int paintedCells;
     private int holeCells;
     private bool recordsCampaignResult;
+    /// <summary>A partida veio da Campanha (registra resultado e volta para o mapa).</summary>
+    public bool RecordsCampaignResult => recordsCampaignResult;
     private bool aguardandoVolta;
     private bool voltando;
     private int frameDaConclusao;

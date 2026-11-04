@@ -1557,6 +1557,8 @@ public class MatchController : MonoBehaviour
         // consumiu upkeep). Quem quer mexer no estado inicial — a fala 0 de uma aula
         // com 'acted CH' — espera por isto, senao o reset apaga o que ela fez.
         MatchStartApplied = true;
+        // Fato da partida para as medalhas (so partida NOVA: o load ja traz o log).
+        JogadasManager.EnsureInstance()?.RegistrarPartidaIniciada(this);
         // Neste ponto todos os objetos da cena ja passaram por OnEnable.
         // Reaplica SFX nos presets sem FOW Total caso o cursor ainda nao
         // estivesse disponivel durante o Awake/ApplyGameSetupPreset.
@@ -3861,6 +3863,7 @@ public class MatchController : MonoBehaviour
 
                     if ((consumed > 0 && isAircraftUnit) || markedForFuelDepletionDeath)
                     {
+                        JogadasManager.EnsureInstance()?.RegistrarAutonomia(currentTurn, unit, beforeFuel, afterFuel);
                         turnStartAutonomyEntries ??= new List<TurnStateManager.TurnStartAutonomyUpkeepEntry>();
                         Vector3Int cell = unit.CurrentCellPosition;
                         cell.z = 0;
@@ -4350,6 +4353,7 @@ public class MatchController : MonoBehaviour
         {
             entry.actualMoney = Mathf.Max(0, entry.actualMoney + credit);
             PanelMoneyController.PushContextualUpdate(team, entry.actualMoney, "Incoming", credit);
+            JogadasManager.EnsureInstance()?.RegistrarRenda(currentTurn, playerIndex, credit);
         }
 
         players[playerIndex] = entry;

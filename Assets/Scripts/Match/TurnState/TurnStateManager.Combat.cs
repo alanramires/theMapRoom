@@ -16,6 +16,12 @@ public partial class TurnStateManager
         public readonly int attackerHpAfter;
         public readonly int defenderHpAfter;
         public readonly string trace;
+        // Posicao dos dois lados (so na resolucao completa). Fato para o log de jogadas.
+        public readonly bool hasDpq;
+        public readonly int attackerDpqPoints;
+        public readonly int defenderDpqPoints;
+        public readonly string attackerPosition;
+        public readonly string defenderPosition;
 
         public CombatResolutionResult(
             bool success,
@@ -26,8 +32,18 @@ public partial class TurnStateManager
             UnitManager defenderUnit,
             int attackerHpAfter,
             int defenderHpAfter,
-            string trace)
+            string trace,
+            bool hasDpq = false,
+            int attackerDpqPoints = 0,
+            int defenderDpqPoints = 0,
+            string attackerPosition = null,
+            string defenderPosition = null)
         {
+            this.hasDpq = hasDpq;
+            this.attackerDpqPoints = attackerDpqPoints;
+            this.defenderDpqPoints = defenderDpqPoints;
+            this.attackerPosition = attackerPosition;
+            this.defenderPosition = defenderPosition;
             this.success = success;
             this.counterExecuted = counterExecuted;
             this.defenderDamageContainedByHpLock = defenderDamageContainedByHpLock;
@@ -334,7 +350,12 @@ public partial class TurnStateManager
             defender,
             attackerHpAfter,
             defenderHpAfter,
-            trace.ToString());
+            trace.ToString(),
+            hasDpq: true,
+            attackerDpqPoints: attackerDpq.points,
+            defenderDpqPoints: defenderDpq.points,
+            attackerPosition: attackerDpq.source,
+            defenderPosition: defenderDpq.source);
     }
 
     private PositionDpqInfo ResolveDpqAtUnitPosition(UnitManager unit, string sensorPositionLabel)

@@ -129,6 +129,12 @@ public class AIIntelAnalyzer : MonoBehaviour
             return result;
         }
 
+        // Jogada.team / team2 / cargo.team sao SLOT (todo registrador passa
+        // SlotIndex). aiTeam e COR. Comparar os dois so acertava quando a cor
+        // coincidia com o numero do slot — e a cor vem do menu. Resolve o slot
+        // uma vez e compara slot com slot.
+        int aiSlot = ResolveAISlot(aiTeam);
+
         int currentTurn = 0;
         for (int i = 0; i < log.jogadas.Count; i++)
             currentTurn = Mathf.Max(currentTurn, log.jogadas[i].turno);
@@ -151,8 +157,8 @@ public class AIIntelAnalyzer : MonoBehaviour
                 continue;
 
             bool recent = jogada.turno >= minTurn;
-            bool friendly = jogada.team == (int)aiTeam;
-            bool enemy = IsEnemyTeam(jogada.team, aiTeam);
+            bool friendly = jogada.team == aiSlot;
+            bool enemy = IsEnemyTeam(jogada.team, aiSlot);
 
             if (jogada.uid > 0)
             {
@@ -228,7 +234,7 @@ public class AIIntelAnalyzer : MonoBehaviour
             }
 
             sector.totalActivity += weight;
-            ApplyActionScores(result, sector, jogada, aiTeam, unitsByUid, purchasesBySigla, siglaMap, weight);
+            ApplyActionScores(result, sector, jogada, aiSlot, unitsByUid, purchasesBySigla, siglaMap, weight);
         }
 
         AppendLiveCounts(result, aiTeam);
@@ -241,7 +247,7 @@ public class AIIntelAnalyzer : MonoBehaviour
 
         foreach (AIUnitIntel unit in unitsByUid.Values)
         {
-            if (IsEnemyTeam(unit.team, aiTeam))
+            if (IsEnemyTeam(unit.team, aiSlot))
                 result.enemyLastKnownUnits.Add(unit);
         }
         result.enemyLastKnownUnits.Sort((a, b) => b.lastSeenTurn.CompareTo(a.lastSeenTurn));
@@ -260,21 +266,21 @@ public class AIIntelAnalyzer : MonoBehaviour
         AIIntelReport result,
         AISectorIntel sector,
         Jogada jogada,
-        TeamId aiTeam,
+        int aiSlot,
         Dictionary<int, AIUnitIntel> unitsByUid,
         Dictionary<string, AIPurchaseIntel> purchasesBySigla,
         Dictionary<string, UnitData> siglaMap,
         float weight)
     {
-        bool friendly = jogada.team == (int)aiTeam;
-        bool enemy = IsEnemyTeam(jogada.team, aiTeam);
+        bool friendly = jogada.team == aiSlot;
+        bool enemy = IsEnemyTeam(jogada.team, aiSlot);
         string action = jogada.acao ?? string.Empty;
 
         if (string.Equals(action, "Ataque", StringComparison.OrdinalIgnoreCase))
         {
             AIUnitIntel target = null;
             bool targetKnown = jogada.uid2 > 0 && unitsByUid.TryGetValue(jogada.uid2, out target);
-            bool hitFriendly = enemy && targetKnown && target.team == (int)aiTeam;
+            bool hitFriendly = enemy && targetKnown && target.team == aiSlot;
 
             if (friendly)
             {
@@ -304,15 +310,15 @@ public class AIIntelAnalyzer : MonoBehaviour
                         defenderIntel.recentKills += weight;
                 }
 
-                bool attackerEnemy = IsEnemyTeam(jogada.team, aiTeam);
-                bool defenderEnemy = IsEnemyTeam(jogada.team2, aiTeam);
-                if (attackerEnemy && jogada.team2 == (int)aiTeam)
+                bool attackerEnemy = IsEnemyTeam(jogada.team, aiSlot);
+                bool defenderEnemy = IsEnemyTeam(jogada.team2, aiSlot);
+                if (attackerEnemy && jogada.team2 == aiSlot)
                 {
                     result.enemyCombatDamageScore += defenderDamage * weight;
                     if (jogada.hp2Antes > 0 && jogada.hp2Depois <= 0)
                         result.enemyCombatKillScore += weight;
                 }
-                if (defenderEnemy && jogada.team == (int)aiTeam)
+                if (defenderEnemy && jogada.team == aiSlot)
                 {
                     result.enemyCombatDamageScore += attackerDamage * weight;
                     if (jogada.hpAntes > 0 && jogada.hpDepois <= 0)
@@ -342,7 +348,7 @@ public class AIIntelAnalyzer : MonoBehaviour
                             }
                         }
 
-                        if (IsEnemyTeam(dealerTeam, aiTeam) && cargo.team == (int)aiTeam)
+                        if (IsEnemyTeam(dealerTeam, aiSlot) && cargo.team == aiSlot)
                         {
                             result.enemyCombatDamageScore += cargoDamage * weight;
                             if (cargoKilled)
@@ -554,9 +560,17 @@ public class AIIntelAnalyzer : MonoBehaviour
         return purchase;
     }
 
-    private static bool IsEnemyTeam(int team, TeamId aiTeam)
+    private static bool IsEnemyTeam(int slot, int aiSlot)
     {
-        return team >= 0 && team != (int)aiTeam;
+        return slot >= 0 && slot != aiSlot;
+    }
+
+    private static int ResolveAISlot(TeamId aiTeam)
+    {
+        MatchController match = UnityEngine.Object.FindFirstObjectByType<MatchController>();
+        if (match != null && match.TryGetUniqueSlotForTeam(aiTeam, out PlayerSlotId slot) && slot.IsValid)
+            return slot.Value;
+        return (int)aiTeam;
     }
 
     private static Vector3Int ResolveRelevantCell(Jogada jogada)

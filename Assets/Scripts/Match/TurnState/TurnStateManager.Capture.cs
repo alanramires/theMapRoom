@@ -130,6 +130,9 @@ public partial class TurnStateManager
                 ? "reparado"
                 : (concluded ? "capturado" : $"{after}/{safeMax}");
             JogadasManager.SetUltimaCapturaObs(capturer.InstanceId, jogadaObs);
+            // Fato 4: o predio e o dono ANTES de a captura trocar o dono.
+            JogadasManager.SetUltimaCapturaFato(capturer.InstanceId, targetConstruction,
+                concluded && operationType == PodeCapturarSensor.CaptureOperationType.CaptureEnemy);
 
             if (concluded)
             {
