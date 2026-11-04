@@ -1369,9 +1369,10 @@ public class MatchController : MonoBehaviour
         ComputeConstructionIncomeSignature(out int signature, out int count);
         cachedConstructionIncomeSignature = signature;
         cachedConstructionIncomeCount = count;
-        RecalculateIncomePerTurnForAllPlayers();
+        bool incomeChanged = RecalculateIncomePerTurnForAllPlayers();
 #if UNITY_EDITOR
-        if (!Application.isPlaying)
+        // O Inspector chama esta rotina em cada repaint; so alteracoes reais sujam a cena.
+        if (!Application.isPlaying && incomeChanged)
             EditorUtility.SetDirty(this);
 #endif
     }
@@ -4237,11 +4238,12 @@ public class MatchController : MonoBehaviour
         return -1;
     }
 
-    private void RecalculateIncomePerTurnForAllPlayers(List<ConstructionManager> constructions = null)
+    private bool RecalculateIncomePerTurnForAllPlayers(List<ConstructionManager> constructions = null)
     {
         if (players == null || players.Count == 0)
-            return;
+            return false;
 
+        bool changed = false;
         constructions ??= GetActiveConstructionsOnScene();
         RecalculatePlayerRuntimeFlags(constructions);
         for (int i = 0; i < players.Count; i++)
@@ -4259,9 +4261,12 @@ public class MatchController : MonoBehaviour
                 income += ResolveConstructionIncomeForPlayer(entry, construction);
             }
 
-            entry.incomePerTurn = Mathf.Max(0, income);
+            int nextIncome = Mathf.Max(0, income);
+            changed |= entry.incomePerTurn != nextIncome;
+            entry.incomePerTurn = nextIncome;
             players[i] = entry;
         }
+        return changed;
     }
 
     private void RecalculatePlayerRuntimeFlags(List<ConstructionManager> constructions)
