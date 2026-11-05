@@ -137,7 +137,10 @@ public partial class AIController
                     snapshot.AITeam, softObj, softReachable,
                     plan, assigned, paths);
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — vai buscar capturador {softPassenger.InstanceId}@{softCell} (sem needy; carona antecipada) via {softMove}");
-                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, softMove, paths);
+                var softPickupAction = BuildMoveBatch(unit, snapshot.AITeam, fromCell, softMove, paths);
+                TraceAIReviewParticipant(softPickupAction, softPassenger.InstanceId,
+                    "Passageiro potencial da busca antecipada", "soft_pickup", softMove);
+                return softPickupAction;
             }
 
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — sem passageiro, pressiona {sectorCell}");

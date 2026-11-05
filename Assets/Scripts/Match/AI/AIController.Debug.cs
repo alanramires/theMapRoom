@@ -25,7 +25,174 @@ public partial class AIController
         public SaveGameManager.AIReviewSaveReference nearestSave;
         public AIReviewState stateBeforeDecision, stateBeforeExecution;
         public List<AIReviewCandidate> candidates = new List<AIReviewCandidate>();
+        public List<AIReviewParticipant> participants = new List<AIReviewParticipant>();
     }
+
+    [System.Serializable]
+    public sealed class AIReviewParticipant
+    {
+        public int unitId;
+        public string name, role, source;
+        public Vector3Int cell;
+        public bool hasRelatedCell;
+        public Vector3Int relatedCell;
+    }
+
+    private sealed class AIReviewParticipantTrace
+    {
+        public PlayerAction choice;
+        public int unitId;
+        public string role, source;
+        public Vector3Int? relatedCell;
+    }
+
+    private readonly List<AIReviewParticipantTrace> aiReviewParticipantTraces = new List<AIReviewParticipantTrace>();
+
+    private void TraceAIReviewParticipant(PlayerAction choice, int unitId, string role, string source, Vector3Int? relatedCell = null)
+    {
+        if (!IsCollectingAIReview || choice == null || unitId < 0) return;
+        aiReviewParticipantTraces.Add(new AIReviewParticipantTrace
+        { choice = choice, unitId = unitId, role = role, source = source, relatedCell = relatedCell });
+    }
+
+    private void TraceAIReviewHandoffParticipants(PlayerAction choice, UnitManager actor,
+        ConstructionManager origin, SectorObjective objective)
+    {
+        if (!IsCollectingAIReview || actor == null || objective?.Slots == null) return;
+        foreach (var need in objective.Slots)
+            if (need != null && need.Filled && need.Role == UnitRole.Capturador && need.AssignedUnitId != actor.InstanceId)
+                TraceAIReviewParticipant(choice, need.AssignedUnitId, "Substituto previsto na captura", "planned_handoff",
+                    origin != null ? origin.CurrentCellPosition : (Vector3Int?)null);
+    }
+
+    private List<AIReviewParticipant> BuildAIReviewParticipants(AIReviewRecord record, PlayerAction action)
+    {
+        var result = new List<AIReviewParticipant>();
+        var state = record.stateBeforeExecution ?? record.stateBeforeDecision;
+        if (state?.units == null || !int.TryParse(action.UnitInstanceId, out int actorId)) return result;
+        void Add(int id, string role, string source, Vector3Int? relatedCell = null)
+        {
+            if (id == actorId || id < 0) return;
+            var unit = state.units.Find(x => x.id == id);
+            if (unit == null) return; // Only units present in the frozen, fog-honest snapshot.
+            var existing = result.Find(x => x.unitId == id);
+            if (existing == null)
+            {
+                result.Add(new AIReviewParticipant
+                {
+                    unitId = id, name = unit.name, cell = unit.cell, role = role, source = source,
+                    hasRelatedCell = relatedCell.HasValue, relatedCell = relatedCell ?? default
+                });
+            }
+            else
+            {
+                if (!existing.role.Contains(role)) existing.role += "; " + role;
+                if (!existing.source.Contains(source)) existing.source += ";" + source;
+                if (relatedCell.HasValue) { existing.hasRelatedCell = true; existing.relatedCell = relatedCell.Value; }
+            }
+        }
+        foreach (var trace in aiReviewParticipantTraces)
+            if (ReferenceEquals(trace.choice, action)) Add(trace.unitId, trace.role, trace.source, trace.relatedCell);
+
+        // Existing selected pairings/reservations: read only, never run a matching scan.
+        foreach (var pair in transportPickupBeacons)
+        {
+            if (pair.Key == actorId) Add(pair.Value, "Passageiro potencial pareado", "pickup_beacon");
+            if (pair.Value == actorId) Add(pair.Key, "Transportador pareado", "pickup_beacon");
+        }
+        foreach (var manifest in tacticalPickupManifestBeacons)
+        {
+            if (manifest.Value == null) continue;
+            if (manifest.Key == actorId)
+                foreach (int passengerId in manifest.Value) Add(passengerId, "Passageiro potencial na LZ", "tactical_manifest");
+            if (manifest.Value.Contains(actorId)) Add(manifest.Key, "Transportador com encontro previsto na LZ", "tactical_manifest");
+        }
+        foreach (var unit in state.units)
+        {
+            if (unit.id == actorId && unit.transportTargetId > 0)
+                Add(unit.transportTargetId, "Passageiro com promessa de resgate", "ride_promise");
+            if (unit.transportTargetId == actorId)
+                Add(unit.id, "Transportador com promessa de resgate", "ride_promise");
+            if (unit.id == actorId && unit.embarkedTransporterId > 0)
+                Add(unit.embarkedTransporterId, "Transporte atual", "current_carrier");
+            if (unit.embarkedTransporterId == actorId)
+                Add(unit.id, "Passageiro a bordo", "current_cargo");
+        }
+        foreach (var pending in pendingAIDesignatedMissions)
+            if (pending.Value.Intent == AIPlanRuntimeIntent.Transport)
+            {
+                if (pending.Key == actorId) Add(pending.Value.TargetUnitInstanceId, "Passageiro da coleta planejada", "pending_transport_mission", pending.Value.TargetCell);
+                if (pending.Value.TargetUnitInstanceId == actorId) Add(pending.Key, "Transportador da coleta planejada", "pending_transport_mission", pending.Value.TargetCell);
+            }
+        if (action.SensorAction == SensorActionType.Embark || action.SensorAction == SensorActionType.Disembark
+            || action.SensorAction == SensorActionType.Merge || action.SensorAction == SensorActionType.Supply || action.SensorAction == SensorActionType.Transfer)
+        {
+            if (int.TryParse(action.TargetInstanceId, out int targetId)) Add(targetId, "Alvo da interacao", "command_target");
+            if (action.SubSteps != null)
+                foreach (var step in action.SubSteps)
+                    if (step != null && int.TryParse(step.TargetInstanceId, out int subTarget)) Add(subTarget, "Envolvido no comando " + step.Label, "command_substep");
+        }
+        // Reverse handoff: the successor can also see who is yielding the capture.
+        if (!string.IsNullOrEmpty(state.planJson) && state.planJson != "null")
+        {
+            var plan = JsonUtility.FromJson<TeamObjectivePlan>(state.planJson);
+            if (plan?.Objectives != null)
+                foreach (var objective in plan.Objectives)
+                    if (objective != null && objective.PreferredHandoffFromUnitId >= 0 && objective.PreferredHandoffFromUnitId != actorId
+                        && objective.Slots != null && objective.Slots.Exists(x => x.Filled && x.Role == UnitRole.Capturador && x.AssignedUnitId == actorId))
+                        Add(objective.PreferredHandoffFromUnitId, "Unidade que cede a captura no plano", "objective_handoff");
+        }
+        result.Sort((a, b) => a.unitId.CompareTo(b.unitId));
+        return result;
+    }
+
+    public static List<AIReviewVisualPair> BuildAIReviewParticipantVisualPairs(AIReviewRecord record, Vector3Int actorCell)
+    {
+        var pairs = new List<AIReviewVisualPair>();
+        if (record?.participants == null) return pairs;
+        var color = new Color(0.2f, 0.85f, 1f, 1f);
+        foreach (var participant in record.participants)
+        {
+            pairs.Add(new AIReviewVisualPair { From = participant.cell, To = participant.cell, Label = "AIReviewParticipant", Color = color });
+            Vector3Int anchor = participant.hasRelatedCell ? participant.relatedCell : actorCell;
+            if (anchor != participant.cell)
+                pairs.Add(new AIReviewVisualPair { From = participant.cell, To = anchor, Label = "AIReviewRelationship", Color = color });
+        }
+        return pairs;
+    }
+
+    public bool FocusAIReviewParticipant(int unitId)
+    {
+        var participant = pendingAIReview?.participants?.Find(x => x.unitId == unitId);
+        if (!HasPendingAIReview || participant == null) return false;
+        var map = boardTilemap != null ? boardTilemap : turnStateManager?.MovementTilemapRef;
+        var camera = FindAnyObjectByType<CameraController>();
+        if (map == null || camera == null) return false;
+        camera.FocusOn(HexCoordinates.GetCellCenterWorld(map, participant.cell), instant: false);
+        return true;
+    }
+
+    private void DrawAIReviewParticipants(AIReviewRecord record, GUIStyle style)
+    {
+        if (record.participants == null || record.participants.Count == 0) return;
+        GUILayout.Label("ENVOLVIDOS NA DECISAO ESCOLHIDA - nao agem agora", style);
+        foreach (var participant in record.participants)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{participant.name} #{participant.unitId} {FormatCell(participant.cell)}: {participant.role}", style);
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled = wasEnabled && HasPendingAIReview;
+            if (GUILayout.Button("Focar #" + participant.unitId, GUILayout.Width(90f)))
+            {
+                GUI.FocusControl(null); aiReviewNoteFocused = false;
+                FocusAIReviewParticipant(participant.unitId);
+            }
+            GUI.enabled = wasEnabled;
+            GUILayout.EndHorizontal();
+        }
+        GUILayout.Label("Azul = envolvido/pareamento; ligacao sem seta nao e uma ordem de movimento nem garante embarque.", style);
+    }
+
 
     [System.Serializable]
     public sealed class AIReviewCandidate
@@ -41,7 +208,7 @@ public partial class AIController
     [System.Serializable]
     public sealed class AIReviewUnitState
     {
-        public int id, slot, hp, movement, ammo;
+        public int id, slot, hp, movement, ammo, transportTargetId = -1, embarkedTransporterId = -1;
         public float fuel;
         public string type, name;
         public Vector3Int cell;
@@ -150,6 +317,9 @@ public partial class AIController
                 id = unit.InstanceId, slot = unit.SlotIndex, hp = unit.CurrentHP,
                 movement = unit.RemainingMovementPoints, fuel = unit.CurrentFuel, ammo = unit.CurrentAmmo,
                 type = unit.UnitId, name = unit.UnitDisplayName, cell = unit.CurrentCellPosition,
+                transportTargetId = unit.AIHasDesignatedMission && unit.AIDesignatedMissionIntent == AIPlanRuntimeIntent.Transport
+                    ? unit.AIDesignatedMissionTargetUnitInstanceId : -1,
+                embarkedTransporterId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : -1,
                 acted = unit.HasActed, embarked = unit.IsEmbarked
             });
         }
@@ -258,6 +428,7 @@ public partial class AIController
         record.hasStateBeforeExecution = record.stateBeforeExecution != null;
         if (!record.hasStateBeforeDecision || !record.hasStateBeforeExecution)
             record.snapshotWarning = "Uma das fotos nao pode ser capturada; este registro nao deve ser usado como prova do estado completo.";
+        record.participants = BuildAIReviewParticipants(record, action);
         record.actionJson = JsonUtility.ToJson(action); // captured before attaching record: no serialization cycle
         record.candidates = currentAIStage == 2 || currentAIStage == 3 ? FinalizeAIReviewCandidates(action) : new List<AIReviewCandidate>();
         record.candidatesObserved = currentAIStage == 2 || currentAIStage == 3 ? aiReviewCandidateCount : 0;
@@ -675,6 +846,7 @@ public partial class AIController
         EndAIReviewCapture();
         aiReviewLogs.Clear();
         aiReviewCandidates.Clear();
+        aiReviewParticipantTraces.Clear();
         aiReviewCandidateCount = 0;
         aiReviewDecisionState = null;
         aiDecisionReasons = "";
@@ -874,6 +1046,30 @@ public partial class AIController
         return pairs;
     }
 
+    public static bool TryGetAIReviewActorCell(PlayerAction action, out Vector3Int cell)
+    {
+        cell = default;
+        if (action == null || action.ActionType != PlayerActionType.UnitAction || string.IsNullOrEmpty(action.UnitInstanceId))
+            return false;
+        if (action.HasMoveFrom) cell = action.MoveFrom;
+        else if (action.HasCursorHex) cell = action.CursorHex;
+        else return false;
+        cell.z = 0;
+        return true;
+    }
+
+    public bool FocusAIReviewActor()
+    {
+        if (!HasPendingAIReview || !TryGetAIReviewActorCell(aiReviewVisualAction, out var cell)) return false;
+        var map = boardTilemap != null ? boardTilemap : turnStateManager?.MovementTilemapRef;
+        var camera = FindAnyObjectByType<CameraController>();
+        if (map == null || camera == null) return false;
+        // Camera presentation only. Never moves/selects the gameplay cursor or executes an action.
+        camera.FocusOn(HexCoordinates.GetCellCenterWorld(map, cell), instant: false);
+        return true;
+    }
+
+
     private void LateUpdate()
     {
         bool visible = HasPendingAIReview && !aiReviewApproved && IsAIReviewWindowVisible();
@@ -887,6 +1083,11 @@ public partial class AIController
         var pairs = aiReviewPreviewCandidate >= 0
             ? BuildAIReviewCandidateVisualPairs(pendingAIReview, aiReviewPreviewCandidate, out aiReviewPreviewMessage)
             : BuildAIReviewVisualPairs(aiReviewVisualAction);
+        if (TryGetAIReviewActorCell(aiReviewVisualAction, out var actorCell))
+        {
+            pairs.Insert(0, new AIReviewVisualPair { From = actorCell, To = actorCell, Label = "AIReviewActor", Color = Color.white });
+            pairs.AddRange(BuildAIReviewParticipantVisualPairs(pendingAIReview, actorCell));
+        }
         turnStateManager.ShowAIReviewPairs(pairs);
         aiReviewDrawnAction = aiReviewVisualAction;
         aiReviewDrawnCandidate = aiReviewPreviewCandidate;
@@ -895,6 +1096,8 @@ public partial class AIController
 
     private Rect aiReviewWindowRect;
     private bool aiReviewWindowPositioned;
+    private bool aiReviewResizing;
+    private Vector2 aiReviewResizeStartMouse, aiReviewResizeStartSize;
 
     private bool IsAIReviewWindowVisible()
     {
@@ -912,6 +1115,8 @@ public partial class AIController
             aiReviewWindowRect = new Rect(Screen.width - width - 12f, 12f, width, height);
             aiReviewWindowPositioned = true;
         }
+        width = Mathf.Clamp(aiReviewWindowRect.width, Mathf.Min(420f, Screen.width), Mathf.Max(1f, Screen.width));
+        height = Mathf.Clamp(aiReviewWindowRect.height, Mathf.Min(460f, Screen.height), Mathf.Max(1f, Screen.height));
         aiReviewWindowRect.width = width;
         aiReviewWindowRect.height = height;
         aiReviewWindowRect.x = Mathf.Clamp(aiReviewWindowRect.x, 0f, Mathf.Max(0f, Screen.width - width));
@@ -923,14 +1128,43 @@ public partial class AIController
     // A camera consulta isto no Update: consumir apenas Event.Use no OnGUI nao bloqueia o input bruto.
     public bool IsPointerOverAIReview(Vector2 screenPosition)
     {
-        return IsAIReviewWindowVisible() && GetAIReviewWindowRect().Contains(
-            new Vector2(screenPosition.x, Screen.height - screenPosition.y));
+        return IsAIReviewWindowVisible() && (aiReviewResizing || GetAIReviewWindowRect().Contains(
+            new Vector2(screenPosition.x, Screen.height - screenPosition.y)));
     }
 
     private bool DrawAIReview()
     {
         if (!IsAIReviewWindowVisible()) { aiReviewNoteFocused = false; return false; }
         Rect windowRect = GetAIReviewWindowRect();
+        int resizeId = GUIUtility.GetControlID(0x41495253, FocusType.Passive);
+        var resizeEvent = Event.current;
+        var grip = new Rect(windowRect.xMax - 22f, windowRect.yMax - 22f, 22f, 22f);
+        if (resizeEvent.type == EventType.MouseDown && resizeEvent.button == 0 && grip.Contains(resizeEvent.mousePosition))
+        {
+            GUIUtility.hotControl = resizeId;
+            aiReviewResizing = true;
+            aiReviewResizeStartMouse = resizeEvent.mousePosition;
+            aiReviewResizeStartSize = windowRect.size;
+            resizeEvent.Use();
+        }
+        if (aiReviewResizing && GUIUtility.hotControl == resizeId)
+        {
+            if (resizeEvent.type == EventType.MouseDrag)
+            {
+                Vector2 size = aiReviewResizeStartSize + resizeEvent.mousePosition - aiReviewResizeStartMouse;
+                aiReviewWindowRect.size = new Vector2(
+                    Mathf.Clamp(size.x, Mathf.Min(420f, Screen.width - windowRect.x), Screen.width - windowRect.x),
+                    Mathf.Clamp(size.y, Mathf.Min(460f, Screen.height - windowRect.y), Screen.height - windowRect.y));
+                windowRect = GetAIReviewWindowRect();
+                resizeEvent.Use();
+            }
+            else if (resizeEvent.type == EventType.MouseUp)
+            {
+                GUIUtility.hotControl = 0;
+                aiReviewResizing = false;
+                resizeEvent.Use();
+            }
+        }
         if (Event.current.type == EventType.MouseDown && !windowRect.Contains(Event.current.mousePosition))
         {
             GUI.FocusControl(null);
@@ -950,11 +1184,24 @@ public partial class AIController
 
     private void DrawAIReviewWindowContents(int windowId)
     {
-        GUILayout.BeginArea(new Rect(8f, 28f, aiReviewWindowRect.width - 16f, aiReviewWindowRect.height - 36f));
+        GUILayout.BeginArea(new Rect(8f, 28f, aiReviewWindowRect.width - 16f, aiReviewWindowRect.height - 52f));
         var record = pendingAIReview ?? (aiReviewHistory.Count > 0 ? aiReviewHistory[aiReviewHistory.Count - 1] : null);
         string stance = record != null ? record.current_stance : aiReviewCurrentStance;
         GUILayout.Label("current_stance: " + (string.IsNullOrEmpty(stance) ? "nao registrada neste passo" : stance),
             new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, wordWrap = true });
+        if (HasPendingAIReview && TryGetAIReviewActorCell(aiReviewVisualAction, out var actorCell))
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Vai agir: " + ResolveUnitLabel(aiReviewVisualAction.UnitInstanceId) + " " + FormatCell(actorCell),
+                new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, wordWrap = true });
+            if (GUILayout.Button("Focar unidade", GUILayout.Width(125f)))
+            {
+                GUI.FocusControl(null);
+                aiReviewNoteFocused = false;
+                FocusAIReviewActor();
+            }
+            GUILayout.EndHorizontal();
+        }
         aiReviewScroll = GUILayout.BeginScrollView(aiReviewScroll);
         GUIStyle textStyle = new GUIStyle(GUI.skin.label) { wordWrap = true };
         if (record == null)
@@ -965,9 +1212,10 @@ public partial class AIController
             GUILayout.Label("DECISAO\n" + record.decision, textStyle);
             GUILayout.Label("MISSAO\n" + record.mission, textStyle);
             GUILayout.Label("MOTIVOS (logs reais da IA)\n" + (string.IsNullOrWhiteSpace(record.reasons) ? "Nenhum motivo registrado. Ative Show AI Logs." : record.reasons), textStyle);
+            DrawAIReviewParticipants(record, textStyle);
             DrawAIReviewAlternatives(record, textStyle);
             GUILayout.Label("COMANDOS PREVISTOS\n" + record.commands, textStyle);
-            GUILayout.Label("Linhas no mapa: ciano = movimento; vermelho = ataque; roxo = transporte; amarelo = outras interacoes. Anel = acao no proprio hex.", textStyle);
+            GUILayout.Label("Quadrado branco = unidade que vai agir. Linhas: ciano = movimento; vermelho = ataque; roxo = transporte; amarelo = outras interacoes. Anel = acao no proprio hex.", textStyle);
             if (!string.IsNullOrEmpty(record.result)) GUILayout.Label("RESULTADO\n" + record.result, textStyle);
         }
         if (record?.nearestSave != null)
@@ -979,7 +1227,8 @@ public partial class AIController
         GUILayout.EndScrollView();
         GUI.enabled = record != null;
         GUILayout.Label("Classificação da nota:");
-        aiReviewMarkClassIndex = GUILayout.Toolbar(aiReviewMarkClassIndex, aiReviewMarkClassLabels);
+        aiReviewMarkClassIndex = GUILayout.SelectionGrid(aiReviewMarkClassIndex, aiReviewMarkClassLabels,
+            aiReviewWindowRect.width < 560f ? 3 : aiReviewMarkClassLabels.Length);
         GUILayout.Label("Nota opcional:");
         var noteStyle = new GUIStyle(GUI.skin.textArea) { wordWrap = true };
         float noteWidth = Mathf.Max(40f, aiReviewWindowRect.width - 24f);
@@ -999,7 +1248,8 @@ public partial class AIController
         if (GUILayout.Button(record != null && (record.marked || record.markedStrange) ? "Adicionar outra marca" : "Salvar marca"))
             MarkAIReview(aiReviewNote, aiReviewMarkClassCodes[aiReviewMarkClassIndex]);
         GUI.enabled = true;
-        GUILayout.BeginHorizontal();
+        bool compactButtons = aiReviewWindowRect.width < 560f;
+        if (compactButtons) GUILayout.BeginVertical(); else GUILayout.BeginHorizontal();
         GUI.enabled = HasPendingAIReview && !aiReviewApproved;
         if (GUILayout.Button("Executar decisao")) ApproveAIReview();
         if (GUILayout.Button("Continuar automaticamente"))
@@ -1016,8 +1266,10 @@ public partial class AIController
         {
             SetAIReviewVisible(false);
         }
-        GUILayout.EndHorizontal();
+        if (compactButtons) GUILayout.EndVertical(); else GUILayout.EndHorizontal();
         GUILayout.EndArea();
+        GUI.Label(new Rect(aiReviewWindowRect.width - 22f, aiReviewWindowRect.height - 22f, 22f, 22f),
+            new GUIContent("◢", "Arraste para redimensionar"));
         GUI.DragWindow(new Rect(0f, 0f, aiReviewWindowRect.width, 26f));
     }
 

@@ -193,3 +193,23 @@ F10 vence. Continuar automaticamente limpa o foco da nota ao desligar AI Step.
 A pausa aguarda o ponto seguro do batch em andamento; nao e cancelamento/rollback.
 
 Teste fora de Play: `unity command script eval --file tools/ai_test/verificar_ai_f10.cs`.
+
+## Identificar quem vai agir
+
+O cabecalho fixo mostra Vai agir: nome #id e a coordenada da unidade pendente.
+Um quadrado branco marca sua celula de origem mesmo em Mover Parado, sem depender
+de existir linha de deslocamento. Ele continua visivel ao inspecionar alternativas
+e desaparece junto da previa ao fechar, concluir ou invalidar a revisao.
+Focar unidade centraliza apenas a camera, sem mover o cursor, selecionar a unidade,
+recalcular sensores ou executar a decisao. Compras e fim de turno nao inventam ator.
+
+Teste: `unity command script eval --file tools/ai_test/verificar_ai_actor_focus.cs`.
+
+
+### Unidades envolvidas no passo
+
+O ator recebe um quadrado branco, inclusive quando fica parado. Os parceiros da decisao escolhida recebem quadrados azuis e linhas tracejadas sem setas: sao vinculos, nao comandos de deslocamento. A secao ENVOLVIDOS mostra o papel e um botao de foco para cada unidade.
+
+Inclui substitutos de captura/revezamento, passageiro potencial da busca antecipada, pareamentos de coleta/LZ, promessas de transporte e passageiros a bordo. Um pareamento potencial nao garante embarque neste passo. Ao visualizar alternativas, esta secao continua identificando os envolvidos da decisao escolhida.
+
+Identidade, papel e coordenadas ficam congelados no registro e seguem no JSON das marcas/replay. A tela nao recalcula pareamentos nem inventa substitutos quando o plano ainda nao os definiu. O teste tools/ai_test/verificar_ai_participants.cs verifica filtros, deduplicacao, serializacao e geometria sem executar uma jogada.

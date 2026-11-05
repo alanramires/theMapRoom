@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -115,6 +115,7 @@ public partial class AIController
             Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> captura {advanceSector}"
                 + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell));
             action = BuildCaptureBatch(unit, snapshot.AITeam, from, targetCell, paths);
+            TraceAIReviewHandoffParticipants(action, unit, origin, handoffObjective);
             return true;
         }
 
@@ -127,7 +128,10 @@ public partial class AIController
         Vector3Int originCell = origin != null ? origin.CurrentCellPosition : new Vector3Int(int.MinValue, 0, 0);
         originCell.z = 0;
         if (TryDecideBlitzkriegTipAttack(unit, snapshot, from, originCell, paths, occupied, out action))
+        {
+            TraceAIReviewHandoffParticipants(action, unit, origin, handoffObjective);
             return true;
+        }
 
         if (targetReachable)
         {
@@ -135,6 +139,7 @@ public partial class AIController
                 + DescribeBlitzkriegHandoff(unit, origin, handoffObjective, plannedHandoff, target, targetCell)
                 + " | sem ataque util: anda ate o alvo");
             action = BuildMoveBatch(unit, snapshot.AITeam, from, targetCell, paths);
+            TraceAIReviewHandoffParticipants(action, unit, origin, handoffObjective);
             return true;
         }
 
@@ -164,6 +169,7 @@ public partial class AIController
         action = SimulateCaptureSensor(unit, best, out _)
             ? BuildCaptureBatch(unit, snapshot.AITeam, from, best, paths)
             : BuildMoveBatch(unit, snapshot.AITeam, from, best, paths);
+        TraceAIReviewHandoffParticipants(action, unit, origin, handoffObjective);
         return true;
     }
 

@@ -5639,6 +5639,8 @@ public partial class TurnStateManager
         if (map == null || pairs == null) return;
         int used = 0;
         float width = Mathf.Max(0.02f, GetMirandoPreviewWidth() * GetMirandoSpotterPreviewMultiplier());
+        float standardWidth = width;
+        int pairSortingOrder = GetMirandoPreviewSortingOrder();
         float dash = Mathf.Clamp(GetMirandoPreviewSegmentLength() * GetMirandoSpotterPreviewMultiplier() * 0.5f, 0.08f, 0.3f);
         void Segment(Vector3 from, Vector3 to, Color color)
         {
@@ -5666,6 +5668,7 @@ public partial class TurnStateManager
                 aiReviewPairLines.Add(line);
             }
             used++;
+            line.sortingOrder = pairSortingOrder;
             line.startWidth = line.endWidth = width;
             line.startColor = line.endColor = color;
             line.positionCount = 2;
@@ -5675,9 +5678,24 @@ public partial class TurnStateManager
         }
         foreach (var pair in pairs)
         {
+            bool actorMarker = pair.Label == "AIReviewActor" || pair.Label == "AIReviewParticipant";
+            width = actorMarker ? standardWidth * 1.6f : standardWidth;
+            pairSortingOrder = GetMirandoPreviewSortingOrder() + (actorMarker ? 1 : 0);
             Vector3 from = HexCoordinates.GetCellCenterWorld(map, pair.From);
             Vector3 to = HexCoordinates.GetCellCenterWorld(map, pair.To);
             from.z = to.z;
+            if (actorMarker)
+            {
+                float half = Mathf.Max(0.18f, Vector3.Distance(from,
+                    HexCoordinates.GetCellCenterWorld(map, pair.From + Vector3Int.right)) * 0.38f);
+                Vector3 a = from + new Vector3(-half, -half, 0f);
+                Vector3 b = from + new Vector3(-half, half, 0f);
+                Vector3 c = from + new Vector3(half, half, 0f);
+                Vector3 d = from + new Vector3(half, -half, 0f);
+                Segment(a, b, pair.Color); Segment(b, c, pair.Color);
+                Segment(c, d, pair.Color); Segment(d, a, pair.Color);
+                continue;
+            }
             float distance = Vector3.Distance(from, to);
             if (distance < 0.001f)
             {
@@ -5695,6 +5713,7 @@ public partial class TurnStateManager
             float spacing = Mathf.Max(dash * 1.8f, distance / 128f);
             for (float at = 0; at < distance; at += spacing)
                 Segment(from + direction * at, from + direction * Mathf.Min(at + dash, distance), pair.Color);
+            if (pair.Label == "AIReviewRelationship") continue; // Association, not an action order.
             Vector3 side = new Vector3(-direction.y, direction.x, 0f);
             float arrow = Mathf.Min(0.18f, distance * 0.25f);
             Segment(to - direction * arrow + side * arrow * 0.6f, to, pair.Color);

@@ -656,7 +656,7 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log("[Debug Command] AI SHOPPING RESUME.");
             }
         }
-        else if (command == "AI REPLAN" || command == "AI REPLAN RESET"
+        else if (command == "AI REPLAN" || command == "AI RESET PLAN" || command == "AI REPLAN RESET"
             || command == "AI REPLANEJAR" || command == "AI REPLANEJAR RESET")
         {
             // Save do meio do turno traz o plano JA DECIDIDO (handoffs, vagas) e a retomada no
@@ -1099,7 +1099,7 @@ public class PanelDebugController : MonoBehaviour
             "ai shopping pause | pause ai shopping\n" +
             "ai shopping resume | resume ai shopping\n" +
             "ai stage <1-3> (reinicia a IA no bloco escolhido)\n" +
-            "ai replan [reset] | ai replanejar [reset] - refaz o plano da IA ativa (use apos carregar save do meio do turno)\n" +
+            "ai replan [reset] | ai reset plan | ai replanejar [reset] - refaz o plano da IA ativa (use apos carregar save do meio do turno)\n" +
             "tutorial help | help tutorial - lista os comandos de roteiro do tutorial (spawn/stat das falas)\n" +
             "help";
     }

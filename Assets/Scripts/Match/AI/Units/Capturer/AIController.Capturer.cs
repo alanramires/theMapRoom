@@ -36,7 +36,11 @@ public partial class AIController
             if (incoming != null)
             {
                 PlayerAction swapAction = DecideSwapVacateAction(unit, incoming, snapshot);
-                if (swapAction != null) return swapAction;
+                if (swapAction != null)
+                {
+                    TraceAIReviewParticipant(swapAction, incoming.InstanceId, "Substituto na captura", "capturer_swap", unit.CurrentCellPosition);
+                    return swapAction;
+                }
             }
         }
 
