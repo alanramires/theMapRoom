@@ -23,6 +23,207 @@ using UnityEditor;
 [AddComponentMenu("The Map Room/Beach Manager")]
 public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
 {
+    [Serializable]
+    public sealed class IslandTerrainCount
+    {
+        public TerrainTypeData terrain;
+        public int count;
+    }
+
+    [Serializable]
+    public sealed class IslandInfo
+    {
+        public string IslandId { get; internal set; }
+        public string DisplayName { get; internal set; }
+        public Vector3Int RepresentativeCell { get; internal set; }
+        public IReadOnlyList<Vector3Int> Cells => cells;
+        public IReadOnlyList<ConstructionSector> Sectors => sectors;
+        public IReadOnlyList<string> BeachIds => beachIds;
+        public IReadOnlyList<IslandTerrainCount> TerrainCounts => terrainCounts;
+        public int CellCount => cells.Count;
+        internal readonly List<Vector3Int> cells = new List<Vector3Int>();
+        internal readonly List<ConstructionSector> sectors = new List<ConstructionSector>();
+        internal readonly List<string> beachIds = new List<string>();
+        internal readonly List<IslandTerrainCount> terrainCounts = new List<IslandTerrainCount>();
+    }
+
+    [Header("Informational Land Islands")]
+    [Tooltip("Terrenos que conectam ilhas. Vazio usa plains, forest, mountain e beach do TerrainDatabase. Agua e estruturas nao criam conexoes.")]
+    [SerializeField] private List<TerrainTypeData> islandLandTerrains = new List<TerrainTypeData>();
+    private readonly List<IslandInfo> islands = new List<IslandInfo>();
+    private readonly Dictionary<Vector3Int, IslandInfo> islandByCell = new Dictionary<Vector3Int, IslandInfo>();
+    private readonly Dictionary<Vector3Int, TerrainTypeData> islandTerrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
+    private readonly List<IslandInfo> regionIslands = new List<IslandInfo>();
+    private readonly Dictionary<Vector3Int, IslandInfo> regionIslandByCell = new Dictionary<Vector3Int, IslandInfo>();
+    private string regionIslandSourceKey;
+    private RectInt regionIslandBounds;
+    private string islandSourceKey;
+    private int islandCheckedFrame = -1;
+    public IReadOnlyList<IslandInfo> Islands { get { EnsureIslands(); return islands; } }
+
+    public bool TryGetIslandAtCell(Vector3Int cell, out IslandInfo island)
+    {
+        EnsureIslands();
+        cell.z = 0;
+        return islandByCell.TryGetValue(cell, out island);
+    }
+
+    // A sector may span several islands. Membership uses every building, never its centroid.
+    public IReadOnlyList<IslandInfo> GetIslandsForSector(ConstructionSector sector)
+    {
+        EnsureIslands();
+        return islands.FindAll(x => x.sectors.Contains(sector));
+    }
+
+    // Clip BEFORE component discovery: authoring quadrants can touch outside the played map.
+    // Separate cache keeps editor previews from replacing the full catalog used by gameplay.
+    public IReadOnlyList<IslandInfo> GetIslandsInRegion(RectInt region)
+    {
+        EnsureIslands();
+        if (regionIslandSourceKey == islandSourceKey && regionIslandBounds == region) return regionIslands;
+        var land = new Dictionary<Vector3Int, TerrainTypeData>();
+        foreach (var entry in islandTerrainByCell)
+            if (region.Contains(new Vector2Int(entry.Key.x, entry.Key.y))) land.Add(entry.Key, entry.Value);
+        TryResolveTopology(out BoardTopologyIndex topology);
+        BuildIslandComponentsInto(land, ResolveMapId(topology, boardTilemap), regionIslands, regionIslandByCell);
+        ApplyIslandMembershipAndNames(regionIslands, regionIslandByCell);
+        regionIslandBounds = region;
+        regionIslandSourceKey = islandSourceKey;
+        return regionIslands;
+    }
+
+    private HashSet<TerrainTypeData> ResolveIslandTerrains()
+    {
+        var result = new HashSet<TerrainTypeData>();
+        if (islandLandTerrains != null && islandLandTerrains.Count > 0)
+        {
+            foreach (var terrain in islandLandTerrains) if (terrain != null) result.Add(terrain);
+            return result;
+        }
+        // Explicit project terrain IDs, not a domain test: beach has naval domain in this game.
+        if (terrainDatabase != null)
+            foreach (string id in new[] { "plains", "forest", "mountain", "beach" })
+                if (terrainDatabase.TryGetById(id, out var terrain)) result.Add(terrain);
+        if (beachTerrainType != null) result.Add(beachTerrainType);
+        return result;
+    }
+
+    private void EnsureIslands()
+    {
+        EnsureCurrent();
+        if (Application.isPlaying && islandCheckedFrame == Time.frameCount) return;
+        islandCheckedFrame = Time.frameCount;
+        TryResolveTopology(out BoardTopologyIndex topology);
+        var allowed = ResolveIslandTerrains();
+        var identities = new List<string>();
+        foreach (var terrain in allowed) identities.Add(terrain.GetEntityId().ToString());
+        identities.Sort();
+        var key = new System.Text.StringBuilder();
+        key.Append(boardTilemap != null ? boardTilemap.GetEntityId().ToString() : "none").Append('|')
+            .Append(topology != null ? topology.TopologyFingerprint : "").Append('|')
+            .Append(sourceTopologyFingerprint).Append('|').Append(string.Join(",", identities));
+        foreach (var building in ConstructionManager.AllActive)
+            if (building != null && building.gameObject.scene == gameObject.scene && !building.IsFakeBuilding)
+                key.Append('|').Append(building.GetEntityId().ToString()).Append(':').Append((int)building.Sector)
+                    .Append(':').Append(building.CurrentCellPosition);
+        string source = key.ToString();
+        if (source == islandSourceKey) return;
+        islands.Clear(); islandByCell.Clear(); islandTerrainByCell.Clear();
+        regionIslandSourceKey = null;
+        if (boardTilemap == null || terrainDatabase == null) { islandSourceKey = source; return; }
+        var land = new Dictionary<Vector3Int, TerrainTypeData>();
+        // Terrain only. A road/bridge overlay never joins two islands across water.
+        if (topology != null && topology.IsReady)
+        {
+            foreach (var record in topology.Cells)
+                if (record != null && record.terrain != null && allowed.Contains(record.terrain))
+                {
+                    var cell = record.cell; cell.z = 0;
+                    land[cell] = record.terrain;
+                }
+        }
+        else
+        {
+            foreach (var map in CollectCompatibleTilemaps(boardTilemap))
+                foreach (var raw in map.cellBounds.allPositionsWithin)
+                    if (terrainDatabase.TryGetByPaletteTile(map.GetTile(raw), out var terrain) && allowed.Contains(terrain))
+                    {
+                        var cell = raw; cell.z = 0;
+                        if (!land.ContainsKey(cell)) land.Add(cell, terrain);
+                    }
+        }
+        foreach (var entry in land) islandTerrainByCell.Add(entry.Key, entry.Value);
+        BuildIslandComponents(land, ResolveMapId(topology, boardTilemap));
+        ApplyIslandMembershipAndNames(islands, islandByCell);
+        islandSourceKey = source;
+    }
+
+    private void ApplyIslandMembershipAndNames(List<IslandInfo> targetIslands,
+        Dictionary<Vector3Int, IslandInfo> targetByCell)
+    {
+        foreach (var building in ConstructionManager.AllActive)
+        {
+            if (building == null || building.IsFakeBuilding || building.gameObject.scene != gameObject.scene
+                || building.Sector == ConstructionSector.None) continue;
+            var cell = building.CurrentCellPosition; cell.z = 0;
+            if (targetByCell.TryGetValue(cell, out var island) && !island.sectors.Contains(building.Sector))
+                island.sectors.Add(building.Sector);
+        }
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var island in targetIslands)
+        {
+            island.sectors.Sort((a,b) => ((int)a).CompareTo((int)b));
+            string name = null;
+            foreach (var beach in beaches)
+                if (beach != null && beach.Cells != null)
+                {
+                    bool belongs = false;
+                    foreach (var cell in beach.Cells)
+                        if (targetByCell.TryGetValue(cell, out var owner) && owner == island) { belongs = true; break; }
+                    if (!belongs) continue;
+                    island.beachIds.Add(beach.BeachId);
+                    if (name == null) name = "Ilha " + beach.DisplayName.Replace(" Beach", "");
+                }
+            if (name == null && island.sectors.Count > 0) name = "Ilha " + island.sectors[0];
+            if (name == null) name = $"Ilha ({island.RepresentativeCell.x},{island.RepresentativeCell.y})";
+            if (!names.Add(name)) name += $" ({island.RepresentativeCell.x},{island.RepresentativeCell.y})";
+            island.DisplayName = name;
+        }
+    }
+
+    private void BuildIslandComponents(Dictionary<Vector3Int, TerrainTypeData> land, string mapId)
+    {
+        BuildIslandComponentsInto(land, mapId, islands, islandByCell);
+    }
+
+    private void BuildIslandComponentsInto(Dictionary<Vector3Int, TerrainTypeData> land, string mapId,
+        List<IslandInfo> targetIslands, Dictionary<Vector3Int, IslandInfo> targetByCell)
+    {
+        targetIslands.Clear(); targetByCell.Clear();
+        var source = new List<Vector3Int>(land.Keys);
+        foreach (var component in DiscoverConnectedBeachComponents(boardTilemap, source))
+        {
+            var island = new IslandInfo
+            {
+                IslandId = BuildStableBeachId(mapId + "::islands", component).Replace("beach-", "island-"),
+                RepresentativeCell = component[0]
+            };
+            island.cells.AddRange(component);
+            var counts = new Dictionary<TerrainTypeData, int>();
+            foreach (var cell in component)
+            {
+                targetByCell[cell] = island;
+                var terrain = land[cell];
+                counts.TryGetValue(terrain, out int count); counts[terrain] = count + 1;
+            }
+            foreach (var entry in counts)
+                island.terrainCounts.Add(new IslandTerrainCount { terrain = entry.Key, count = entry.Value });
+            island.terrainCounts.Sort((a,b) => string.CompareOrdinal(a.terrain.id, b.terrain.id));
+            targetIslands.Add(island);
+        }
+    }
+
+
     private const int CurrentBuildAlgorithmVersion = 3;
 
     [Serializable]
@@ -395,6 +596,8 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
 
     public void OnAfterDeserialize()
     {
+        islandSourceKey = null;
+        islandCheckedFrame = -1;
         hydrated = false;
     }
 
@@ -443,6 +646,8 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
 
     private void Rebuild(string reason, bool forceLog = false)
     {
+        islandSourceKey = null;
+        islandCheckedFrame = -1;
         TryResolveTopology(out BoardTopologyIndex topology);
         if (boardTilemap == null)
             AutoResolveSourcesFromScene();

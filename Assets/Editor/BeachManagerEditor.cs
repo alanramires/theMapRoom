@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -8,6 +9,34 @@ using UnityEngine.Tilemaps;
 [CustomEditor(typeof(BeachManager))]
 public sealed class BeachManagerEditor : Editor
 {
+    private static BeachManager focusedIslandManager;
+    private static string focusedIslandId;
+    private static string IslandPaintKey(BeachManager manager) => "BeachManager.PaintIslands." + manager.gameObject.scene.path;
+    private static Color IslandColor(int index) => Color.HSVToRGB(Mathf.Repeat(index * 0.618034f, 1f), 0.7f, 1f);
+    private static RectInt? AuthoringRegion()
+    {
+        var q = Application.isPlaying ? null : InvasionAxisMap.AuthoringQuadrante;
+        return q == null ? (RectInt?)null : new RectInt(q.originX, q.originY, Mathf.Max(1, q.width), Mathf.Max(1, q.height));
+    }
+    private static IReadOnlyList<BeachManager.IslandInfo> VisibleIslands(BeachManager manager)
+    {
+        var region = AuthoringRegion();
+        return region.HasValue ? manager.GetIslandsInRegion(region.Value) : manager.Islands;
+    }
+    private static bool VisibleCell(Vector3Int cell)
+    {
+        var region = AuthoringRegion();
+        return !region.HasValue || region.Value.Contains(new Vector2Int(cell.x, cell.y));
+    }
+    private static List<BeachManager.BeachInfo> VisibleBeaches(BeachManager manager)
+    {
+        var result = new List<BeachManager.BeachInfo>();
+        foreach (var beach in manager.Beaches)
+            foreach (var cell in beach.Cells)
+                if (VisibleCell(cell)) { result.Add(beach); break; }
+        return result;
+    }
+
     private SerializedProperty boardTilemapProp;
     private SerializedProperty terrainDatabaseProp;
     private SerializedProperty beachTerrainTypeProp;
@@ -46,6 +75,9 @@ public sealed class BeachManagerEditor : Editor
         EditorGUILayout.PropertyField(
             terrainDatabaseProp,
             new GUIContent("Terrain Database"));
+
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("islandLandTerrains"),
+            new GUIContent("Terrenos das ilhas"), true);
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField(
@@ -110,10 +142,44 @@ public sealed class BeachManagerEditor : Editor
                 MessageType.Warning);
         }
 
-        var beaches = manager.Beaches;
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Mapa de trabalho", EditorStyles.boldLabel);
+        if (GUILayout.Button("Abrir Map Helper")) MapHelperWindow.OpenWindow();
+        var authoring = Application.isPlaying ? null : InvasionAxisMap.AuthoringQuadrante;
+        EditorGUILayout.HelpBox(authoring != null
+            ? $"Recorte do Map Helper / Axis Editor: {authoring.displayName} ({authoring.quadranteId})."
+            : "Mapa inteiro. Na autoria, selecione um quadrante no Map Helper para recortar ilhas e praias.", MessageType.Info);
+        bool paintIslands = SessionState.GetBool(IslandPaintKey(manager), false);
+        bool nextPaint = EditorGUILayout.ToggleLeft("Colorir ilhas no Scene View", paintIslands);
+        if (nextPaint != paintIslands)
+        {
+            SessionState.SetBool(IslandPaintKey(manager), nextPaint);
+            SceneView.RepaintAll();
+        }
+        var islands = VisibleIslands(manager);
+        EditorGUILayout.LabelField($"Ilhas terrestres: {islands.Count}", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox("Informativo: conectividade geografica, nao caminho de tanque. Sem praias, o nome vem do primeiro setor em ordem numerica. Lista vazia de terrenos usa planicie, floresta, montanha e praia.", MessageType.Info);
+        for (int islandIndex = 0; islandIndex < islands.Count; islandIndex++)
+        {
+            var island = islands[islandIndex];
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.BeginHorizontal();
+            EditorGUI.DrawRect(GUILayoutUtility.GetRect(16f, 18f, GUILayout.Width(16f)), IslandColor(islandIndex));
+            EditorGUILayout.LabelField($"I{islandIndex + 1} - {island.DisplayName}", EditorStyles.boldLabel);
+            if (GUILayout.Button("Focar", GUILayout.Width(55f))) FocusIsland(manager, island);
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.SelectableLabel(island.IslandId, GUILayout.Height(18f));
+            EditorGUILayout.LabelField("Tiles / praias", $"{island.CellCount} / {island.BeachIds.Count}");
+            EditorGUILayout.LabelField("Setores", string.Join(", ", island.Sectors), EditorStyles.wordWrappedLabel);
+            foreach (var count in island.TerrainCounts)
+                EditorGUILayout.LabelField(count.terrain.displayName, count.count.ToString());
+            EditorGUILayout.EndVertical();
+        }
+
+        var beaches = VisibleBeaches(manager);
         int cells = 0;
         for (int i = 0; i < beaches.Count; i++)
-            cells += beaches[i] != null ? beaches[i].CellCount : 0;
+            foreach (var cell in beaches[i].Cells) if (VisibleCell(cell)) cells++;
         EditorGUILayout.HelpBox(
             $"{beaches.Count} praia(s) militar(es), {cells} hex(es) de praia. " +
             "Componentes descontinuos recebem identidades diferentes.",
@@ -148,15 +214,20 @@ public sealed class BeachManagerEditor : Editor
             Object.FindObjectsByType<BeachManager>(
                 FindObjectsInactive.Include);
         CompareFunction previousZTest = Handles.zTest;
+        Color previousColor = Handles.color;
         Handles.zTest = CompareFunction.Always;
         try
         {
             for (int i = 0; i < managers.Length; i++)
+            {
+                DrawIslands(managers[i]);
                 DrawBeachStrips(managers[i]);
+            }
         }
         finally
         {
             Handles.zTest = previousZTest;
+            Handles.color = previousColor;
         }
     }
 
@@ -168,7 +239,7 @@ public sealed class BeachManagerEditor : Editor
         if (tilemap == null)
             return;
 
-        var beaches = manager.Beaches;
+        var beaches = VisibleBeaches(manager);
         float cellDotRadius = Mathf.Max(0.10f, tilemap.cellSize.x * 0.24f);
         float repDotRadius = Mathf.Max(0.14f, tilemap.cellSize.x * 0.32f);
         for (int i = 0; i < beaches.Count; i++)
@@ -184,6 +255,7 @@ public sealed class BeachManagerEditor : Editor
             Handles.color = color;
             for (int c = 0; c < beach.Cells.Count; c++)
             {
+                if (!VisibleCell(beach.Cells[c])) continue;
                 Vector3 world =
                     tilemap.GetCellCenterWorld(beach.Cells[c]);
                 Handles.DrawSolidDisc(
@@ -192,8 +264,10 @@ public sealed class BeachManagerEditor : Editor
                     cellDotRadius);
             }
 
-            Vector3 repWorld =
-                tilemap.GetCellCenterWorld(beach.BeachRepCell);
+            Vector3Int repCell = beach.BeachRepCell;
+            if (!VisibleCell(repCell))
+                foreach (var cell in beach.Cells) if (VisibleCell(cell)) { repCell = cell; break; }
+            Vector3 repWorld = tilemap.GetCellCenterWorld(repCell);
             color.a = 0.95f;
             Handles.color = color;
             Handles.DrawSolidDisc(
@@ -216,6 +290,52 @@ public sealed class BeachManagerEditor : Editor
                 BeachLabelStyle(
                     textColor,
                     manager.BeachLabelFontSize));
+        }
+    }
+
+    private static Bounds IslandBounds(Tilemap map, BeachManager.IslandInfo island)
+    {
+        var bounds = new Bounds(map.GetCellCenterWorld(island.Cells[0]), Vector3.zero);
+        foreach (var cell in island.Cells) bounds.Encapsulate(map.GetCellCenterWorld(cell));
+        bounds.Expand(Mathf.Max(1f, map.cellSize.magnitude));
+        return bounds;
+    }
+
+    private static void FocusIsland(BeachManager manager, BeachManager.IslandInfo island)
+    {
+        focusedIslandManager = manager; focusedIslandId = island.IslandId;
+        SessionState.SetBool(IslandPaintKey(manager), true);
+        if (manager.BoardTilemap != null && SceneView.lastActiveSceneView != null)
+            SceneView.lastActiveSceneView.Frame(IslandBounds(manager.BoardTilemap, island), false);
+        SceneView.RepaintAll();
+    }
+
+    private static void DrawIslands(BeachManager manager)
+    {
+        if (manager == null || !SessionState.GetBool(IslandPaintKey(manager), false) || manager.BoardTilemap == null) return;
+        var map = manager.BoardTilemap;
+        var islands = VisibleIslands(manager);
+        float radius = Mathf.Max(0.1f, map.cellSize.x * 0.27f);
+        for (int i = 0; i < islands.Count; i++)
+        {
+            var island = islands[i];
+            var color = IslandColor(i);
+            bool selected = focusedIslandManager == manager && focusedIslandId == island.IslandId;
+            color.a = selected ? 0.65f : 0.3f;
+            Handles.color = color;
+            Vector3 center = IslandBounds(map, island).center;
+            Vector3 label = map.GetCellCenterWorld(island.Cells[0]);
+            float nearest = float.MaxValue;
+            foreach (var cell in island.Cells)
+            {
+                Vector3 world = map.GetCellCenterWorld(cell);
+                Handles.DrawSolidDisc(world, Vector3.back, radius);
+                float distance = (world - center).sqrMagnitude;
+                if (distance < nearest) { nearest = distance; label = world; }
+            }
+            Handles.color = IslandColor(i);
+            Handles.DrawWireDisc(label, Vector3.back, radius * 1.7f);
+            Handles.Label(label, $"I{i + 1} {island.DisplayName}", BeachLabelStyle(Color.white, manager.BeachLabelFontSize));
         }
     }
 
