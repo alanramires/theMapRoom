@@ -283,11 +283,16 @@ public partial class AIController
 
                 float dpq = GetTerrainDpqPontos(cell);
                 float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-                float score = motive
+                // Degraus: motivo (dinheiro) > DPQ da celula de tiro > o resto. Quem reveza para
+                // lutar luta do melhor terreno: no AI Step 2026-11-04 a montanha (dpq 3) perdeu para
+                // o plano (dpq 2) porque a ameaca pesava 80 por ponto e anulava os 400 do DPQ,
+                // com o combate previsto identico nos dois. Ameaca, alvo fraco e caminho so
+                // desempatam dentro do mesmo DPQ.
+                float score = motive * 1000f
+                    + dpq * 100000f
                     + GetCapturerTargetPreferenceScore(preference) * 0.1f
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 100f
-                    + dpq * 400f
-                    - threat * 80f
+                    - Mathf.Clamp(threat, 0f, 500f) * 10f
                     - GetPathStepCount(paths, cell) * 20f;
                 if (score > bestScore)
                 {
