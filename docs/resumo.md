@@ -1,15 +1,34 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-04, **depois** da tag `v9.6.0`.
+Ponto de retomada. Atualizado em 2026-11-05, **depois** da tag `v10.0.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.6.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
-no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.6.0.md`](relatorio_v9.6.0.md).
+`v10.0.0` tagueada e publicada, **abrindo a v10 — Cada mapa, a mesma IA**. O primeiro MVP
+estável segue no ar (v9.2.0). Relatório: [`relatorio_v10.0.0.md`](relatorio_v10.0.0.md). Os
+relatórios da v9 foram arquivados em `Versões/`.
+
+**A descoberta da v10.0.0: quase toda marca do AI Step era uma regra no lugar errado.** Não um
+número: uma constante de hex onde devia haver banda, uma composição de solo onde devia haver
+família, um corte de estrada que nenhuma ficha declarava. Cada conserto tirou a regra da IA e a
+devolveu ao mapa:
+
+- **blitz "o de trás paga":** a fila é o eixo, a base é a raiz, o herdeiro captura no Tático,
+  a ponta que reveza luta (dinheiro primeiro, melhor DPQ) e o herdeiro fica gravado no objetivo;
+- **embarque:** o veículo escolhe o par, a LZ fica na borda do Tático do passageiro rumo ao
+  destino, o hex de encontro é reservado;
+- **estrada atravessa construção** (regra de movimento, humano e IA): a construção cobra custo,
+  a rodovia decide o bônus por terreno — **visto rodando** (Tanque Leve pelo QG até (6,10));
+- **núcleo e pacote 2/2/1 por família** (`Tools > Role Families`); **ilha sem ligação por terra**
+  pede Apache e SAM/AAA, sem poupança de MBT, e a **ilha invadida** religa o terrestre;
+- **teto macro** não corta objetivo do eixo com capturador a caminho;
+- **Shopping:** veículo nasce na fábrica com estrada.
+
+O mapa de teste agora é o **Peixe Pequeno** (Q3, ilhas de metrópoles, ar + exército sem ligação
+por terra). A Batalha aponta para ele. **Nada do Shopping novo foi visto rodando lá.**
 
 **A descoberta da v9.6.0: o jogo grava o pensamento da IA, o autor marca, o agente lê.**
 A tela **AI Step** ([`ai_step.md`](ai_step.md)) para a IA antes de cada execução e
@@ -276,6 +295,24 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
+### O que a v10.0.0 deixou — o teste aéreo no Peixe Pequeno
+
+1. **Ver rodando no Peixe Pequeno** a linha `rota terrestre: SEM LIGACAO …` no Shopping, o
+   pacote comprando Apache e SAM/AAA, e a `ilha invadida` religando tanque e MBT quando o
+   inimigo desembarcar (`AIShoppingPlanner.Demand.cs`: `IsGroundCutOffFromEnemy`,
+   `TryFindEnemyOnOwnIsland`).
+2. **Counter compra tanque contra blindado na ilha do inimigo:** a demanda de counter não
+   pergunta se a ameaça alcança a nossa ilha. Próximo conserto, com a ilha do BeachManager.
+3. **Capturador com vaga que não está revezando** ainda pode tomar o prédio do herdeiro
+   escolhido (`HandoffHeirUnitId`); a trava só vale para a ponta que reveza.
+4. **Prédio neutro dentro da própria base** (aeroporto do Q3) não vira objetivo; só o
+   oportunista pega. Teste proposital do autor.
+5. **Feijão Torto depois da família:** o Obus Leve passou a contar como assalto e a vaga de
+   fogo aceita AAA. Observar se a composição ficou boa.
+6. **Medir** o mapa de custo real por destino no `MelhorEmbarqueService`
+   (`MelhorEmbarqueDestinationCostMaps`); aposentar `ShuttlePickupRange` depois.
+7. **Escrever a doutrina do blitz** em `AI Behavior/Capturador.md`.
+
 ### O que a v9.6.0 deixou — revisão lance a lance do núcleo, em andamento
 
 O fluxo: o autor joga com AI Step ligado e marca. "Adicionei um estranho" = ler a
@@ -511,25 +548,20 @@ O que vem, em ordem de custo:
 
 ### O teste da blitzkrieg reprova no código atual
 
-O [`teste_blitzkrieg.md`](AI%20Behavior/teste_blitzkrieg.md) do autor pede troca
+**Reavaliar:** o handoff foi reescrito na v10.0.0 (herdeiro no Tático, fila do eixo, herdeiro gravado); a análise abaixo é da versão antiga. O [`teste_blitzkrieg.md`](AI%20Behavior/teste_blitzkrieg.md) do autor pede troca
 sem plano, mas a troca mora no planner. Os casos C, E e F falham em
 [Handoff.cs:97](../Assets/Scripts/Match/AI/2.%20Planner/AIController.PlanEvaluator.Handoff.cs):
 - substituto que não alcança o prédio é aceito;
 - o vizinho do prédio conta como chegar nele;
 - ninguém confere se o substituto já agiu.
 
-### O eixo autorado precisa de uma ferramenta melhor
+### O eixo autorado ganhou ferramenta (v10.0.0)
 
-Escrever o grafo funciona: ficha do prédio → dropdown → grava na lista do
-quadrante, e o desenho no Scene View mostra o que o jogo vai seguir. O veredito
-do autor:
-
-> *"não é prático pra dar manutenção, mas resolve, e é o que temos no momento"*
-
-O gargalo é montar o grafo prédio por prédio sem ver a linha se formando.
-Melhorar o dropdown é polir o gesto errado — o caminho é desenhar no Scene View:
-clicar o QG, clicar os setores na ordem. E lembrar: **o desenho só se refaz quando
-se aperta "Desenhar eixos" de novo.**
+`Tools > Axis Editor`: escolhe o quadrante (liga o mesmo recorte do Map Helper), mostra a
+fila de cada eixo por slot com setas, rally sempre no fim, e desenha no Scene View a linha do
+QG ao rally com bolinha numerada por setor. Na Fixture lê os prédios **da cena**; fora dela, o
+bake. O bloco de eixo no Inspector da construção segue a ordem do clique e o quadrante do Map
+Helper.
 
 ### O `0b` NUNCA rodou
 
@@ -650,6 +682,13 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **testar mudança de IA com save do meio do turno** | o plano vai no save; a retomada no stage 2 reexecuta a decisão antiga e esconde o código novo. Usar `ai replan` na vez da IA, ou save de antes de ela planejar |
+| **o bake é foto** | mexer em rally ou eixo na cena e não rebakear deixa a Batalha com o dado velho (o dono do rally de Juliet estava na cena e não no bake). Na autoria, ler a cena |
+| **o Shopping em uso é o carrinho por papéis** | `AIShoppingPlanner.Demand.cs`, log `[AI Shopping Roles] … carrinho`. A ordenação de `landBuildings` em `AIShoppingPlanner.cs` não roda nesta partida |
+| **família não é composição** | o pacote conta por `ResolveFamily`; a composição antiga (`ResolveCompositionRole`) diverge em Obus Leve e antiaéreos. Demanda que conta por família tem de comprar por família (`RequiredFamily`) |
+| **afirmar sobre estrada sem ler a rota** | a rota autorada (bake do quadrante) e o `Rodovias.asset` decidem; a construção só cobra custo. Conferir antes de dizer que há ou não bônus |
+| **retângulos de quadrante que se tocam** | a faixa compartilhada entra no bake dos dois mapas, sem erro. Conferir o bake de cada quadrante depois de mexer nas bordas |
+| **`git mv` antes de outros commits** | a renomeação fica no índice e entra no próximo `git commit`, de qualquer frente. Mover arquivos por último, ou `git reset` antes |
 | **`unity recompile` com o jogo em Play** | recarrega o domínio e **derruba a partida** (voltou ao turno 1). Em Play, só `tools/compilar.sh`; a Unity recompila quando sai do Play |
 | **validar a IA chamando funções por dentro** | `TryAIDirectPurchase` faz a jogada valer mas não testa menu nem automata. Agir por batch → `ExecuteLiveAIBatch` |
 | **perguntar à IA todas as unidades de uma vez** | ela é sequencial: sem a reserva da anterior, o ensaio manda todos ao mesmo hex. Uma unidade, executa, a próxima |
@@ -758,25 +797,27 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | documento | uso |
 |---|---|
+| [`relatorio_v10.0.0.md`](relatorio_v10.0.0.md) | a IA lance a lance aprende o mapa — o de trás paga, o veículo escolhe o par, estrada pelo QG, núcleo por família, ilha sem ligação |
+| [`ilhas.md`](ilhas.md) | as ilhas geográficas do BeachManager e o recorte de autoria |
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
-| [`relatorio_v9.5.0.md`](relatorio_v9.5.0.md) | uma IA validando a IA — Claude joga pelo Unity CLI, produtora e compra corrigidas, fatos de medalha, diagnóstico no save |
+| [`relatorio_v9.5.0.md`](Versões/relatorio_v9.5.0.md) | uma IA validando a IA — Claude joga pelo Unity CLI, produtora e compra corrigidas, fatos de medalha, diagnóstico no save |
 | [`playtest_claude.md`](playtest_claude.md) | o playtest turno a turno: IA × Claude, cada divergência com tipo e arquivo |
-| [`relatorio_v9.4.0.md`](relatorio_v9.4.0.md) | revisão do motor — veredito de cada achado do consultor, combate em fonte única, Neutral em dois momentos |
+| [`relatorio_v9.4.0.md`](Versões/relatorio_v9.4.0.md) | revisão do motor — veredito de cada achado do consultor, combate em fonte única, Neutral em dois momentos |
 | [`arquitetura/The-Map-Room-reconhecimento-arquitetural.md`](arquitetura/The-Map-Room-reconhecimento-arquitetural.md) | o reconhecimento do consultor (estático, em `3da75fd`) — riscos e sequência sugerida; ler com o veredito do relatório v9.4.0 ao lado |
 | [`arquitetura/revisao_maquina_de_estados.md`](arquitetura/revisao_maquina_de_estados.md) | os cinco estágios do ciclo e as três fronteiras (antes de confirmar, depois de confirmar, depois de recalcular) |
-| [`relatorio_v9.3.2.md`](relatorio_v9.3.2.md) | a aula 2 contra IA que briga — save da aula e do mundo, rebelde caça, fala avulsa, relógio |
-| [`relatorio_v9.3.1.md`](relatorio_v9.3.1.md) | a primeira aula fecha — travas só do aluno, atalhos fechados, fala final, volta automática |
-| [`relatorio_v9.3.0.md`](relatorio_v9.3.0.md) | a aula vira um quadrante — Academia, regras de fim da aula, tarefas de captura, bake embarcado |
+| [`relatorio_v9.3.2.md`](Versões/relatorio_v9.3.2.md) | a aula 2 contra IA que briga — save da aula e do mundo, rebelde caça, fala avulsa, relógio |
+| [`relatorio_v9.3.1.md`](Versões/relatorio_v9.3.1.md) | a primeira aula fecha — travas só do aluno, atalhos fechados, fala final, volta automática |
+| [`relatorio_v9.3.0.md`](Versões/relatorio_v9.3.0.md) | a aula vira um quadrante — Academia, regras de fim da aula, tarefas de captura, bake embarcado |
 | [`tutorial/sintaxe.md`](tutorial/sintaxe.md) | **como escrever uma aula** — comandos, tarefas, parâmetros, convenções |
-| [`relatorio_v9.2.2.md`](relatorio_v9.2.2.md) | o primeiro estranho jogou — Configurações, Ação Direta, a névoa com uma memória só |
+| [`relatorio_v9.2.2.md`](Versões/relatorio_v9.2.2.md) | o primeiro estranho jogou — Configurações, Ação Direta, a névoa com uma memória só |
 | [`pendencias do mvp.md`](pendencias%20do%20mvp.md) | o inventário transacional: o que vaza na névoa, o que foi decidido, o que falta testar |
 | [`playtest de 3 de outubro 2026.md`](playtest%20de%203%20de%20outubro%202026.md) | o primeiro playtest externo e o que saiu dele |
-| [`relatorio_v9.2.1.md`](relatorio_v9.2.1.md) | a IA pergunta antes de decidir — questionário, fusão no perfil, reparo pela linha |
-| [`relatorio_v9.2.0.md`](relatorio_v9.2.0.md) | aguenta o celular — memória medida, áudio/texturas web, LTO, toque |
-| [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md) | o save manda na partida — load, estado fora da cena, menu no turno da IA |
-| [`relatorio_v9.0.0.md`](relatorio_v9.0.0.md) | a mesma linha — visão de regra única, construção com altura, auditável |
+| [`relatorio_v9.2.1.md`](Versões/relatorio_v9.2.1.md) | a IA pergunta antes de decidir — questionário, fusão no perfil, reparo pela linha |
+| [`relatorio_v9.2.0.md`](Versões/relatorio_v9.2.0.md) | aguenta o celular — memória medida, áudio/texturas web, LTO, toque |
+| [`relatorio_v9.1.0.md`](Versões/relatorio_v9.1.0.md) | o save manda na partida — load, estado fora da cena, menu no turno da IA |
+| [`relatorio_v9.0.0.md`](Versões/relatorio_v9.0.0.md) | a mesma linha — visão de regra única, construção com altura, auditável |
 | [`Versões/relatorio_v8.6.1.md`](Versões/relatorio_v8.6.1.md) | configurado ≠ valendo — perfis, portões (com errata na v9.0.0) |
 | [`modding/guia de modding.md`](modding/guia%20de%20modding.md) | o guia do autor; a direção "auditável" sai dele |
 | [`AI Behavior/capturador_politicas.md`](AI%20Behavior/capturador_politicas.md) | as quatro políticas do capturador, e o [teste da blitzkrieg](AI%20Behavior/teste_blitzkrieg.md) |
