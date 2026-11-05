@@ -231,6 +231,8 @@ public partial class AIController
 
         var protectedObjectives = new HashSet<SectorObjective>();
         var candidates = new List<(SectorObjective obj, float score)>();
+        InvasionAxisMap capAxisMap = InvasionAxisMap.Build(
+            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), boardTilemap);
 
         foreach (SectorObjective obj in plan.Objectives)
         {
@@ -244,6 +246,20 @@ public partial class AIController
             {
                 protectedObjectives.Add(obj);
                 Debug.Log($"[AI Macro][T{turnNumber}][{aiTeam}] preservando {obj.Sector}: progresso/captura ativa");
+                continue;
+            }
+
+            // ATRIBUIDO NAO CAI (decisao do autor, 2026-11-04). Objetivo do eixo
+            // com capturador ja a caminho fica fora do corte, como a captura em
+            // andamento. Perder um setor para o inimigo nao retira a atribuicao:
+            // a cadeia era "ele toma Foxtrot -> meu territorio cai a 36% ->
+            // Perdendo -> teto 3 -> Foxtrot, com o #14 a caminho, e o cortado".
+            // O teto continua cortando o que ainda nao tem ninguem.
+            if (capAxisMap.GetEixo(obj.Sector) > 0
+                && TryGetEnRouteCapturer(obj, aiTeam, out int enRouteId))
+            {
+                protectedObjectives.Add(obj);
+                Debug.Log($"[AI Macro][T{turnNumber}][{aiTeam}] preservando {obj.Sector}: eixo {capAxisMap.GetEixo(obj.Sector)} com capturador #{enRouteId} a caminho");
                 continue;
             }
 
@@ -302,6 +318,25 @@ public partial class AIController
             || obj.Status == ObjectiveStatus.Pursuing
             || obj.Status == ObjectiveStatus.Capturing
             || obj.Status == ObjectiveStatus.PartialReadyForHandoff;
+    }
+
+    // Capturador vivo, fora de reparo, numa vaga deste objetivo.
+    private bool TryGetEnRouteCapturer(SectorObjective obj, TeamId aiTeam, out int unitId)
+    {
+        unitId = -1;
+        if (obj?.Slots == null)
+            return false;
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot == null || !slot.Filled || slot.Role != UnitRole.Capturador)
+                continue;
+            UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (unit == null || unit.IsDead || unit.IsUnderRepair)
+                continue;
+            unitId = unit.InstanceId;
+            return true;
+        }
+        return false;
     }
 
     private static bool IsMacroProtectedOffensiveObjective(SectorObjective obj, TeamId aiTeam, AIMacroTerritoryContext macro)
