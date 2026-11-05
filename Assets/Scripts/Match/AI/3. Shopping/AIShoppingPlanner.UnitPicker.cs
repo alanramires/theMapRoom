@@ -79,6 +79,74 @@ public partial class AIShoppingPlanner
         return best;
     }
 
+    // Fabrica com estrada asfaltada passando POR ELA: o autor autora os nos da estrada pelo meio
+    // da construcao. So o proprio hex conta — o bonus exige TRECHO de estrada saindo do hex de
+    // partida, e vizinho com estrada nao basta (a fabrica colada no QG da base amarela teria
+    // prioridade sem dar bonus nenhum).
+    private static bool HasRoadAtDoor(ConstructionManager building)
+    {
+        if (building == null || building.BoardTilemap == null)
+            return false;
+        Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(building.BoardTilemap, cell);
+        return structure != null && structure.routeNetworkType == RouteNetworkType.Asfaltado;
+    }
+
+    // A ORDENACAO NAO BASTAVA. Ela so decide quem escolhe primeiro; cada fabrica
+    // escolhe com a demanda do momento, e a da estrada levava Soldado (vaga de
+    // capturador aberta) enquanto o tanque sobrava para a sem estrada (AI Step
+    // 2026-11-04, amarelo T3: Tanque B em (13,4)). Depois de decidido O QUE
+    // comprar, decide-se ONDE: veiculo que pega bonus de estrada troca de fabrica
+    // com uma compra que nao pega, se as duas fabricas oferecem as duas unidades.
+    // Nada muda em orcamento, contagem ou demanda — so o hex de nascimento.
+    private static void SwapRoadVehiclesToRoadFactories(List<ShoppingOrder> orders)
+    {
+        if (orders == null || orders.Count < 2)
+            return;
+
+        var roadAtDoor = new Dictionary<ConstructionManager, bool>();
+        bool Road(ConstructionManager b)
+        {
+            if (b == null) return false;
+            if (!roadAtDoor.TryGetValue(b, out bool has))
+                roadAtDoor[b] = has = HasRoadAtDoor(b);
+            return has;
+        }
+
+        for (int v = 0; v < orders.Count; v++)
+        {
+            ShoppingOrder vehicle = orders[v];
+            if (vehicle.Building == null
+                || !UnitMovementPathRules.QualifiesForRoadFullMoveBonus(vehicle.UnitToBuy)
+                || Road(vehicle.Building))
+                continue;
+
+            for (int t = 0; t < orders.Count; t++)
+            {
+                ShoppingOrder other = orders[t];
+                if (t == v || other.Building == null
+                    || UnitMovementPathRules.QualifiesForRoadFullMoveBonus(other.UnitToBuy)
+                    || !Road(other.Building)
+                    || !CanOfferUnit(other.Building, vehicle.UnitToBuy)
+                    || !CanOfferUnit(vehicle.Building, other.UnitToBuy))
+                    continue;
+
+                ConstructionManager roadFactory = other.Building;
+                ConstructionManager plainFactory = vehicle.Building;
+                vehicle.Building = roadFactory;
+                vehicle.SelectedIndex = IndexOf(roadFactory.OfferedUnits, vehicle.UnitToBuy);
+                other.Building = plainFactory;
+                other.SelectedIndex = IndexOf(plainFactory.OfferedUnits, other.UnitToBuy);
+                // struct: grava de volta na lista.
+                orders[v] = vehicle;
+                orders[t] = other;
+                Debug.Log($"[AI Shopping] estrada: {vehicle.UnitToBuy.displayName} vai para {roadFactory.ConstructionDisplayName} " +
+                          $"(com estrada) e {other.UnitToBuy.displayName} para {plainFactory.ConstructionDisplayName}");
+                break;
+            }
+        }
+    }
+
     private static float GetMinDistanceToOpenObjective(ConstructionManager building, TeamObjectivePlan plan, TeamId aiTeam)
     {
         if (plan == null) return float.MaxValue;

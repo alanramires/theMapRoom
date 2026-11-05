@@ -1557,6 +1557,9 @@ public partial class AIShoppingPlanner
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] pendente "
                     + $"{FormatDemandCapability(demand)} x{demand.Count} pri={demand.Priority} "
                     + $"origem={demand.Origin} motivo={demand.Reason}");
+        // Este e o caminho de compra em uso (carrinho por papeis). A troca de fabrica
+        // pela estrada vive aqui tambem: primeiro decide O QUE, depois ONDE nasce.
+        SwapRoadVehiclesToRoadFactories(orders);
         return orders;
     }
 

@@ -917,6 +917,23 @@ public partial class AIShoppingPlanner : MonoBehaviour
             wantsEliteFireSupport       = false;
         }
 
+        // ESTRADA NA PORTA. O bonus de estrada so vale partindo dela: veiculo que nasce em fabrica
+        // sem estrada perde o hex extra ja no primeiro turno (Tanque Leve #18, AI Step 2026-11-04).
+        // Com veiculo na fila de compra, a fabrica com estrada anexada (ou em cima) vai antes; a
+        // isolada fica para o que sobra — tropinha, que quase nao depende do bonus. Desempate,
+        // nao trava: sem fabrica com estrada, o veiculo sai onde der. Quem diz onde ha estrada e
+        // a cena (RoadNetworkManager), nao a ConstructionData. Calculado uma vez: a consulta de
+        // estrutura varre a cena e o comparador roda muitas vezes.
+        bool vehicleDemandPending = (wantsEliteAssault && !eliteAssaultBought)
+            || (wantsEliteFireSupport && !eliteFireSupportBought)
+            || (urgentTransportDemand && openTransportSlots > 0)
+            || openLogisticsSlots > 0
+            || defensiveArmorThreat;
+        var roadAtDoor = new Dictionary<ConstructionManager, bool>();
+        if (vehicleDemandPending)
+            foreach (ConstructionManager b in landBuildings)
+                roadAtDoor[b] = HasRoadAtDoor(b);
+
         var sortedBuildings = landBuildings;
         sortedBuildings.Sort((a, b) =>
         {
@@ -970,6 +987,13 @@ public partial class AIShoppingPlanner : MonoBehaviour
             int fireA = openFireSupportSlots > 0 && CanOfferFireSupportUnit(a) ? 0 : 1;
             int fireB = openFireSupportSlots > 0 && CanOfferFireSupportUnit(b) ? 0 : 1;
             if (fireA != fireB) return fireA.CompareTo(fireB);
+
+            if (vehicleDemandPending)
+            {
+                int roadA = roadAtDoor.TryGetValue(a, out bool ra) && ra ? 0 : 1;
+                int roadB = roadAtDoor.TryGetValue(b, out bool rb) && rb ? 0 : 1;
+                if (roadA != roadB) return roadA.CompareTo(roadB);
+            }
 
             return GetMinDistanceToOpenObjective(a, plan, snapshot.AITeam)
                 .CompareTo(GetMinDistanceToOpenObjective(b, plan, snapshot.AITeam));
@@ -1198,6 +1222,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
             if (remaining <= 0) break;
         }
+
+        SwapRoadVehiclesToRoadFactories(orders);
 
         // Air shopping — separate pass over air buildings (transporters, interceptors, ground attack)
         {

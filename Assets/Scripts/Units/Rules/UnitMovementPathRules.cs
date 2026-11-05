@@ -666,6 +666,16 @@ public static class UnitMovementPathRules
         return costByCell;
     }
 
+    // Mesma regra de CanUseRoadFullMoveBonus, para quem ainda nao existe em campo
+    // (o Shopping decide de que fabrica um veiculo sai antes de ele nascer).
+    public static bool QualifiesForRoadFullMoveBonus(UnitData data)
+    {
+        return data != null
+            && data.movement >= RoadBonusMinBaseMove
+            && data.domain == Domain.Land
+            && data.heightLevel == HeightLevel.Surface;
+    }
+
     private static bool CanUseRoadFullMoveBonus(UnitManager unit, int baseMove)
     {
         if (unit == null)
