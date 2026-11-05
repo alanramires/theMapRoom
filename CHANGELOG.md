@@ -16,7 +16,19 @@ major fecha, os relatórios dele são arquivados em `docs/Versões/`.
 
 ---
 
-## v9 — Auditável *(em curso)*
+## v10 — Cada mapa, a mesma IA *(em curso)*
+
+A IA é validada lance a lance nas marcas do autor, e cada marca tira uma regra de dentro dela e
+a devolve ao mapa: banda em vez de hex, família em vez de rótulo, eixo, ilha e estrada como fatos
+da cena. Um mapa novo tem de pedir autoria, não código.
+
+| versão | título | relatório |
+|---|---|---|
+| v10.0.0 | A IA lance a lance aprende o mapa (o de trás paga, o veículo escolhe o par, a estrada atravessa o QG, núcleo por família e ilha sem ligação) | [relatório](docs/relatorio_v10.0.0.md) |
+
+---
+
+## v9 — Auditável *(fechado)*
 
 O que está configurado tem de ser o que está valendo, e dá para provar olhando.
 Cada valor sabe dizer de onde veio, cada save se lê sem arqueologia, e as regras
@@ -25,17 +37,17 @@ de sensor têm uma fonte só. A direção vem do guia de modding do autor
 
 | versão | título | relatório |
 |---|---|---|
-| v9.0.0 | Ver, detectar e atirar partem da mesma linha | [relatório](docs/relatorio_v9.0.0.md) |
-| v9.1.0 | O save manda na partida | [relatório](docs/relatorio_v9.1.0.md) |
-| v9.2.0 | O jogo aguenta o celular de quem testa (primeiro MVP no ar) | [relatório](docs/relatorio_v9.2.0.md) |
-| v9.2.1 | A IA pergunta antes de decidir (contrato do questionário) | [relatório](docs/relatorio_v9.2.1.md) |
-| v9.2.2 | O primeiro estranho jogou (Configurações, Ação Direta, a névoa com uma memória só) | [relatório](docs/relatorio_v9.2.2.md) |
-| v9.3.0 | A aula vira um quadrante (Academia: tutorial como mundo, regras de fim da aula, tarefas de captura) | [relatório](docs/relatorio_v9.3.0.md) |
-| v9.3.1 | A primeira aula fecha de ponta a ponta (travas só do aluno, atalhos fechados, fala final, volta automática) | [relatório](docs/relatorio_v9.3.1.md) |
-| v9.3.2 | A aula 2 joga contra uma IA que briga (save da aula e do mundo, rebelde caça, peças de roteiro) | [relatório](docs/relatorio_v9.3.2.md) |
-| v9.4.0 | Revisão do Motor (fórmula e DPQ de combate em fonte única, IA só simula o que o sensor oferece, Neutral com dois momentos) | [relatório](docs/relatorio_v9.4.0.md) |
-| v9.5.0 | Uma IA validando a IA (Claude joga pelo Unity CLI; liberar produtora, compra por vaga do plano; fatos de medalha; diagnóstico no save) | [relatório](docs/relatorio_v9.5.0.md) |
-| v9.6.0 | A IA lance a lance (AI Step: o autor marca, o agente lê; grana antes do counter no Médio/Difícil; postura no mesmo ponto do ciclo; log do handoff) | [relatório](docs/relatorio_v9.6.0.md) |
+| v9.0.0 | Ver, detectar e atirar partem da mesma linha | [relatório](docs/Versões/relatorio_v9.0.0.md) |
+| v9.1.0 | O save manda na partida | [relatório](docs/Versões/relatorio_v9.1.0.md) |
+| v9.2.0 | O jogo aguenta o celular de quem testa (primeiro MVP no ar) | [relatório](docs/Versões/relatorio_v9.2.0.md) |
+| v9.2.1 | A IA pergunta antes de decidir (contrato do questionário) | [relatório](docs/Versões/relatorio_v9.2.1.md) |
+| v9.2.2 | O primeiro estranho jogou (Configurações, Ação Direta, a névoa com uma memória só) | [relatório](docs/Versões/relatorio_v9.2.2.md) |
+| v9.3.0 | A aula vira um quadrante (Academia: tutorial como mundo, regras de fim da aula, tarefas de captura) | [relatório](docs/Versões/relatorio_v9.3.0.md) |
+| v9.3.1 | A primeira aula fecha de ponta a ponta (travas só do aluno, atalhos fechados, fala final, volta automática) | [relatório](docs/Versões/relatorio_v9.3.1.md) |
+| v9.3.2 | A aula 2 joga contra uma IA que briga (save da aula e do mundo, rebelde caça, peças de roteiro) | [relatório](docs/Versões/relatorio_v9.3.2.md) |
+| v9.4.0 | Revisão do Motor (fórmula e DPQ de combate em fonte única, IA só simula o que o sensor oferece, Neutral com dois momentos) | [relatório](docs/Versões/relatorio_v9.4.0.md) |
+| v9.5.0 | Uma IA validando a IA (Claude joga pelo Unity CLI; liberar produtora, compra por vaga do plano; fatos de medalha; diagnóstico no save) | [relatório](docs/Versões/relatorio_v9.5.0.md) |
+| v9.6.0 | A IA lance a lance (AI Step: o autor marca, o agente lê; grana antes do counter no Médio/Difícil; postura no mesmo ponto do ciclo; log do handoff) | [relatório](docs/Versões/relatorio_v9.6.0.md) |
 
 ---
 
