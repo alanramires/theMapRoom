@@ -73,6 +73,7 @@ public partial class AIController
                     obj.Status = ObjectiveStatus.Defending;
                     obj.HandoffEligible = false;
                     obj.PreferredHandoffFromUnitId = -1;
+                    obj.HandoffHeirUnitId = -1;
                     Debug.Log($"[AI Commit Light][T{turnNumber}][{TeamUtils.GetName(aiTeam)}] guarnicao mantida: {obj.Sector} enemy<=2h guard={guardCell}");
                     continue;
                 }

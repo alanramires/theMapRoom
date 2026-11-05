@@ -80,6 +80,11 @@ public class SectorObjective
     [Header("Handoff")]
     public bool HandoffEligible;
     public int  PreferredHandoffFromUnitId = -1;
+    // Quem o planejador ESCOLHEU para fechar o predio que a ponta largou. Antes o
+    // herdeiro era deduzido de "todo outro ocupante de vaga", e a ponta de outro
+    // predio com vaga aqui (o #4 de Echo, poder 7) via o objetivo como seu e roubava
+    // a captura do escolhido (#16 da base, poder 10). -1 = nenhum escolhido.
+    public int  HandoffHeirUnitId = -1;
 
     public bool HasOpenSlot(UnitRole role)
     {
@@ -299,7 +304,8 @@ public class ObjectiveManager : MonoBehaviour
                         rallyReadinessReason = obj.RallyReadinessReason,
                         budgetReserved = obj.BudgetReserved,
                         handoffEligible = obj.HandoffEligible,
-                        preferredHandoffFromUnitId = obj.PreferredHandoffFromUnitId
+                        preferredHandoffFromUnitId = obj.PreferredHandoffFromUnitId,
+                        handoffHeirUnitId = obj.HandoffHeirUnitId
                     };
 
                     if (obj.Slots != null)
@@ -411,7 +417,8 @@ public class ObjectiveManager : MonoBehaviour
                         RallyReadinessReason = savedObj.rallyReadinessReason,
                         BudgetReserved = savedObj.budgetReserved,
                         HandoffEligible = savedObj.handoffEligible,
-                        PreferredHandoffFromUnitId = savedObj.preferredHandoffFromUnitId
+                        PreferredHandoffFromUnitId = savedObj.preferredHandoffFromUnitId,
+                        HandoffHeirUnitId = savedObj.handoffHeirUnitId
                     };
 
                     if (savedObj.slots != null)

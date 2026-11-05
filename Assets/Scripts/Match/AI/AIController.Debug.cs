@@ -59,6 +59,14 @@ public partial class AIController
         ConstructionManager origin, SectorObjective objective)
     {
         if (!IsCollectingAIReview || actor == null || objective?.Slots == null) return;
+        // Herdeiro escolhido pelo planejador, quando ha: so ele e o substituto. Os
+        // demais ocupantes de vaga podem estar em outra tarefa (a ponta de outro predio).
+        if (objective.HandoffHeirUnitId >= 0 && objective.HandoffHeirUnitId != actor.InstanceId)
+        {
+            TraceAIReviewParticipant(choice, objective.HandoffHeirUnitId, "Herdeiro escolhido na captura", "planned_handoff",
+                origin != null ? origin.CurrentCellPosition : (Vector3Int?)null);
+            return;
+        }
         foreach (var need in objective.Slots)
             if (need != null && need.Filled && need.Role == UnitRole.Capturador && need.AssignedUnitId != actor.InstanceId)
                 TraceAIReviewParticipant(choice, need.AssignedUnitId, "Substituto previsto na captura", "planned_handoff",

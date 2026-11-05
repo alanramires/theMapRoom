@@ -314,6 +314,7 @@ public class AIObjectiveSaveData
     public int budgetReserved;
     public bool handoffEligible;
     public int preferredHandoffFromUnitId = -1;
+    public int handoffHeirUnitId = -1;
     public List<AISlotNeedSaveData> slots = new List<AISlotNeedSaveData>();
 }
 

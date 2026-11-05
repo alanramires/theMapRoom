@@ -292,6 +292,7 @@ public partial class AIController
                 obj.Status                     = ObjectiveStatus.PartialReadyForHandoff;
                 obj.HandoffEligible            = true;
                 obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
+                obj.HandoffHeirUnitId          = swapCandidate.InstanceId;
                 ApplyPlanHUD(swapCandidate, obj);
 
                 bool swapCompletes = PodeCapturarSensor.GetCapturePower(
@@ -357,6 +358,7 @@ public partial class AIController
             obj.Status                     = ObjectiveStatus.PartialReadyForHandoff;
             obj.HandoffEligible            = true;
             obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
+            obj.HandoffHeirUnitId          = substitute.InstanceId;
             ApplyPlanHUD(substitute, obj);
 
             if (substituteExistingSlot == null)

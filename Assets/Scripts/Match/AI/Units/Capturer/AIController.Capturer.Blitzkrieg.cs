@@ -86,6 +86,30 @@ public partial class AIController
         if (advanceSector == ConstructionSector.None || advanceSector == originSector)
             return false;
 
+        // PREDIO DE OUTRO HERDEIRO NAO E MEU. A ponta que reveza ia para o proprio
+        // objetivo mesmo quando ele acabava de ser passado a um herdeiro escolhido:
+        // AI Step 2026-11-04, o #4 (poder 7) largou Echo e capturou Golf, que o #10
+        // tinha passado ao #16 da base (poder 10, fechava). Segue para alem dele; sem
+        // nada alem, a ponta so atira ou segura — devolver false a mandaria ao fluxo
+        // normal, que capturaria o mesmo predio.
+        bool holdIfNoAttack = false;
+        SectorObjective advanceObjective = plan != null ? plan.GetObjectiveForSector(advanceSector) : null;
+        if (advanceObjective != null
+            && advanceObjective.HandoffHeirUnitId >= 0
+            && advanceObjective.HandoffHeirUnitId != unit.InstanceId
+            && FindActiveUnit(advanceObjective.HandoffHeirUnitId, snapshot.AITeam) != null)
+        {
+            ConstructionSector beyond = ComputeBlitzkriegForwardSector(advanceSector, snapshot.AITeam);
+            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} nao toma {advanceSector}: e do herdeiro " +
+                      $"#{advanceObjective.HandoffHeirUnitId}" +
+                      (beyond != ConstructionSector.None && beyond != advanceSector && beyond != originSector
+                          ? $"; segue para {beyond}" : "; nada alem — so ataque ou segura"));
+            if (beyond != ConstructionSector.None && beyond != advanceSector && beyond != originSector)
+                advanceSector = beyond;
+            else
+                holdIfNoAttack = true;
+        }
+
         Vector3Int from = unit.CurrentCellPosition;
         from.z = 0;
         ConstructionManager target = FindCapturableInSector(advanceSector, snapshot.AITeam, from);
@@ -109,7 +133,9 @@ public partial class AIController
             return false;
 
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        bool targetReachable = paths.ContainsKey(targetCell) && !occupied.Contains(targetCell);
+        // Predio reservado ao herdeiro: nem captura nem estaciona em cima dele.
+        bool targetReachable = !holdIfNoAttack
+            && paths.ContainsKey(targetCell) && !occupied.Contains(targetCell);
         if (targetReachable && SimulateCaptureSensor(unit, targetCell, out _))
         {
             Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} hard handoff {originSector} -> captura {advanceSector}"
@@ -150,6 +176,7 @@ public partial class AIController
         {
             Vector3Int candidate = entry.Key;
             if (occupied.Contains(candidate)) continue;
+            if (holdIfNoAttack && candidate == targetCell) continue;
             float distance = SectorManager.HexDistance(candidate, targetCell);
             int steps = entry.Value != null ? entry.Value.Count : 0;
             if (distance < bestDistance || (Mathf.Approximately(distance, bestDistance) && steps > bestSteps))
@@ -190,7 +217,10 @@ public partial class AIController
         }
 
         var herdeiros = new List<string>();
-        if (handoffObjective != null && handoffObjective.Slots != null)
+        if (handoffObjective != null && handoffObjective.HandoffHeirUnitId >= 0
+            && handoffObjective.HandoffHeirUnitId != unit.InstanceId)
+            herdeiros.Add("#" + handoffObjective.HandoffHeirUnitId);
+        else if (handoffObjective != null && handoffObjective.Slots != null)
             foreach (SlotNeed slot in handoffObjective.Slots)
                 if (slot != null && slot.Filled && slot.AssignedUnitId >= 0
                     && slot.AssignedUnitId != unit.InstanceId)

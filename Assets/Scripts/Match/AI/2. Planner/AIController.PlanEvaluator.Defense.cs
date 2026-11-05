@@ -95,6 +95,7 @@ public partial class AIController
         obj.Status = ObjectiveStatus.Pursuing;
         obj.HandoffEligible = false;
         obj.PreferredHandoffFromUnitId = -1;
+        obj.HandoffHeirUnitId = -1;
 
         bool hasCapturerSlot = false;
         for (int i = obj.Slots.Count - 1; i >= 0; i--)
