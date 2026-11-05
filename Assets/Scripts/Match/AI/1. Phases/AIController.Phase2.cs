@@ -34,6 +34,8 @@ public partial class AIController
         pendingRebelCaptureTargets.Clear();
         pendingAIDesignatedMissions.Clear();
         transportPickupBeacons.Clear();
+        pickupMeetingReservations.Clear();
+        pendingRendezvousTransporters.Clear();
         tacticalPickupManifestBeacons.Clear();
         transportPlanningSnapshots.Clear();
         tacticalPickupInitiativePassengers.Clear();
@@ -274,6 +276,25 @@ public partial class AIController
                 continue;
             }
 
+            // Passageiro que quis ir ao encontro de um veiculo que ainda nao agiu
+            // cede a vez: quem escolhe o par e o veiculo. Guarda !secondPass —
+            // na segunda passada ele age com o que o veiculo decidiu.
+            if (pendingRendezvousTransporters.TryGetValue(unit.InstanceId, out int waitedTransporterId))
+            {
+                pendingRendezvousTransporters.Remove(unit.InstanceId);
+                UnitManager waitedTransporter = FindActiveUnit(waitedTransporterId, aiTeam);
+                if (!secondPass && waitedTransporter != null && !waitedTransporter.HasActed)
+                {
+                    deferredUnitIds.Add(unit.InstanceId);
+                    Debug.Log(
+                        $"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} quer carona e cede vez para " +
+                        $"{FormatInitiativeUnitName(waitedTransporter)} escolher o passageiro e a LZ primeiro.");
+                    cursor++;
+                    yield return null;
+                    continue;
+                }
+            }
+
             if (!secondPass
                 && ShouldDeferPassengerForIncomingTransport(
                     unit, action, units, out UnitManager incomingTransporter))
@@ -314,6 +335,7 @@ public partial class AIController
                 Vector3Int blockedDestination = action.MoveTo;
                 blockedDestination.z = 0;
                 transportPickupBeacons.Remove(unit.InstanceId);
+                pickupMeetingReservations.Remove(unit.InstanceId);
                 tacticalPickupManifestBeacons.Remove(unit.InstanceId);
                 rebelCaptureTargetReservations.Remove(
                     blockedDestination);
@@ -376,6 +398,7 @@ public partial class AIController
                 pendingAIDesignatedMissions.Remove(
                     unit.InstanceId);
                 transportPickupBeacons.Remove(unit.InstanceId);
+                pickupMeetingReservations.Remove(unit.InstanceId);
                 tacticalPickupManifestBeacons.Remove(unit.InstanceId);
                 unitMoved = false;
                 unitAttacked = false;

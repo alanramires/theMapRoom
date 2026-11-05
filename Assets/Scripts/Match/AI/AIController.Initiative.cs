@@ -1142,6 +1142,17 @@ public partial class AIController
         if (includeConscriptionClosedProducers)
             AddConscriptionClosedProducerCells(set);
 
+        // Hex de encontro reservado por um transportador: ocupado para todos,
+        // menos o passageiro escolhido e o proprio veiculo.
+        int excludeId = excludeUnit != null ? excludeUnit.InstanceId : int.MinValue;
+        foreach (KeyValuePair<int, (int passengerId, Vector3Int cell)> reservation
+                 in pickupMeetingReservations)
+        {
+            if (reservation.Key == excludeId || reservation.Value.passengerId == excludeId)
+                continue;
+            set.Add(reservation.Value.cell);
+        }
+
         return set;
 
     }

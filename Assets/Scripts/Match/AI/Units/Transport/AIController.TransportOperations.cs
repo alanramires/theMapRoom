@@ -1859,7 +1859,8 @@ public partial class AIController
         Vector3Int fromCell,
         Vector3Int destination,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        MelhorEmbarqueManifestScore manifest = null)
+        MelhorEmbarqueManifestScore manifest = null,
+        MelhorEmbarqueOption option = null)
     {
         // Farol de planejamento da Phase 2. Nao altera unidade, tabuleiro nem
         // recurso confirmado e, principalmente, nao bloqueia outro veiculo de
@@ -1869,6 +1870,27 @@ public partial class AIController
         {
             transportPickupBeacons[transporter.InstanceId] =
                 passenger.InstanceId;
+        }
+
+        // RESERVA DO ENCONTRO. O farol dizia QUEM, nao ONDE: outro passageiro
+        // (ou qualquer unidade) terminava o movimento no hex de encontro e o
+        // embarque escolhido falhava (AI Step 2026-11-04, #9 e o APC #21 em
+        // (8,13) com o encontro (7,13) tomado). A celula fica reservada para o
+        // passageiro escolhido e o proprio veiculo — BuildOccupied a entrega como
+        // ocupada para todo o resto. Reserva de planejamento da Phase 2, como o
+        // farol: limpa no inicio da fase e quando o batch do veiculo aborta.
+        if (passenger != null && option != null
+            && option.passenger == passenger
+            && option.hasPassengerMeetingCell)
+        {
+            Vector3Int meeting = option.passengerMeetingCell;
+            meeting.z = 0;
+            pickupMeetingReservations[transporter.InstanceId] =
+                (passenger.InstanceId, meeting);
+        }
+        else
+        {
+            pickupMeetingReservations.Remove(transporter.InstanceId);
         }
 
         if (manifest != null)
@@ -1965,7 +1987,7 @@ public partial class AIController
             return BuildTransportPickupMove(
                 unit, decision.TargetUnit, snapshot.AITeam,
                 fromCell, serviceRendezvous, paths,
-                decision.PickupManifest);
+                decision.PickupManifest, decision.PickupOption);
         }
 
         if (serviceRendezvous != fromCell
@@ -1990,7 +2012,7 @@ public partial class AIController
             return BuildTransportPickupMove(
                 unit, decision.TargetUnit, snapshot.AITeam,
                 fromCell, progressionCell, paths,
-                decision.PickupManifest);
+                decision.PickupManifest, decision.PickupOption);
         }
 
         if (serviceRendezvous == fromCell)
@@ -2003,7 +2025,7 @@ public partial class AIController
             return BuildTransportPickupMove(
                 unit, decision.TargetUnit, snapshot.AITeam,
                 fromCell, fromCell, paths,
-                decision.PickupManifest);
+                decision.PickupManifest, decision.PickupOption);
         }
 
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +

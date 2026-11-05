@@ -479,6 +479,10 @@ public partial class AIController
                 continue;
             bool pickupBeaconTransport =
                 IsTransportPickupBeaconFor(transporter, unit);
+            // Casco com outro passageiro escolhido nao atrai (mesma regra do
+            // capturador em TryBuildCapturerLzRendezvousAction).
+            if (IsPickupTakenByOtherPassenger(transporter, unit))
+                continue;
 
             if (!MelhorEmbarqueService
                     .TryResolveCompatiblePassengerSlot(

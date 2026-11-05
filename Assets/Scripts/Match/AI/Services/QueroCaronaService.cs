@@ -811,6 +811,12 @@ public static class QueroCaronaService
         result.isStranded = false;
 
         objectiveCell.z = 0;
+        // QUEM PEDE CARONA TEM DESTINO. Antes este ramo — justamente o de quem
+        // quer carona — deixava evaluatedTarget em (0,0): so quem RECUSAVA a
+        // carona (alcanca sozinho) dizia para onde ia. O MelhorEmbarque balizava
+        // a LZ por um destino vazio e o encontro caia entre os dois, nunca a
+        // frente (AI Step 2026-11-04: #9 querendo Delta, LZ em (5,14)).
+        result.evaluatedTarget = objectiveCell;
         MobilityRelation relation =
             UnitReachEnvelopeService.ClassifyMobility(
                 request.unit,

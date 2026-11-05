@@ -26,6 +26,15 @@ public partial class AIController
     // o mesmo passageiro: escolha e promessa orientam, mas nunca possuem P1.
     private readonly Dictionary<int, int> transportPickupBeacons =
         new Dictionary<int, int>();
+    // Passageiro -> transportador ao encontro de quem ele quis ir antes de o
+    // veiculo agir. A Phase 2 adia esse passageiro ate o veiculo decidir.
+    private readonly Dictionary<int, int> pendingRendezvousTransporters =
+        new Dictionary<int, int>();
+    // Transportador -> (passageiro escolhido, hex de encontro dele). Ninguem
+    // alem dos dois termina movimento ali nesta Phase 2 (ver BuildOccupied).
+    private readonly Dictionary<int, (int passengerId, Vector3Int cell)>
+        pickupMeetingReservations =
+            new Dictionary<int, (int passengerId, Vector3Int cell)>();
     // Passageiros P2+ que tambem alcancam a LZ Tactical escolhida por cada
     // transportador. E um farol de encontro para o passageiro, nao um lock:
     // o mesmo passageiro pode aparecer nos manifestos de varios cascos.

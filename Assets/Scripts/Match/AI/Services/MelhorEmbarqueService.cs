@@ -664,6 +664,8 @@ public static class MelhorEmbarqueService
                 : left.z.CompareTo(right.z);
         });
 
+        var destinationCostMaps =
+            new Dictionary<Vector3Int, Dictionary<Vector3Int, int>>();
         int topologyCellsVisited = 0;
         int lzWithoutReachableNow = 0;
         bool hasDecisiveTacticalPickup = false;
@@ -747,6 +749,22 @@ public static class MelhorEmbarqueService
                     || PodePousarSensor.CanLandAtCell(
                         request.transporter, request.map,
                         request.terrainDatabase, cell, out _));
+            // LZ NUNCA EM CIMA DE PRODUTORA PROPRIA. Transportador estacionado na
+            // fabrica tranca a compra daquele hex no fim do turno. AI Step
+            // 2026-11-04: o APC #21 "aguardava" o #9 parado na propria
+            // FabricaLeve (4,15) — distancia zero vencia qualquer LZ.
+            if (lzGateOk)
+            {
+                ConstructionManager lzBuilding =
+                    ConstructionOccupancyRules.GetConstructionAtCell(
+                        request.map, cell);
+                if (lzBuilding != null
+                    && lzBuilding.CanProduceUnitsForSlot(
+                        request.transporter.SlotIndex))
+                {
+                    lzGateOk = false;
+                }
+            }
             lzGateMs +=
                 (Time.realtimeSinceStartup - lzGateStartedAt) * 1000f;
             AIDecisionPerf.AddCount("MelhorEmbarqueLzGateProbes");
@@ -870,8 +888,50 @@ public static class MelhorEmbarqueService
                 int seatsDisplaced = passengerSeatsDisplaced[passenger];
                 int slotWeight = unitsBrought - seatsDisplaced;
 
+                // A LZ BALIZADA PELO DESTINO. A viagem que importa e a do
+                // passageiro: entre LZs que ele alcanca, vale a que fica mais
+                // perto de onde ele quer ir — a intersecao do Tatico dele com a
+                // direcao do objetivo. Pesa mais que o deslocamento do
+                // transportador (100/hex); sem isso a LZ de custo zero (o hex do
+                // proprio veiculo) vencia sempre, mesmo atras do passageiro.
+                // RELATIVO ao passageiro (quanto a LZ o adianta), nunca a distancia
+                // absoluta: senao quem esta mais longe do objetivo — quem mais
+                // precisa da carona — pontuaria menos. LZ atras dele e negativa.
+                // CUSTO REAL, nao hex: 2 hexes de serra nao sao 2 de estrada. O
+                // trecho que sobra depois do embarque e do VEICULO, entao a
+                // medida e o mapa de custo do transportador a partir do destino
+                // (um por destino, cacheado). Celula fora do mapa (o veiculo nao
+                // entra ali) cai no HexDistance, para nao virar "ganho zero".
+                float destinationGain = 0f;
+                if (rideNeed != null
+                    && (rideNeed.evaluatedConstruction != null
+                        || rideNeed.evaluatedTarget != Vector3Int.zero))
+                {
+                    Vector3Int destination = rideNeed.evaluatedTarget;
+                    destination.z = 0;
+                    Dictionary<Vector3Int, int> costToDestination =
+                        ResolveDestinationCostMap(
+                            request, destinationCostMaps, destination);
+                    if (costToDestination.TryGetValue(
+                            passengerCell, out int fromPassenger)
+                        && costToDestination.TryGetValue(
+                            cell, out int fromLz))
+                    {
+                        destinationGain =
+                            (fromPassenger - fromLz) * DestinationGainPerHex;
+                    }
+                    else
+                    {
+                        destinationGain =
+                            (SectorManager.HexDistance(passengerCell, destination)
+                             - SectorManager.HexDistance(cell, destination))
+                            * DestinationGainPerHex;
+                    }
+                }
+
                 float optionScore = 100000f
                     - distance * 100f
+                    + destinationGain
                     - routePenalty
                     - rescueApproachPenalty
                     + rideNeedAdjustment
@@ -920,6 +980,7 @@ public static class MelhorEmbarqueService
                         $"{(passengerTotalCost < int.MaxValue ? passengerTotalCost.ToString() : "n/a")} " +
                         $"distTransport={distance} " +
                         $"aproxPax={passengerMeetingDistance:F0} " +
+                        $"adiantaDestino={destinationGain / DestinationGainPerHex:+0;-0;0}mp " +
                         $"carona={disposition} " +
                         $"ajusteCarona={rideNeedAdjustment:0} " +
                         $"peso={slotWeight:+0;-0;0} " +
@@ -1522,6 +1583,30 @@ public static class MelhorEmbarqueService
     // do peso e ~[-3, +2], logo ate 900, abaixo dos 1000 que separam
     // Requested de Emergency.
     private const float SlotWeightScale = 300f;
+    // Cada hex que a LZ adianta o passageiro rumo ao destino. Acima dos 100/hex
+    // do deslocamento do transportador: a viagem que importa e a do passageiro.
+    private const float DestinationGainPerHex = 300f;
+    // Teto do mapa de custo a partir do destino. Generoso de proposito: celula
+    // fora dele cai no HexDistance. O resultado fica no MovementReachCache.
+    private const int DestinationCostBudget = 99;
+
+    // Um mapa por destino por avaliacao: quantos passageiros dividirem o mesmo
+    // objetivo, uma unica varredura.
+    private static Dictionary<Vector3Int, int> ResolveDestinationCostMap(
+        MelhorEmbarqueRequest request,
+        Dictionary<Vector3Int, Dictionary<Vector3Int, int>> maps,
+        Vector3Int destination)
+    {
+        if (maps.TryGetValue(destination, out Dictionary<Vector3Int, int> map))
+            return map;
+        AIDecisionPerf.AddCount("MelhorEmbarqueDestinationCostMaps");
+        map = UnitMovementPathRules.CalculateMovementCostMap(
+                  request.map, request.transporter, destination,
+                  DestinationCostBudget, request.terrainDatabase)
+              ?? new Dictionary<Vector3Int, int>();
+        maps[destination] = map;
+        return map;
+    }
 
     /// <summary>
     /// Pedido que a esteira nao pode mais adiar: emergencia de reparo, ou

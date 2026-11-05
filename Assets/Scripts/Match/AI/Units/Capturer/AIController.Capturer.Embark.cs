@@ -230,6 +230,19 @@ public partial class AIController
     /// Tactical de outro casco vence uma promessa Operational/Strategic, e na
     /// ausencia de solucao prometida qualquer transportador compativel serve.
     /// </summary>
+    // O casco ja tem passageiro escolhido nesta Phase 2 e nao e este. Manifesto
+    // Tactical (varios assentos na mesma LZ) continua aceitando os seus.
+    private bool IsPickupTakenByOtherPassenger(UnitManager transporter, UnitManager passenger)
+    {
+        if (transporter == null || passenger == null)
+            return false;
+        if (!transportPickupBeacons.TryGetValue(transporter.InstanceId, out int chosenId)
+            || chosenId == passenger.InstanceId)
+            return false;
+        return !(tacticalPickupManifestBeacons.TryGetValue(transporter.InstanceId, out HashSet<int> manifest)
+                 && manifest != null && manifest.Contains(passenger.InstanceId));
+    }
+
     private PlayerAction TryBuildCapturerLzRendezvousAction(
         UnitManager passenger,
         AIWorldSnapshot snapshot,
@@ -279,6 +292,16 @@ public partial class AIController
             {
                 continue;
             }
+
+            // VEICULO COM DONO NAO ATRAI. Cada passageiro perguntava sozinho e
+            // sobrescrevia o farol com o proprio nome: o ultimo a agir ganhava,
+            // e todos andavam ate o APC (AI Step 2026-11-04: #9, #13, #14, #19
+            // e #20 "vao ao encontro" do #21, que tinha escolhido o #9). Se o
+            // casco ja tem passageiro escolhido — por ele mesmo ou por quem agiu
+            // antes —, quem nao e esse passageiro nem esta no manifesto dele
+            // procura outro casco ou segue a vida.
+            if (IsPickupTakenByOtherPassenger(option.transporter, passenger))
+                continue;
 
             if (best == null)
                 best = option;
@@ -333,10 +356,23 @@ public partial class AIController
             best.transporter,
             passenger);
 
-        // Farol provisorio desta Phase 2. Ajuda o casco que ainda vai decidir,
-        // sem criar reserva nem alterar a missao confirmada do passageiro.
-        transportPickupBeacons[best.transporter.InstanceId] =
-            passenger.InstanceId;
+        // QUEM ESCOLHE E O VEICULO. Casco do mesmo time que ainda vai agir nesta
+        // fase: o passageiro NAO anda para a LZ antes dele, nem marca o farol —
+        // so registra a espera e a Phase 2 o adia (cede a vez). Depois que o
+        // veiculo decide e reserva o encontro, o passageiro re-decide: se foi o
+        // escolhido, vai; se nao, o casco tem dono e ele segue a propria agenda.
+        if (!best.transporter.HasActed
+            && best.transporter.SlotIndex == passenger.SlotIndex)
+        {
+            pendingRendezvousTransporters[passenger.InstanceId] =
+                best.transporter.InstanceId;
+        }
+        else
+        {
+            // Veiculo ja agiu (ou nao e desta IA): o farol so registra o par.
+            transportPickupBeacons[best.transporter.InstanceId] =
+                passenger.InstanceId;
+        }
 
         PlayerAction action;
         string verb;
