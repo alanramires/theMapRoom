@@ -12792,7 +12792,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::QuadranteController
   mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
   campanhaId: A_IA
-  quadranteId: A_IA_Q1
+  quadranteId: A_IA_Q3
   mundosConhecidos:
   - {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
   - {fileID: 11400000, guid: 5401ad1240f096b4cab210a757057edf, type: 2}
