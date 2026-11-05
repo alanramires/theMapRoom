@@ -9919,7 +9919,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1899427098}
+  m_Father: {fileID: 1986179052}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &181762657
 MonoBehaviour:
@@ -9933,6 +9933,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f2b6e9e6a8f4cc4b1d3f5a7c9e10234, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::BeachManager
+  islandLandTerrains: []
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   beachTerrainType: {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
@@ -18251,7 +18252,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 12000
+    incomePerTurn: 15000
     startMoneyApplied: 1
   - teamId: 3
     flipX: 1
@@ -18263,7 +18264,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 13000
+    incomePerTurn: 19000
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -36188,6 +36189,28 @@ MonoBehaviour:
       - {x: -13, y: 22, z: 0}
       - {x: -14, y: 23, z: 0}
       - {x: -14, y: 24, z: 0}
+    - routeName: Ilha da base Azul
+      ownerDatabase: {fileID: 11400000, guid: 82ff47f9ef992184f977e1cef89c1f4f, type: 2}
+      cells:
+      - {x: -2, y: 26, z: 0}
+      - {x: -3, y: 25, z: 0}
+      - {x: -3, y: 24, z: 0}
+      - {x: -3, y: 23, z: 0}
+      - {x: -3, y: 22, z: 0}
+      - {x: -3, y: 21, z: 0}
+      - {x: -2, y: 21, z: 0}
+      - {x: -1, y: 20, z: 0}
+      - {x: 0, y: 20, z: 0}
+      - {x: 1, y: 20, z: 0}
+      - {x: 2, y: 20, z: 0}
+      - {x: 3, y: 20, z: 0}
+      - {x: 4, y: 20, z: 0}
+      - {x: 4, y: 21, z: 0}
+      - {x: 5, y: 22, z: 0}
+      - {x: 5, y: 23, z: 0}
+      - {x: 5, y: 24, z: 0}
+      - {x: 4, y: 25, z: 0}
+      - {x: 4, y: 26, z: 0}
   - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
     routes: []
   - structure: {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
@@ -38344,9 +38367,69 @@ Tilemap:
   - first: {x: -3, y: 26, z: 0}
     second:
       serializedVersion: 2
+      m_TileIndex: 0
+      m_TileSpriteIndex: 0
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -2, y: 26, z: 0}
+    second:
+      serializedVersion: 2
       m_TileIndex: 2
       m_TileSpriteIndex: 2
-      m_TileMatrixIndex: 6
+      m_TileMatrixIndex: 1
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -1, y: 26, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 1
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 0, y: 26, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 1
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 1, y: 26, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 1
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 2, y: 26, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 1
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 3, y: 26, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 1
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
       dummyAlignment: 0
@@ -38354,9 +38437,9 @@ Tilemap:
   - first: {x: 4, y: 26, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 1
-      m_TileSpriteIndex: 1
-      m_TileMatrixIndex: 8
+      m_TileIndex: 3
+      m_TileSpriteIndex: 3
+      m_TileMatrixIndex: 1
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
       dummyAlignment: 0
@@ -38364,39 +38447,39 @@ Tilemap:
   m_AnimatedTiles: {}
   m_TileAssetArray:
   - serializedVersion: 2
-    m_RefCount: 2
+    m_RefCount: 3
     m_Data: {fileID: 11400000, guid: 9dc76304884487740ab3ec8c096b0034, type: 2}
   - serializedVersion: 2
-    m_RefCount: 28
+    m_RefCount: 27
     m_Data: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
   - serializedVersion: 2
-    m_RefCount: 65
+    m_RefCount: 70
     m_Data: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
   - serializedVersion: 2
-    m_RefCount: 41
+    m_RefCount: 42
     m_Data: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
   - serializedVersion: 2
     m_RefCount: 1
     m_Data: {fileID: 11400000, guid: 9d61e3fb5ca6f0c4db7268b6cc9569e3, type: 2}
   m_TileSpriteArray:
   - serializedVersion: 2
-    m_RefCount: 2
+    m_RefCount: 3
     m_Data: {fileID: 21300000, guid: 908142c41c7c6594b8c99ed58815a5f7, type: 3}
   - serializedVersion: 2
-    m_RefCount: 28
+    m_RefCount: 27
     m_Data: {fileID: 21300000, guid: 86606810d10263b4f843b0e916cb3a10, type: 3}
   - serializedVersion: 2
-    m_RefCount: 65
+    m_RefCount: 70
     m_Data: {fileID: 21300000, guid: 512d241c3ffefc340a1f5d2b15875c37, type: 3}
   - serializedVersion: 2
-    m_RefCount: 41
+    m_RefCount: 42
     m_Data: {fileID: 21300000, guid: cffa89daff7f85c4cb3446a4fc7d2fbb, type: 3}
   - serializedVersion: 2
     m_RefCount: 1
     m_Data: {fileID: 21300000, guid: 0fb51f118f5fa584e8abb9407f3d61f8, type: 3}
   m_TileMatrixArray:
   - serializedVersion: 2
-    m_RefCount: 17
+    m_RefCount: 18
     m_Data:
       e00: -0.5000001
       e01: 0.8660254
@@ -38415,7 +38498,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 24
+    m_RefCount: 31
     m_Data:
       e00: -1.0000001
       e01: -0.00000015885017
@@ -38510,7 +38593,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 25
+    m_RefCount: 24
     m_Data:
       e00: 0.49999997
       e01: 0.86602545
@@ -38548,7 +38631,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 15
+    m_RefCount: 14
     m_Data:
       e00: 0.49999997
       e01: -0.86602545
@@ -38587,7 +38670,7 @@ Tilemap:
       e33: 1
   m_TileColorArray:
   - serializedVersion: 2
-    m_RefCount: 137
+    m_RefCount: 143
     m_Data: {r: 1, g: 1, b: 1, a: 1}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
@@ -47328,7 +47411,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1555416421}
+  - {fileID: 1020421005}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -61652,6 +61735,42 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1020062326}
   m_CullTransparentMesh: 1
+--- !u!21 &1020421005
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1024648473
 GameObject:
   m_ObjectHideFlags: 0
@@ -87443,42 +87562,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1551804500}
   m_CullTransparentMesh: 1
---- !u!21 &1555416421
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1556464109
 GameObject:
   m_ObjectHideFlags: 0
@@ -122942,8 +123025,7 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 181762656}
+  m_Children: []
   m_Father: {fileID: 1986179052}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1899427099
@@ -123007,25 +123089,112 @@ MonoBehaviour:
       capturePointsMax: 50
       source: {fileID: 2046391681}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
+    - SlotIndex: 0
+      Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 18
+        AirDistance: 29
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -123038,62 +123207,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 31
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -123110,84 +123223,53 @@ MonoBehaviour:
         AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 92
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 29
+        AirDistance: 28
         NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 96
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 93
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 28
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
+        InstanceId: 22
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 31
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        InstanceId: 19
+        Distance: 12
+        VehicleDistance: 12
         AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
+        InstanceId: 23
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
+        AirDistance: 19
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 1
@@ -123233,25 +123315,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1131844750}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
+    - SlotIndex: 0
+      Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        AirDistance: 25
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -123264,62 +123433,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 27
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 27
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -123336,84 +123449,53 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
+        InstanceId: 92
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        AirDistance: 27
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
+        InstanceId: 96
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
+        AirDistance: 29
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
+        InstanceId: 93
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 15
+        AirDistance: 27
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
+        InstanceId: 22
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 25
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 0
@@ -123459,25 +123541,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 2035122341}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
+    - SlotIndex: 0
+      Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 15
+        AirDistance: 28
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 7
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 7
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 27
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -123490,62 +123659,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -123562,84 +123675,53 @@ MonoBehaviour:
         AirDistance: 20
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 92
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 28
+        AirDistance: 23
         NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 96
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 27
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 93
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
+        InstanceId: 22
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
         Distance: 8
         VehicleDistance: 8
         AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
+        InstanceId: 23
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
+        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 0
@@ -123685,25 +123767,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1485539615}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.4
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.6
-      RiskLevel: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 42
+        VehicleDistance: 42
+        AirDistance: 35
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 41
+        VehicleDistance: 41
+        AirDistance: 34
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 42
+        VehicleDistance: 42
+        AirDistance: 35
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 28
-        VehicleDistance: 28
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
         AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 2
@@ -123716,62 +123885,6 @@ MonoBehaviour:
         Distance: 2
         VehicleDistance: 2
         AirDistance: 2
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 4
-        VehicleDistance: 4
-        AirDistance: 4
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 17
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -123788,84 +123901,53 @@ MonoBehaviour:
         AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 42
-        VehicleDistance: 42
-        AirDistance: 35
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 42
-        VehicleDistance: 42
-        AirDistance: 35
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        InstanceId: 92
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
+        InstanceId: 96
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
+        InstanceId: 93
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 41
-        VehicleDistance: 41
-        AirDistance: 34
+        InstanceId: 22
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 4
+        VehicleDistance: 4
+        AirDistance: 4
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 10
@@ -123911,25 +123993,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1785043757}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
+    - SlotIndex: 0
+      Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 12
+        AirDistance: 24
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -123942,62 +124111,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -124014,84 +124127,53 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
+        InstanceId: 92
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 12
+        AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
+        InstanceId: 96
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 93
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 22
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 6
@@ -124137,25 +124219,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1800890478}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
+    - SlotIndex: 0
+      Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 13
+        AirDistance: 20
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -124168,62 +124337,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -124240,84 +124353,53 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
+        InstanceId: 92
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
+        InstanceId: 96
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
+        AirDistance: 25
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
+        InstanceId: 93
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
+        InstanceId: 22
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 20
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 1
@@ -124371,25 +124453,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 1489984255}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
+    - SlotIndex: 0
+      Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 9
+        AirDistance: 21
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -124402,62 +124571,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -124474,84 +124587,53 @@ MonoBehaviour:
         AirDistance: 14
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
+        InstanceId: 92
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 12
+        AirDistance: 19
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
+        InstanceId: 96
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 93
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 22
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 4
@@ -124605,25 +124687,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 489574832}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.43
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.57
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
       RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 57
+        VehicleDistance: 57
+        AirDistance: 41
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 56
+        VehicleDistance: 56
+        AirDistance: 40
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 57
+        VehicleDistance: 57
+        AirDistance: 41
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 43
-        VehicleDistance: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
         AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 18
@@ -124636,62 +124805,6 @@ MonoBehaviour:
         Distance: 17
         VehicleDistance: 17
         AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 17
-        VehicleDistance: 17
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 42
-        VehicleDistance: 42
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 44
-        VehicleDistance: 44
-        AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -124708,84 +124821,53 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 57
-        VehicleDistance: 57
-        AirDistance: 41
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 57
-        VehicleDistance: 57
-        AirDistance: 41
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
+        InstanceId: 92
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        InstanceId: 96
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 93
+        Distance: 19
+        VehicleDistance: 19
         AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
+        InstanceId: 22
+        Distance: 44
+        VehicleDistance: 44
+        AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 17
+        VehicleDistance: 17
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 56
-        VehicleDistance: 56
-        AirDistance: 40
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 42
+        VehicleDistance: 42
+        AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 9
@@ -124823,25 +124905,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 1151227833}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.21
-      RiskLevel: 0
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.79
-      RiskLevel: 4
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 21
@@ -124854,62 +125023,6 @@ MonoBehaviour:
         Distance: 22
         VehicleDistance: 22
         AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 21
-        VehicleDistance: 21
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 4
-        VehicleDistance: 4
-        AirDistance: 4
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -124926,84 +125039,53 @@ MonoBehaviour:
         AirDistance: 0
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
+        InstanceId: 92
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
+        InstanceId: 96
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
+        InstanceId: 93
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 15
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 18
-        VehicleDistance: 18
+        InstanceId: 22
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 21
+        VehicleDistance: 21
         AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 4
+        VehicleDistance: 4
+        AirDistance: 4
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 13
@@ -125049,25 +125131,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 2080657936}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.43
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.57
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
       RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 55
+        VehicleDistance: 55
+        AirDistance: 41
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 54
+        VehicleDistance: 54
+        AirDistance: 40
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 55
+        VehicleDistance: 55
+        AirDistance: 41
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 27
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 41
-        VehicleDistance: 41
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
         AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 16
@@ -125080,62 +125249,6 @@ MonoBehaviour:
         Distance: 15
         VehicleDistance: 15
         AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 40
-        VehicleDistance: 40
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 17
-        VehicleDistance: 17
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 42
-        VehicleDistance: 42
-        AirDistance: 23
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -125152,84 +125265,53 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 55
-        VehicleDistance: 55
-        AirDistance: 41
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 55
-        VehicleDistance: 55
-        AirDistance: 41
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 27
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
+        InstanceId: 92
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        InstanceId: 96
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        InstanceId: 93
+        Distance: 17
+        VehicleDistance: 17
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 54
-        VehicleDistance: 54
-        AirDistance: 40
+        InstanceId: 22
+        Distance: 42
+        VehicleDistance: 42
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 40
+        VehicleDistance: 40
+        AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 7
@@ -125259,25 +125341,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 320208598}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.43
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.57
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
       RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 54
+        VehicleDistance: 54
+        AirDistance: 45
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 53
+        VehicleDistance: 53
+        AirDistance: 44
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 54
+        VehicleDistance: 54
+        AirDistance: 45
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 40
-        VehicleDistance: 40
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
         AirDistance: 26
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 15
@@ -125290,62 +125459,6 @@ MonoBehaviour:
         Distance: 14
         VehicleDistance: 14
         AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 39
-        VehicleDistance: 39
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 41
-        VehicleDistance: 41
-        AirDistance: 27
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -125362,84 +125475,53 @@ MonoBehaviour:
         AirDistance: 26
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 54
-        VehicleDistance: 54
-        AirDistance: 45
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 54
-        VehicleDistance: 54
-        AirDistance: 45
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        InstanceId: 92
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        InstanceId: 96
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        InstanceId: 93
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 13
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 53
-        VehicleDistance: 53
-        AirDistance: 44
+        InstanceId: 22
+        Distance: 41
+        VehicleDistance: 41
+        AirDistance: 27
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 39
+        VehicleDistance: 39
+        AirDistance: 26
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 7
@@ -125477,25 +125559,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 494466726}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.26
-      RiskLevel: 1
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.74
-      RiskLevel: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 37
+        VehicleDistance: 37
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 35
@@ -125508,62 +125677,6 @@ MonoBehaviour:
         Distance: 36
         VehicleDistance: 36
         AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 35
-        VehicleDistance: 35
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 37
-        VehicleDistance: 37
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 36
-        VehicleDistance: 36
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 6
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 36
-        VehicleDistance: 36
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 36
-        VehicleDistance: 36
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -125580,84 +125693,53 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 26
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        InstanceId: 92
+        Distance: 36
+        VehicleDistance: 36
         AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
+        InstanceId: 96
+        Distance: 36
+        VehicleDistance: 36
+        AirDistance: 13
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        InstanceId: 93
+        Distance: 36
+        VehicleDistance: 36
         AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 25
+        InstanceId: 22
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 35
+        VehicleDistance: 35
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 12
@@ -125703,25 +125785,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 641237696}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.24
-      RiskLevel: 0
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.76
-      RiskLevel: 4
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 25
+        VehicleDistance: 25
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 6
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 5
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 35
+        VehicleDistance: 35
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 33
@@ -125734,62 +125903,6 @@ MonoBehaviour:
         Distance: 34
         VehicleDistance: 34
         AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 33
-        VehicleDistance: 33
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 35
-        VehicleDistance: 35
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 34
-        VehicleDistance: 34
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 4
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 34
-        VehicleDistance: 34
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 34
-        VehicleDistance: 34
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 6
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -125806,84 +125919,53 @@ MonoBehaviour:
         AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
+        InstanceId: 92
+        Distance: 34
+        VehicleDistance: 34
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
+        InstanceId: 96
+        Distance: 34
+        VehicleDistance: 34
+        AirDistance: 14
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
+        InstanceId: 93
+        Distance: 34
+        VehicleDistance: 34
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 25
-        VehicleDistance: 25
-        AirDistance: 22
+        InstanceId: 22
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 33
+        VehicleDistance: 33
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 4
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 11
@@ -125921,25 +126003,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 72073071}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.18
-      RiskLevel: 0
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.82
-      RiskLevel: 4
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 32
+        VehicleDistance: 32
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 30
@@ -125952,62 +126121,6 @@ MonoBehaviour:
         Distance: 31
         VehicleDistance: 31
         AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 32
-        VehicleDistance: 32
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 4
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 6
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 4
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -126024,84 +126137,53 @@ MonoBehaviour:
         AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        InstanceId: 92
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 13
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        InstanceId: 96
+        Distance: 31
+        VehicleDistance: 31
         AirDistance: 15
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
+        InstanceId: 93
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 21
+        InstanceId: 22
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 4
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 4
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 12
@@ -126147,25 +126229,112 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1289015276}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.25
-      RiskLevel: 1
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.75
-      RiskLevel: 4
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 22
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 6
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 36
+        VehicleDistance: 36
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 34
@@ -126178,62 +126347,6 @@ MonoBehaviour:
         Distance: 35
         VehicleDistance: 35
         AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 34
-        VehicleDistance: 34
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 36
-        VehicleDistance: 36
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 6
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 35
-        VehicleDistance: 35
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 35
-        VehicleDistance: 35
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 35
-        VehicleDistance: 35
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -126250,84 +126363,53 @@ MonoBehaviour:
         AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
+        InstanceId: 92
+        Distance: 35
+        VehicleDistance: 35
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        InstanceId: 96
+        Distance: 35
+        VehicleDistance: 35
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 93
+        Distance: 35
+        VehicleDistance: 35
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 22
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 7
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 34
+        VehicleDistance: 34
         AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
+        InstanceId: 19
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 24
+        InstanceId: 23
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 6
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 11
@@ -126357,25 +126439,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 1456351524}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.29
-      RiskLevel: 1
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.71
-      RiskLevel: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 27
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 9
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 39
+        VehicleDistance: 39
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 37
@@ -126388,62 +126557,6 @@ MonoBehaviour:
         Distance: 38
         VehicleDistance: 38
         AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 37
-        VehicleDistance: 37
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 39
-        VehicleDistance: 39
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 38
-        VehicleDistance: 38
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 38
-        VehicleDistance: 38
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 38
-        VehicleDistance: 38
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -126460,84 +126573,53 @@ MonoBehaviour:
         AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
+        InstanceId: 92
+        Distance: 38
+        VehicleDistance: 38
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
+        InstanceId: 96
+        Distance: 38
+        VehicleDistance: 38
+        AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
+        InstanceId: 93
+        Distance: 38
+        VehicleDistance: 38
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 27
+        InstanceId: 22
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 37
+        VehicleDistance: 37
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 16
@@ -126567,25 +126649,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 1588212629}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.28
-      RiskLevel: 1
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.72
-      RiskLevel: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 27
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 26
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 27
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 38
+        VehicleDistance: 38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 36
@@ -126597,62 +126766,6 @@ MonoBehaviour:
         InstanceId: 94
         Distance: 37
         VehicleDistance: 37
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 36
-        VehicleDistance: 36
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 38
-        VehicleDistance: 38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 37
-        VehicleDistance: 37
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 37
-        VehicleDistance: 37
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 37
-        VehicleDistance: 37
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 11
-        VehicleDistance: 11
         AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
@@ -126670,84 +126783,53 @@ MonoBehaviour:
         AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 27
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 27
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
+        InstanceId: 92
+        Distance: 37
+        VehicleDistance: 37
+        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
+        InstanceId: 96
+        Distance: 37
+        VehicleDistance: 37
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 15
+        InstanceId: 93
+        Distance: 37
+        VehicleDistance: 37
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 26
+        InstanceId: 22
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 36
+        VehicleDistance: 36
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 15
@@ -126882,15 +126964,95 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 1091017609}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.5
-      RiskLevel: 2
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0.5
       RiskLevel: 2
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 0
+        VehicleDistance: 0
+        AirDistance: 0
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
@@ -126898,9 +127060,16 @@ MonoBehaviour:
         InstanceId: 0
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 3.4028235e+38
@@ -126913,62 +127082,6 @@ MonoBehaviour:
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -126985,84 +127098,53 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 0
-        VehicleDistance: 0
-        AirDistance: 0
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
+        InstanceId: 92
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
+        InstanceId: 96
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
+        InstanceId: 93
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
+        InstanceId: 22
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 30
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: -1
@@ -127196,25 +127278,112 @@ MonoBehaviour:
       capturePointsMax: 30
       source: {fileID: 1198405773}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0.4
-      RiskLevel: 1
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.6
-      RiskLevel: 3
+      RiskRatio: 0
+      RiskLevel: 0
+    - SlotIndex: 1
+      Team: 3
+      RiskRatio: 0.5
+      RiskLevel: 2
     sectorDistances:
+    - SlotIndex: 0
+      Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 41
+        VehicleDistance: 41
+        AirDistance: 34
+        NavalDistance: 3.4028235e+38
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 45
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 46
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 52
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 43
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 44
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 31
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 26
+        Distance: 40
+        VehicleDistance: 40
+        AirDistance: 33
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 51
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 41
+        VehicleDistance: 41
+        AirDistance: 34
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 3
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 1
       Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 15
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 91
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 95
         Distance: 1
@@ -127227,62 +127396,6 @@ MonoBehaviour:
         Distance: 2
         VehicleDistance: 2
         AirDistance: 2
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Pesada"
-        InstanceId: 97
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 91
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 23
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 15
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 93
-        Distance: 0
-        VehicleDistance: 0
-        AirDistance: 0
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 92
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 96
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 22
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -127299,84 +127412,53 @@ MonoBehaviour:
         AirDistance: 15
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-    - SlotIndex: 0
-      Team: 2
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 41
-        VehicleDistance: 41
-        AirDistance: 34
-        NavalDistance: 3.4028235e+38
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 41
-        VehicleDistance: 41
-        AirDistance: 34
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 31
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 45
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 44
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 51
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
+        InstanceId: 92
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 46
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 43
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
+        InstanceId: 96
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 52
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
+        InstanceId: 93
+        Distance: 0
+        VehicleDistance: 0
+        AirDistance: 0
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 26
-        Distance: 40
-        VehicleDistance: 40
-        AirDistance: 33
+        InstanceId: 22
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Pesada"
+        InstanceId: 97
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 23
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 15
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: -1
@@ -131951,6 +132033,7 @@ Transform:
   m_Children:
   - {fileID: 492494720}
   - {fileID: 1899427098}
+  - {fileID: 181762656}
   - {fileID: 1213214727}
   - {fileID: 569387743}
   - {fileID: 1310407251}
@@ -139896,7 +139979,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 12000 / turn
+      value: 15000 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled
