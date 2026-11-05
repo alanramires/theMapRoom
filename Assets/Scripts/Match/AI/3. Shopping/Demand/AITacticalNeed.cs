@@ -116,6 +116,10 @@ public class AIShoppingDemand
 {
     public UnitRole Role;
     public UnitRole ExactRole = UnitRole.None;
+    // Familia exigida (UnitRoleFamily). O pacote 2/2/1 CONTA por familia; a demanda dele tem
+    // de COMPRAR por familia tambem, senao o Obus Leve (familia Assalto, mas satisfaz
+    // FogoIndireto) entrava na vaga de fogo, nao somava nela e a vaga pedia de novo.
+    public UnitRoleFamily? RequiredFamily;
     public Domain? Domain;
     public Domain? RequiredVisionDomain;
     public HeightLevel? RequiredVisionHeight;

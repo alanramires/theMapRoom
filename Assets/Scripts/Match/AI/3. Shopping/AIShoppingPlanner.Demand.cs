@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 // CÃ¡lculo de demanda por role e progressÃ£o de compra de capturadores.
@@ -2141,32 +2141,184 @@ public partial class AIShoppingPlanner
         s_coreArtTarget = artilleryTarget;
     }
 
-    // Algum produtor da IA oferta unidade que CONTA para este componente do núcleo?
-    // Usa ResolveCompositionRole de propósito — é o mesmo predicado de CountCompositionRole. Usar
-    // CanSatisfy aqui faria um CapturadorCombatente "prometer" fechar o slot de Assalto que ele nunca
-    // conta, e o alvo continuaria inalcançável.
-    private static bool CanAnyOfferedUnitCloseCore(AIWorldSnapshot snapshot, UnitRole role)
+    // ───────────────────────────────────────────── rota terrestre ao inimigo ──
+    // INTEL: a ilha do QG desta IA tem ligacao POR TERRA com algum QG inimigo? Pergunta ao
+    // SectorManager (mapa de distancia reverso a partir de cada QG inimigo, pela ficha
+    // terrestre mais barata da familia Assalto que a IA vende) e cruza com o QG e os
+    // produtores da IA.
+    //
+    // Tres respostas, separadas de proposito ("gate inaplicavel": nao confundir "ainda
+    // nao" com "impossivel neste mapa"):
+    //   - sem dado (sem assalto terrestre ofertado, sem QG inimigo, sem contexto de
+    //     distancia) -> NAO corta nada. Falha conservadora.
+    //   - alguma origem alcanca algum QG inimigo -> ligado.
+    //   - todos os mapas montados e nenhuma origem dentro -> SEM LIGACAO.
+    //
+    // E a ilha INVADIDA (inimigo visivel numa celula de onde se chega por terra ao QG da IA)
+    // religa tudo: pacote terrestre e poupanca do blindado voltam, porque ai o tanque tem
+    // onde lutar.
+    [System.NonSerialized] private static AIWorldSnapshot s_groundRouteSnapshot;
+    private static bool s_groundCutOff;
+
+    private static bool IsGroundCutOffFromEnemy(AIWorldSnapshot snapshot)
     {
-        if (snapshot?.MyBuildings == null)
-            return true; // sem informação de oferta: não afrouxa o gate
+        if (snapshot == null)
+            return false;
+        if (ReferenceEquals(snapshot, s_groundRouteSnapshot))
+            return s_groundCutOff;
+
+        s_groundRouteSnapshot = snapshot;
+        s_groundCutOff = ComputeGroundCutOff(snapshot, out string why);
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] rota terrestre: {why}");
+        return s_groundCutOff;
+    }
+
+    private static bool ComputeGroundCutOff(AIWorldSnapshot snapshot, out string why)
+    {
+        why = "sem dado (nao corta)";
+        if (snapshot.MyBuildings == null)
+            return false;
+
+        UnitData reference = null;
+        var origins = new List<Vector3Int>();
+        Vector3Int? ownHq = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || building.OfferedUnits == null) continue;
-            foreach (UnitData offered in building.OfferedUnits)
-                if (offered != null && UnitRoleCompatibility.ResolveCompositionRole(offered) == role)
+            if (building == null) continue;
+            Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+            bool sells = false;
+            if (building.OfferedUnits != null)
+                foreach (UnitData offered in building.OfferedUnits)
+                {
+                    if (offered == null || offered.domain != Domain.Land
+                        || UnitRoleCompatibility.ResolveFamily(offered) != UnitRoleFamily.Assalto)
+                        continue;
+                    sells = true;
+                    if (reference == null || offered.cost < reference.cost)
+                        reference = offered;
+                }
+            if (building.IsPlayerHeadQuarter) ownHq = cell;
+            if (sells || building.IsPlayerHeadQuarter)
+                origins.Add(cell);
+        }
+        if (reference == null || origins.Count == 0)
+            return false;
+
+        var enemyHqs = new List<Vector3Int>();
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+            if (c != null && c.IsPlayerHeadQuarter && c.TeamId != TeamId.Neutral && c.TeamId != snapshot.AITeam)
+            {
+                Vector3Int hq = c.CurrentCellPosition; hq.z = 0;
+                enemyHqs.Add(hq);
+            }
+        if (enemyHqs.Count == 0)
+            return false;
+
+        foreach (Vector3Int hq in enemyHqs)
+        {
+            if (!SectorManager.TryBuildLandMovementDistanceToTargetMap(hq, reference, out Dictionary<Vector3Int, int> map)
+                || map == null)
+                return false; // sem contexto de distancia: nao afirma corte
+            foreach (Vector3Int origin in origins)
+                if (map.ContainsKey(origin))
+                {
+                    why = $"ligada ({reference.displayName} chega a um QG inimigo)";
+                    return false;
+                }
+        }
+
+        // Sem ligacao. A ilha do QG esta sendo invadida?
+        if (ownHq.HasValue && snapshot.EnemyUnits != null
+            && TryFindEnemyOnOwnIsland(snapshot, ownHq.Value, reference, out UnitManager invasor, out string fonteIlha))
+        {
+            Vector3Int ec = invasor.CurrentCellPosition; ec.z = 0;
+            why = $"SEM LIGACAO, mas a ilha do QG esta invadida ({invasor.UnitDisplayName}#{invasor.InstanceId} "
+                + $"em ({ec.x},{ec.y}), {fonteIlha}) — pacote terrestre e poupanca do blindado religados";
+            return false;
+        }
+
+        why = $"SEM LIGACAO: {reference.displayName} nao chega por terra a nenhum QG inimigo "
+            + $"({origins.Count} origens, {enemyHqs.Count} QG) — pacote pede ataque aereo e antiaereo; "
+            + "sem poupanca de blindado";
+        return true;
+    }
+
+    // Inimigo visivel na ilha do QG. A ilha vem da GEOGRAFIA do BeachManager (planicie,
+    // floresta, montanha e praia continuas; agua e ponte separam): pega tambem o desembarque
+    // numa serra que o tanque nao alcanca — "atacar os setores cobertos pela ilha". Sem
+    // BeachManager ou sem ilha no QG, cai no alcance terrestre do tanque a partir do QG.
+    private static bool TryFindEnemyOnOwnIsland(
+        AIWorldSnapshot snapshot, Vector3Int ownHq, UnitData reference,
+        out UnitManager invader, out string source)
+    {
+        invader = null;
+        source = "";
+
+        BeachManager beaches = BeachManager.GetOrCreate();
+        if (beaches != null && beaches.TryGetIslandAtCell(ownHq, out BeachManager.IslandInfo ilhaDoQg) && ilhaDoQg != null)
+        {
+            source = ilhaDoQg.DisplayName;
+            foreach (UnitManager enemy in snapshot.EnemyUnits)
+            {
+                // So quem esta EM TERRA invade: aeronave sobrevoando nao e desembarque, e
+                // tanque nao responde a ela (a vaga antiaerea do pacote responde).
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.GetDomain() != Domain.Land) continue;
+                Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+                if (beaches.TryGetIslandAtCell(ec, out BeachManager.IslandInfo ilha) && ilha == ilhaDoQg)
+                {
+                    invader = enemy;
                     return true;
+                }
+            }
+            return false;
+        }
+
+        source = "alcance terrestre do QG";
+        if (!SectorManager.TryBuildLandMovementDistanceToTargetMap(ownHq, reference, out Dictionary<Vector3Int, int> alcance)
+            || alcance == null)
+            return false;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.GetDomain() != Domain.Land) continue;
+            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            if (alcance.ContainsKey(ec))
+            {
+                invader = enemy;
+                return true;
+            }
         }
         return false;
     }
 
+    // Algum produtor da IA oferta unidade que CONTA para este componente do nucleo? Assalto
+    // e fogo contam por FAMILIA (o mesmo que CountCoreFamily); os demais, por composicao.
+    // Usar CanSatisfy aqui faria um CapturadorCombatente "prometer" fechar o slot de Assalto
+    // que ele nunca conta, e o alvo continuaria inalcancavel.
+    private static bool CanAnyOfferedUnitCloseCore(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        if (snapshot?.MyBuildings == null)
+            return true; // sem informação de oferta: não afrouxa o gate
+        UnitRoleFamily family = role == UnitRole.Assalto ? UnitRoleFamily.Assalto
+            : role == UnitRole.FogoIndireto ? UnitRoleFamily.FogoDeSuporte : UnitRoleFamily.Nenhuma;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || building.OfferedUnits == null) continue;
+            foreach (UnitData offered in building.OfferedUnits)
+                if (offered != null && (family != UnitRoleFamily.Nenhuma
+                        ? UnitRoleCompatibility.ResolveFamily(offered) == family
+                        : UnitRoleCompatibility.ResolveCompositionRole(offered) == role))
+                    return true;
+        }
+        return false;
+    }
     private static bool HasOperationalCore(AIWorldSnapshot snapshot)
     {
         if (snapshot == null)
             return false;
         ResolveOperationalCoreTargets(snapshot, out int capturerTarget, out int assaultTarget, out int artilleryTarget);
         return CountCompositionRole(snapshot, UnitRole.Capturador) >= capturerTarget
-            && CountCompositionRole(snapshot, UnitRole.Assalto) >= assaultTarget
-            && CountCompositionRole(snapshot, UnitRole.FogoIndireto) >= artilleryTarget;
+            && CountCoreFamily(snapshot, UnitRoleFamily.Assalto) >= assaultTarget
+            && CountCoreFamily(snapshot, UnitRoleFamily.FogoDeSuporte) >= artilleryTarget;
     }
 
     private static float ComputeOperationalCoreMaturity(AIWorldSnapshot snapshot)
@@ -2179,9 +2331,9 @@ public partial class AIShoppingPlanner
         float capturer = capturerTarget <= 0 ? 1f : Mathf.Clamp01(
             CountCompositionRole(snapshot, UnitRole.Capturador) / (float)capturerTarget);
         float assault = assaultTarget <= 0 ? 1f : Mathf.Clamp01(
-            CountCompositionRole(snapshot, UnitRole.Assalto) / (float)assaultTarget);
+            CountCoreFamily(snapshot, UnitRoleFamily.Assalto) / (float)assaultTarget);
         float fire = artilleryTarget <= 0 ? 1f : Mathf.Clamp01(
-            CountCompositionRole(snapshot, UnitRole.FogoIndireto) / (float)artilleryTarget);
+            CountCoreFamily(snapshot, UnitRoleFamily.FogoDeSuporte) / (float)artilleryTarget);
         return (capturer + assault + fire) / 3f;
     }
 
@@ -2297,6 +2449,9 @@ public partial class AIShoppingPlanner
         if (AIController.Instance == null || !AIController.Instance.AbreComBlindado)
             return 0;
         if (CountActiveEliteAssaultUnits(snapshot) > 0)
+            return 0;
+        // Ilha sem rota terrestre ao inimigo: nao entesoura caixa para o primeiro blindado.
+        if (IsGroundCutOffFromEnemy(snapshot))
             return 0;
 
         // NÃO entesoura pro MBT antes de ter a massa de captura inicial. No começo (poucos/zero
@@ -2682,8 +2837,10 @@ public partial class AIShoppingPlanner
         }
 
         int capturers = CountCompositionRole(snapshot, UnitRole.Capturador);
-        int assaults = CountCompositionRole(snapshot, UnitRole.Assalto);
-        int fireSupport = CountCompositionRole(snapshot, UnitRole.FogoIndireto);
+        // Assalto e fogo contam por FAMILIA (Tools > Role Families): Apache conta como assalto,
+        // SAM/AAA como fogo de suporte — o pacote fecha no ar quando o solo nao serve.
+        int assaults = CountCoreFamily(snapshot, UnitRoleFamily.Assalto);
+        int fireSupport = CountCoreFamily(snapshot, UnitRoleFamily.FogoDeSuporte);
         int core = capturers + assaults + fireSupport;
         int packages = Mathf.Max(1, Mathf.CeilToInt(core / 5f));
         // Vaga de captura ABERTA no plano tambem e demanda de capturador. O pacote 2/2/1
@@ -2695,8 +2852,24 @@ public partial class AIShoppingPlanner
         int capturerDemand = Mathf.Max(Mathf.Max(0, packages * 2 - capturers), openCapturerSlots);
         EnsureRoleDemand(demands, UnitRole.Capturador, capturerDemand, 30,
             "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport} vagasPlano={openCapturerSlots}");
-        EnsureRoleDemand(demands, UnitRole.Assalto, Mathf.Max(0, packages * 2 - assaults), 31,
-            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+        // ILHA SEM LIGACAO POR TERRA ao inimigo (e nao invadida): o pacote continua 2 assalto +
+        // 1 fogo, mas pede a versao que serve ali — assalto = ATAQUE AEREO (Apache), fogo =
+        // ANTIAEREO (SAM, ou AAA, que satisfaz Antiaereo). Tanque e artilharia so seriam
+        // comprados por doutrina para avancar aonde nao chegam; a defesa segue pelas demandas
+        // proprias, e a ilha invadida religa o pacote terrestre (IsGroundCutOffFromEnemy).
+        bool groundCutOff = IsGroundCutOffFromEnemy(snapshot);
+        int assaultNeed = Mathf.Max(0, packages * 2 - assaults);
+        string compositionReason = $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}"
+            + (groundCutOff ? " (ilha sem ligacao por terra: ar + antiaereo)" : "");
+        if (assaultNeed > 0)
+        {
+            AIShoppingDemand assaultDemand = NewRoleDemand(
+                groundCutOff ? UnitRole.AtaqueAereo : UnitRole.Assalto, assaultNeed, 31,
+                "composition", compositionReason, false);
+            assaultDemand.RequiredFamily = UnitRoleFamily.Assalto;
+            if (groundCutOff) assaultDemand.Domain = Domain.Air;
+            MergeRoleDemand(demands, assaultDemand, false);
+        }
         // Fire support de composição espera a massa inicial de capturadores se formar (igual ao
         // transporte). Assalto continua liberado. A artilharia defensiva (PreventiveDefense) não
         // passa por aqui e não é gateada.
@@ -2709,11 +2882,18 @@ public partial class AIShoppingPlanner
         const float materialCounterGap = 0.4f;
         bool counterResponseOwnsFireSlot = Mathf.Max(
             counterPressure.AntiInfantry, counterPressure.AntiTank) >= materialCounterGap;
-        int compositionFire = capturers >= massGate && !counterResponseOwnsFireSlot
+        // Na ilha sem ligacao o fogo e antiaereo, e a regra do counter terrestre nao se aplica.
+        int compositionFire = capturers >= massGate && (groundCutOff || !counterResponseOwnsFireSlot)
             ? Mathf.Max(0, packages - fireSupport)
             : 0;
-        EnsureRoleDemand(demands, UnitRole.FogoIndireto, compositionFire, 32,
-            "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+        if (compositionFire > 0)
+        {
+            AIShoppingDemand fireDemand = NewRoleDemand(
+                groundCutOff ? UnitRole.Antiaereo : UnitRole.FogoIndireto, compositionFire, 32,
+                "composition", compositionReason, false);
+            fireDemand.RequiredFamily = UnitRoleFamily.FogoDeSuporte;
+            MergeRoleDemand(demands, fireDemand, false);
+        }
         if (log && counterResponseOwnsFireSlot && capturers >= massGate
             && packages > fireSupport)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
@@ -3065,6 +3245,7 @@ public partial class AIShoppingPlanner
             if (currentRally != incomingRally)
                 continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
+                || current.RequiredFamily != incoming.RequiredFamily
                 || current.Domain != incoming.Domain
                 || current.RequiredVisionDomain != incoming.RequiredVisionDomain
                 || current.RequiredVisionHeight != incoming.RequiredVisionHeight
@@ -3117,6 +3298,9 @@ public partial class AIShoppingPlanner
         if (unit.eliteLevel < demand.MinEliteLevel || unit.eliteLevel > demand.MaxEliteLevel)
             return false;
         if (demand.ExactRole != UnitRole.None && unit.roles[0] != demand.ExactRole)
+            return false;
+        if (demand.RequiredFamily.HasValue
+            && UnitRoleCompatibility.ResolveFamily(unit) != demand.RequiredFamily.Value)
             return false;
         if (demand.RequiredWeaponCategory.HasValue
             && !HasWeaponCategory(unit, demand.RequiredWeaponCategory.Value))
@@ -3779,6 +3963,23 @@ public partial class AIShoppingPlanner
         MergeRoleDemand(demands, quality, false);
     }
 
+    // ───────────────────────────────────────── familias do pacote / nucleo ──
+    // O pacote 2/2/1 e o nucleo minimo pedem FAMILIA, nao dominio: "2 da familia Assalto + 1
+    // da familia Fogo de Suporte" (UnitRoleCompatibility.ResolveFamily, Tools > Role Families).
+    // No solo isso e tanque e artilharia; na ilha sem ligacao por terra, Apache e SAM/AAA.
+    // O Feijao Torto (so solo) fecha o pacote como sempre; o Peixe Pequeno fecha pelo ar e
+    // pelo antiaereo, sem forcar tanque onde ele nao chega (decisao do autor, 2026-11-05).
+    // So o pacote e o nucleo contam por familia; o resto do shopping segue por rotulo.
+    private static int CountCoreFamily(AIWorldSnapshot snapshot, UnitRoleFamily family)
+    {
+        int count = 0;
+        if (snapshot?.MyUnits == null) return 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
+                && UnitRoleCompatibility.ResolveFamily(data) == family)
+                count++;
+        return count;
+    }
     private static int CountCompositionRole(AIWorldSnapshot snapshot, UnitRole role)
     {
         int count = 0;
