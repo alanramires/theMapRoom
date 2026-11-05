@@ -40,6 +40,8 @@ Os domínios de cada estrutura estão declarados em `02_dominios_terrenos_e_ocup
 
 A **estrada** oferece bônus de velocidade para unidades motorizadas que percorrem todo o seu movimento sobre ela. Abre passagem por florestas e montanhas, permitindo que unidades alcancem cidades construídas em terrenos elevados.
 
+Uma construção que a estrada atravessa — o QG, uma fábrica, uma cidade — não interrompe a corrida. Ao entrar nela você paga o custo da construção, mas continua sobre a rota, e o bônus segue valendo enquanto a própria estrada o permitir naquele terreno. Na montanha ela não permite, então uma cidade nos Alpes não vira atalho.
+
 Na combinação com planície, a estrada funciona como pista improvisada — aeronaves conseguem pousar para receber reabastecimento de unidades logísticas como o caminhão de suprimentos. Na montanha, essa mesma aeronave não pousa. O terreno cancela o acesso que a estrutura abriria.
 
 **A estrada na montanha é um desfiladeiro.** Ela abre a passagem, mas não por qualquer flanco: para subir a serra por ela, você tem que **entrar pela boca da estrada** — o ponto onde ela encontra o terreno mais baixo — e seguir o traçado como se fosse um trilho. Não dá para atacar a montanha de lado e cair na estrada no meio. A exceção é chegar a uma construção na serra (uma cidade, por exemplo): construção liberta o movimento e encerra o desfiladeiro dali em diante. O efeito tático é grande — um passo de montanha vira gargalo, defensável pelas duas bocas.

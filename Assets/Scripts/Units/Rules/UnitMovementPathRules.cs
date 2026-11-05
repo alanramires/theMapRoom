@@ -136,7 +136,7 @@ public static class UnitMovementPathRules
                     applyOperationalAutonomyModifier: true,
                     traversal);
                 bool nextIsRoadBoost =
-                    traversal.source == TraversalSource.Structure
+                    IsRoadBoostTraversal(traversal)
                     && cache.IsRoadBoostEdge(
                         current,
                         next,
@@ -273,10 +273,12 @@ public static class UnitMovementPathRules
             bool fullMoveWasOnRoad = true;
             for (int i = 1; i <= baseMove; i++)
             {
-                if (!cache.IsRoadBoostEdge(
+                if (!IsRoadBoostStep(
+                        cache,
                         path[i - 1],
                         path[i],
-                        unit))
+                        unit,
+                        terrainDatabase != null))
                 {
                     fullMoveWasOnRoad = false;
                     break;
@@ -285,10 +287,12 @@ public static class UnitMovementPathRules
 
             if (fullMoveWasOnRoad)
             {
-                if (cache.IsRoadBoostEdge(
+                if (IsRoadBoostStep(
+                        cache,
                         path[baseMove],
                         path[baseMove + 1],
-                        unit))
+                        unit,
+                        terrainDatabase != null))
                 {
                     freeRoadStepIndex = baseMove + 1;
                 }
@@ -362,19 +366,72 @@ public static class UnitMovementPathRules
 
         for (int i = 1; i <= baseMove; i++)
         {
-            if (!cache.IsRoadBoostEdge(
+            if (!IsRoadBoostStep(
+                    cache,
                     path[i - 1],
                     path[i],
-                    unit))
+                    unit,
+                    terrainDatabase != null))
             {
                 return false;
             }
         }
 
-        return cache.IsRoadBoostEdge(
+        return IsRoadBoostStep(
+            cache,
             path[baseMove],
             path[baseMove + 1],
-            unit);
+            unit,
+            terrainDatabase != null);
+    }
+
+    // UMA PERGUNTA, TRES CONTAS. "Este passo e trecho de estrada para o bonus?"
+    // e respondido aqui para a conta de autonomia e para DidUseRoadFullMoveBonus;
+    // a busca (CalcularCaminhosValidos) usa o mesmo IsRoadBoostTraversal com a
+    // travessia que ja resolveu. Antes a busca exigia a estrada GOVERNANDO o hex
+    // e as outras duas nao — discordavam no QG da base azul.
+    private static bool IsRoadBoostStep(
+        MovementQueryCache cache,
+        Vector3Int from,
+        Vector3Int to,
+        UnitManager unit,
+        bool terrainRulesAvailable)
+    {
+        from.z = 0;
+        to.z = 0;
+        if (cache == null || !cache.IsRoadBoostEdge(from, to, unit))
+            return false;
+
+        if (!TryResolveTraversal(
+                to,
+                cache,
+                cache.GetConstructionAtCell(to),
+                cache.GetStructureAtCell(to),
+                cache.ResolveTerrainAtCell(to),
+                cache.HasAnyPaintedTileAtCell(to),
+                terrainRulesAvailable,
+                unit,
+                from,
+                out TraversalDecision traversal))
+        {
+            return false;
+        }
+
+        return IsRoadBoostTraversal(traversal);
+    }
+
+    // A CONSTRUCAO NAO CORTA A ESTRADA (decisao do autor, 2026-11-04). Num hex de
+    // construcao a construcao continua cobrando custo e skills; a CONTINUIDADE do
+    // bonus segue a rota, onde a propria rodovia permitir (IsRoadBoostEdge ja
+    // consulta IsRoadBoostEnabled do terreno: na montanha a rodovia desliga, entao
+    // cidade nos Alpes nao da bonus). Antes so valia com a estrada governando o hex,
+    // e o QG em planicie quebrava a corrente sem regra escrita nenhuma.
+    // Terrain fica de fora: e passagem pelo terreno (TerrainPassage, ou construcao
+    // que herda o terreno), nao rodovia.
+    private static bool IsRoadBoostTraversal(TraversalDecision traversal)
+    {
+        return traversal.source == TraversalSource.Structure
+            || traversal.source == TraversalSource.Construction;
     }
 
     public static bool TryGetEnterCellCost(
