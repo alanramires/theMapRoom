@@ -466,35 +466,37 @@ public class ConstructionManagerEditor : Editor
                 quadrante.eixos.Add(destino);
             }
 
-            // Uma varredura de cena so para a escrita inteira: a ordenacao consulta
-            // rally e distancia setor a setor, e refazer o Find a cada consulta varria
-            // a cena dezenas de vezes por clique.
-            var pecas = new List<ConstructionManager>(ConstrucoesDoQuadrante(quadrante));
-            destino.caminho.Insert(PosicaoNoCaminho(pecas, slot, destino, setor), setor);
+            // A ORDEM E A DO CLIQUE. Quem desenha a marcha e o autor: o setor entra no
+            // fim, na ordem em que foi clicado. A ordenacao antiga por distancia em linha
+            // reta ao QG fazia zigue-zague num mapa de ilhas e montanhas (Mike-Mike-Mike
+            // no Peixe Pequeno) e nao respeitava o caminho que o autor pensou.
+            destino.caminho.Add(setor);
         }
+
+        // RALLY SEMPRE POR ULTIMO, reposicionado a cada escrita de qualquer eixo do
+        // slot — nao so na hora de inserir. O Papa entrou antes de ser marcado rally (ou
+        // a marca mudou depois) e ficou no meio da fila, com Oscar/Quebec/November atras.
+        var pecas = new List<ConstructionManager>(ConstrucoesDoQuadrante(quadrante));
+        foreach (EixoAutorado e in quadrante.eixos)
+            if (e != null && e.slotIndex == slot && e.caminho != null)
+                MoverRallyParaOFim(pecas, slot, e);
 
         EditorUtility.SetDirty(mundo);
     }
 
-    // Onde o setor entra no caminho. A ordem e a distancia ao QG do slot — o corredor
-    // anda do QG pra fora —, e o setor que tem o RALLY vai pro fim, porque o rally e
-    // onde a tropa para. Sem QG na cena, entra no fim e o autor reordena na lista.
-    private static int PosicaoNoCaminho(
-        List<ConstructionManager> pecas, int slot, EixoAutorado eixo, ConstructionSector setor)
+    // Ordem estavel: os setores sem rally mantem a ordem do autor; os de rally vao
+    // para o fim, na ordem em que ja estavam.
+    private static void MoverRallyParaOFim(List<ConstructionManager> pecas, int slot, EixoAutorado eixo)
     {
-        if (TemRallyDoSlot(pecas, slot, setor))
-            return eixo.caminho.Count;
-
-        float d = DistanciaAoQG(pecas, slot, setor);
-        if (float.IsPositiveInfinity(d))
-            return eixo.caminho.Count;
-
-        int i = 0;
-        while (i < eixo.caminho.Count
-               && !TemRallyDoSlot(pecas, slot, eixo.caminho[i])
-               && DistanciaAoQG(pecas, slot, eixo.caminho[i]) <= d)
-            i++;
-        return i;
+        var comuns = new List<ConstructionSector>();
+        var rallies = new List<ConstructionSector>();
+        foreach (ConstructionSector s in eixo.caminho)
+            (TemRallyDoSlot(pecas, slot, s) ? rallies : comuns).Add(s);
+        if (rallies.Count == 0)
+            return;
+        eixo.caminho.Clear();
+        eixo.caminho.AddRange(comuns);
+        eixo.caminho.AddRange(rallies);
     }
 
     private static bool TemRallyDoSlot(
@@ -505,28 +507,6 @@ public class ConstructionManagerEditor : Editor
                 && (c.IsRallyForSlot(slot) || c.RallyOwnerSlots.Count == 0))
                 return true;
         return false;
-    }
-
-    // Distancia do QG do slot ao predio MAIS PROXIMO daquele setor: um setor e um
-    // punhado de predios, e o que interessa e por onde a tropa encosta nele.
-    private static float DistanciaAoQG(
-        List<ConstructionManager> pecas, int slot, ConstructionSector setor)
-    {
-        ConstructionManager hq = null;
-        foreach (ConstructionManager c in pecas)
-            if (c.IsPlayerHeadQuarter && c.SlotIndex == slot) { hq = c; break; }
-        if (hq == null)
-            return float.PositiveInfinity;
-
-        Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
-        float melhor = float.PositiveInfinity;
-        foreach (ConstructionManager c in pecas)
-        {
-            if (c.Sector != setor) continue;
-            Vector3Int cell = c.CurrentCellPosition; cell.z = 0;
-            melhor = Mathf.Min(melhor, SectorManager.HexDistance(cell, hqCell));
-        }
-        return melhor;
     }
 
     private static IEnumerable<ConstructionManager> ConstrucoesDoQuadrante(QuadranteData quadrante)
@@ -553,6 +533,27 @@ public class ConstructionManagerEditor : Editor
 
         string cenaAberta = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
         string[] guids = AssetDatabase.FindAssets("t:MundoData");
+
+        // O QUADRANTE DO MAP HELPER MANDA. Ele ja recorta o SectorManager e o mapa de
+        // eixos; esta ficha tem de escrever no MESMO quadrante. Sem isso, prédio numa
+        // faixa de borda (os retangulos se sobrepoem: y=10 e de Q1/Q3 e de Q2/Q4) caia
+        // no primeiro quadrante da lista e o eixo era gravado no mapa vizinho.
+        QuadranteData selecionado = InvasionAxisMap.AuthoringQuadrante;
+        if (selecionado != null && selecionado.ContainsCampaignCell(cell))
+        {
+            foreach (string guid in guids)
+            {
+                var candidato = AssetDatabase.LoadAssetAtPath<MundoData>(AssetDatabase.GUIDToAssetPath(guid));
+                if (candidato == null) continue;
+                foreach (QuadranteData q in candidato.AllQuadrantes())
+                {
+                    if (q != selecionado) continue;
+                    mundo = candidato;
+                    quadrante = q;
+                    return true;
+                }
+            }
+        }
         foreach (string guid in guids)
         {
             var candidato = AssetDatabase.LoadAssetAtPath<MundoData>(AssetDatabase.GUIDToAssetPath(guid));
