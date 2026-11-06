@@ -1,15 +1,23 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-05, **depois** da tag `v10.0.0`.
+Ponto de retomada. Atualizado em 2026-11-06, **depois** da tag `v10.0.1`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v10.0.0` tagueada e publicada, **abrindo a v10 — Cada mapa, a mesma IA**. O primeiro MVP
-estável segue no ar (v9.2.0). Relatório: [`relatorio_v10.0.0.md`](relatorio_v10.0.0.md). Os
-relatórios da v9 foram arquivados em `Versões/`.
+`v10.0.1` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.0.1.md`](relatorio_v10.0.1.md),
+[`relatorio_v10.0.0.md`](relatorio_v10.0.0.md).
+
+**A descoberta da v10.0.1: a regra da ilha estava numa porta só.** O pacote 2/2/1 já trocava
+tanque por ar na ilha sem ligação por terra; o counter, o elite, o déficit de operação, a AA
+urgente e a vigilância continuavam comprando como se houvesse estrada. Agora toda porta pergunta
+à mesma fonte (`OwnLandProbe`). No plano, a mesma lição: o alocador e o blitz decidiam sem
+perguntar se a unidade chega lá a pé. **Quem fecha nesta rodada ganha o objetivo** (troca pelo
+Tático, também entre quem já tem vaga), e **a ponta só reveza com rota terrestre** — esta,
+vista rodando. O resto só compilou.
 
 **A descoberta da v10.0.0: quase toda marca do AI Step era uma regra no lugar errado.** Não um
 número: uma constante de hex onde devia haver banda, uma composição de solo onde devia haver
@@ -295,14 +303,28 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
-### O que a v10.0.0 deixou — o teste aéreo no Peixe Pequeno
+### O que a v10.0.1 deixou — ver rodando no Peixe Pequeno
 
-1. **Ver rodando no Peixe Pequeno** a linha `rota terrestre: SEM LIGACAO …` no Shopping, o
-   pacote comprando Apache e SAM/AAA, e a `ilha invadida` religando tanque e MBT quando o
-   inimigo desembarcar (`AIShoppingPlanner.Demand.cs`: `IsGroundCutOffFromEnemy`,
-   `TryFindEnemyOnOwnIsland`).
-2. **Counter compra tanque contra blindado na ilha do inimigo:** a demanda de counter não
-   pergunta se a ameaça alcança a nossa ilha. Próximo conserto, com a ilha do BeachManager.
+1. **Procurar nos logs do Shopping:** `foraDaTerra=N` (counter), `(ilha sem ligacao por
+   terra)` (elite e escolta de operação), `ameaca aerea: X/Y … dentro do anel`,
+   `vigilancia aerea: sem demanda`. Conferir se o Chinook do Difícil sai no T1 (imposto de
+   conscrição sem elite).
+2. **Planner:** `[Plan][TrocaTatico]` quando um capturador com o prédio no Tático está em
+   outra vaga. Observar se o desconto de −20 puxa capturador para outro eixo.
+3. **LZ do Chinook pousado** cai ao lado do passageiro, nunca em cima
+   (`MelhorEmbarqueService.CanAircraftLandForPickup`). Com a aeronave pousada o terreno de
+   pouso segue sem teste: o `PodePousar` só responde para quem está no ar.
+4. **Apaches demais?** A escolta "risky" vira Apache por setor e soma com o pacote.
+5. **Compra de prioridade 20 no troco** da de 15 que não coube: problema do carrinho, para
+   toda demanda. Não tocado.
+6. **SAM/AAA posicionados** (ideia do autor): SAM nos cantos expande a cobertura, um cobre o
+   ponto cego do outro, AAA escolta o SAM. Posicionamento, não compra.
+
+### O que a v10.0.0 deixou e segue aberto
+
+1. **Ver rodando** a `ilha invadida` religando tanque e MBT quando o inimigo desembarcar
+   (`TryFindEnemyOnOwnIsland`).
+2. ~~Counter compra tanque contra blindado na ilha do inimigo~~ — feito na v10.0.1.
 3. **Capturador com vaga que não está revezando** ainda pode tomar o prédio do herdeiro
    escolhido (`HandoffHeirUnitId`); a trava só vale para a ponta que reveza.
 4. **Prédio neutro dentro da própria base** (aeroporto do Q3) não vira objetivo; só o
@@ -682,6 +704,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **o plano persiste entre turnos** | quem já tem vaga não volta para a matriz de atribuição de capturadores. Mudar o custo da matriz não mexe nele, nem com `ai replan`. Antes de mexer num custo, conferir **quem entra** na atribuição |
+| **aeronave pousada é `Land`** | `GetDomain() != Air` não diz "não é aeronave": o Chinook no aeroporto pulava o teste de pouso. Perguntar à ficha (`IsAircraft`) |
+| **grep no arquivo do sensor não segue a delegação** | eu disse que o `PodePousar` não olhava ocupação; ele delega a `AircraftOperationRules`, onde ela mora. Seguir a chamada antes de dizer que um sensor não faz algo |
+| **regra de ilha numa porta só** | o shopping tem várias portas (pacote, counter, elite, operação, AA, vigilância). Regra de mapa que vira demanda tem de passar por todas |
 | **testar mudança de IA com save do meio do turno** | o plano vai no save; a retomada no stage 2 reexecuta a decisão antiga e esconde o código novo. Usar `ai replan` na vez da IA, ou save de antes de ela planejar |
 | **o bake é foto** | mexer em rally ou eixo na cena e não rebakear deixa a Batalha com o dado velho (o dono do rally de Juliet estava na cena e não no bake). Na autoria, ler a cena |
 | **o Shopping em uso é o carrinho por papéis** | `AIShoppingPlanner.Demand.cs`, log `[AI Shopping Roles] … carrinho`. A ordenação de `landBuildings` em `AIShoppingPlanner.cs` não roda nesta partida |
