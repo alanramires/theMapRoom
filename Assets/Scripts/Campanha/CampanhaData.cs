@@ -40,6 +40,13 @@ public class CampanhaData : INoDoMapa
         + "jogavel nem selecionavel. Vazio = so os quadrantes aparecem. Row-major, y crescendo.")]
     public List<TileBase> bakedFundo = new List<TileBase>();
 
+    [Tooltip(
+        "Rotas (rodovia, ferrovia, rio) recortadas pelo retangulo da CAMPANHA, em coordenada "
+        + "local dela. Assadas junto com o fundo. So apresentacao: a cena Campanha desenha "
+        + "aqui as arestas que nenhum quadrante tem — a que cruza a divisa entre dois "
+        + "quadrantes ou corre pela paisagem. A Batalha nao le isto; ela usa o bake do quadrante.")]
+    public List<RotaAssada> bakedFundoRotas = new List<RotaAssada>();
+
     public bool HasFundo => bakedFundo != null && bakedFundo.Count == Mathf.Max(1, width) * Mathf.Max(1, height);
 
     public TileBase GetFundoTile(int localX, int localY)

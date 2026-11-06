@@ -110,6 +110,8 @@ public class CampaignSelectionController : MonoBehaviour
         public Tilemap Map;
         public Vector3Int Cell;
         public Color BaseColor;
+        // Estrada do fundo que nao encosta em quadrante nenhum: cor fixa, nao reage a selecao.
+        public bool Paisagem;
     }
 
     private readonly List<MapDetailPreview> mapDetails = new List<MapDetailPreview>();
@@ -998,22 +1000,7 @@ public class CampaignSelectionController : MonoBehaviour
                         shared.Quadrants.Add(i);
                         continue;
                     }
-                    Vector3 from = worldTilemap.GetCellCenterWorld(a), to = worldTilemap.GetCellCenterWorld(b);
-                    Vector3 delta = to - from;
-                    var go = new GameObject($"{route.structureId} {a} - {b}");
-                    go.transform.SetParent(roadPreviewRoot, false);
-                    go.transform.position = (from + to) * 0.5f;
-                    go.transform.rotation = Quaternion.Euler(0, 0, Vector2.SignedAngle(Vector2.up, delta));
-                    SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
-                    renderer.sprite = structure.roadSegmentSprite;
-                    renderer.color = structure.roadColor;
-                    renderer.sortingLayerName = "Estruturas";
-                    renderer.sortingOrder = 20;
-                    Vector3 size = renderer.sprite.bounds.size;
-                    go.transform.localScale = new Vector3(
-                        Mathf.Clamp(structure.roadWidth, 0.03f, 0.6f) / Mathf.Max(0.0001f, size.x),
-                        (delta.magnitude + Mathf.Clamp(structure.segmentOverlap, 0f, 0.3f)) / Mathf.Max(0.0001f, size.y), 1);
-                    var detail = new MapDetailPreview { Renderer = renderer, BaseColor = structure.roadColor };
+                    MapDetailPreview detail = CreateRoadSegment(structure, route.structureId, a, b);
                     detail.Quadrants.Add(i);
                     edges.Add(key, detail);
                     mapDetails.Add(detail);
@@ -1021,6 +1008,102 @@ public class CampaignSelectionController : MonoBehaviour
                 }
             }
         }
+
+        roadSegmentCount += BuildBackgroundRoads(edges, missingStructures);
+    }
+
+    // ESTRADA DA PAISAGEM. Cada quadrante assa so o trecho dentro do proprio retangulo,
+    // entao a aresta que cruza a divisa entre dois quadrantes — ou que corre por terreno
+    // sem quadrante — nao era de ninguem e sumia: a rodovia aparecia partida no mapa.
+    // O fundo da campanha (CampanhaData.bakedFundoRotas) guarda as rotas recortadas pelo
+    // retangulo da CAMPANHA. Aresta que um quadrante ja desenhou fica com ele; o resto
+    // entra aqui. Encostando num quadrante, acende com ele; solta na paisagem, leva a
+    // cor do fundo e nao reage a selecao.
+    private int BuildBackgroundRoads(
+        Dictionary<(string, Vector3Int, Vector3Int), MapDetailPreview> edges,
+        HashSet<string> missingStructures)
+    {
+        if (mundo?.blocos == null)
+            return 0;
+        int count = 0;
+        foreach (BlocoData bloco in mundo.blocos)
+        {
+            if (bloco?.campanhas == null) continue;
+            foreach (CampanhaData campanha in bloco.campanhas)
+            {
+                if (campanha?.bakedFundoRotas == null) continue;
+                foreach (RotaAssada route in campanha.bakedFundoRotas)
+                {
+                    if (route?.celulas == null || route.celulas.Count < 2) continue;
+                    if (structureDatabase == null ||
+                        !structureDatabase.TryGetById(route.structureId, out StructureData structure) ||
+                        structure == null || structure.roadSegmentSprite == null)
+                    {
+                        if (missingStructures.Add(route.structureId ?? string.Empty))
+                            Debug.LogWarning($"[Campanha] Estrada '{route.structureId}' sem catalogo ou sprite visual.", this);
+                        continue;
+                    }
+                    for (int c = 0; c < route.celulas.Count - 1; c++)
+                    {
+                        Vector3Int a = route.celulas[c], b = route.celulas[c + 1];
+                        a = new Vector3Int(campanha.originX + a.x, campanha.originY + a.y, 0);
+                        b = new Vector3Int(campanha.originX + b.x, campanha.originY + b.y, 0);
+                        if (a == b || !worldTilemap.HasTile(a) || !worldTilemap.HasTile(b)) continue;
+                        var key = a.x < b.x || (a.x == b.x && a.y < b.y)
+                            ? (route.structureId, a, b) : (route.structureId, b, a);
+                        if (edges.ContainsKey(key)) continue;
+
+                        MapDetailPreview detail = CreateRoadSegment(structure, route.structureId, a, b);
+                        AddQuadrantsAt(detail.Quadrants, a);
+                        AddQuadrantsAt(detail.Quadrants, b);
+                        if (detail.Quadrants.Count == 0)
+                        {
+                            detail.Paisagem = true;
+                            detail.BaseColor = MultiplyRgb(structure.roadColor, fundoTint);
+                            detail.Renderer.color = detail.BaseColor;
+                        }
+                        edges.Add(key, detail);
+                        mapDetails.Add(detail);
+                        count++;
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private void AddQuadrantsAt(HashSet<int> destino, Vector3Int worldCell)
+    {
+        for (int i = 0; i < quadrants.Count; i++)
+        {
+            QuadranteData q = quadrants[i].Quadrante;
+            if (q == null || !q.HasBake) continue;
+            int x = worldCell.x - q.originX, y = worldCell.y - q.originY;
+            if (IsInsideQuadrant(q, x, y) && q.GetBakedTile(x, y) != null)
+                destino.Add(i);
+        }
+    }
+
+    private static Color MultiplyRgb(Color a, Color b) => new Color(a.r * b.r, a.g * b.g, a.b * b.b, a.a);
+
+    private MapDetailPreview CreateRoadSegment(StructureData structure, string structureId, Vector3Int a, Vector3Int b)
+    {
+        Vector3 from = worldTilemap.GetCellCenterWorld(a), to = worldTilemap.GetCellCenterWorld(b);
+        Vector3 delta = to - from;
+        var go = new GameObject($"{structureId} {a} - {b}");
+        go.transform.SetParent(roadPreviewRoot, false);
+        go.transform.position = (from + to) * 0.5f;
+        go.transform.rotation = Quaternion.Euler(0, 0, Vector2.SignedAngle(Vector2.up, delta));
+        SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
+        renderer.sprite = structure.roadSegmentSprite;
+        renderer.color = structure.roadColor;
+        renderer.sortingLayerName = "Estruturas";
+        renderer.sortingOrder = 20;
+        Vector3 size = renderer.sprite.bounds.size;
+        go.transform.localScale = new Vector3(
+            Mathf.Clamp(structure.roadWidth, 0.03f, 0.6f) / Mathf.Max(0.0001f, size.x),
+            (delta.magnitude + Mathf.Clamp(structure.segmentOverlap, 0f, 0.3f)) / Mathf.Max(0.0001f, size.y), 1);
+        return new MapDetailPreview { Renderer = renderer, BaseColor = structure.roadColor };
     }
 
     private static bool IsInsideQuadrant(QuadranteData q, int x, int y)
@@ -1465,6 +1548,7 @@ public class CampaignSelectionController : MonoBehaviour
 
         foreach (MapDetailPreview detail in mapDetails)
         {
+            if (detail.Paisagem) continue;
             Color color = detail.Quadrants.Contains(selectedQuadrantIndex)
                 ? detail.BaseColor : ScaleRgb(detail.BaseColor, unfocusedConstructionBrightness);
             if (detail.Renderer != null) detail.Renderer.color = color;

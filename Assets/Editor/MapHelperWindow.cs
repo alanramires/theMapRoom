@@ -304,7 +304,7 @@ public class MapHelperWindow : EditorWindow
             }
         }
 
-        if (GUILayout.Button("Assar TODOS os quadrantes"))
+        if (GUILayout.Button("Assar TODOS (quadrantes + fundos)"))
             BakeAll();
         EditorGUILayout.EndHorizontal();
 
@@ -583,7 +583,7 @@ public class MapHelperWindow : EditorWindow
                 c.HasFundo ? $"fundo assado ({c.width}×{c.height})" : "fundo: não assado",
                 EditorStyles.miniLabel);
             if (GUILayout.Button(new GUIContent("Assar fundo",
-                    "Grava o terreno de todo o retângulo da campanha (da cena aberta). A Campanha pinta isso apagado por baixo dos quadrantes."),
+                    "Grava o terreno e as rotas (estrada, ferrovia, rio) de todo o retângulo da campanha (da cena aberta). A Campanha pinta isso apagado por baixo dos quadrantes, e a estrada segue inteira pela divisa entre eles."),
                     GUILayout.Width(100f)))
                 BakeFundo(c);
             EditorGUILayout.EndHorizontal();
@@ -1501,8 +1501,71 @@ public class MapHelperWindow : EditorWindow
             }
         }
 
+        int trechos = BakeFundoRotas(c, w, h);
+
         EditorUtility.SetDirty(mundo);
-        status = $"Fundo de '{c.campanhaId}' assado: {pintados} de {w * h} células com terreno.";
+        status = $"Fundo de '{c.campanhaId}' assado: {pintados} de {w * h} células com terreno, "
+            + $"{trechos} trecho(s) de rota.";
+    }
+
+    // Rotas do fundo: a MESMA regra do recorte do quadrante (RecortarRota), so que pelo
+    // retangulo da campanha. Celula fora ou sem terreno no fundo fecha o trecho — juntar
+    // os dois lados criaria aresta que o autor nao desenhou. So a cena Campanha le isto.
+    private int BakeFundoRotas(CampanhaData c, int w, int h)
+    {
+        if (c.bakedFundoRotas == null)
+            c.bakedFundoRotas = new List<RotaAssada>();
+        c.bakedFundoRotas.Clear();
+
+        Scene active = SceneManager.GetActiveScene();
+        RoadNetworkManager network = null;
+        foreach (RoadNetworkManager n in
+                 FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (n != null && n.gameObject.scene == active)
+            {
+                network = n;
+                break;
+            }
+        }
+        if (network == null || network.RoadRoutesByStructure == null)
+            return 0;
+
+        foreach (StructureRoadRouteBucket bucket in network.RoadRoutesByStructure)
+        {
+            if (bucket?.structure == null || bucket.routes == null
+                || string.IsNullOrWhiteSpace(bucket.structure.id))
+                continue;
+            foreach (RoadRouteDefinition rota in bucket.routes)
+            {
+                if (rota?.cells == null) continue;
+                List<Vector3Int> corrente = null;
+                for (int i = 0; i <= rota.cells.Count; i++)
+                {
+                    bool fecha = i == rota.cells.Count;
+                    if (!fecha)
+                    {
+                        Vector3Int cell = rota.cells[i];
+                        int x = cell.x - c.originX, y = cell.y - c.originY;
+                        bool dentro = x >= 0 && y >= 0 && x < w && y < h && c.GetFundoTile(x, y) != null;
+                        if (dentro)
+                        {
+                            (corrente ??= new List<Vector3Int>()).Add(new Vector3Int(x, y, 0));
+                            continue;
+                        }
+                    }
+                    if (corrente != null && corrente.Count > 0)
+                        c.bakedFundoRotas.Add(new RotaAssada
+                        {
+                            structureId = bucket.structure.id,
+                            routeName = rota.routeName,
+                            celulas = corrente
+                        });
+                    corrente = null;
+                }
+            }
+        }
+        return c.bakedFundoRotas.Count;
     }
 
     private void Bake(QuadranteData q)
@@ -2163,7 +2226,20 @@ public class MapHelperWindow : EditorWindow
             n++;
         }
 
-        status = $"{n} quadrante(s) assado(s) de '{SceneManager.GetActiveScene().name}'.";
+        // O fundo tambem: a estrada que cruza a divisa entre quadrantes so existe nele.
+        // Assar so os quadrantes deixava o mapa da Campanha com a rodovia partida.
+        int fundos = 0;
+        if (mundo.blocos != null)
+            foreach (BlocoData bloco in mundo.blocos)
+                if (bloco?.campanhas != null)
+                    foreach (CampanhaData c in bloco.campanhas)
+                        if (c != null)
+                        {
+                            BakeFundo(c);
+                            fundos++;
+                        }
+
+        status = $"{n} quadrante(s) e {fundos} fundo(s) de campanha assado(s) de '{SceneManager.GetActiveScene().name}'.";
     }
 
     // ────────────────────────────────────────────────────────────── cena ──
