@@ -35,8 +35,8 @@ public partial class AIShoppingPlanner
             if      (primary == UnitRole.Transportador && wantsTransport)        score = 10000 + u.cost;
             else if (primary == UnitRole.Interceptador && !elite && wantsCacaB)  score = (urgentCacaB ? 25000 : 18000) + u.cost;
             else if (primary == UnitRole.Interceptador &&  elite && wantsCacaA)  score = 30000 + u.cost;
-            else if (primary == UnitRole.AtaqueAereo   && !elite && wantsApache) score = 20000 + u.cost;
-            else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba)  score = 36000 + u.cost;
+            else if (UnitRoleCompatibility.MatchesLabel(primary, UnitRole.AtaqueAereo)   && !elite && wantsApache) score = 20000 + u.cost;
+            else if (UnitRoleCompatibility.MatchesLabel(primary, UnitRole.AtaqueAereo)   &&  elite && wantsBomba)  score = 36000 + u.cost;
             else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
             else if (wantsAirSurveillance
                 && IsDedicatedAirSurveillancePurchase(u))
@@ -523,7 +523,8 @@ public partial class AIShoppingPlanner
 
     private static bool IsPrimaryRole(UnitData unit, UnitRole role)
     {
-        return unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role;
+        return unit != null && unit.roles != null && unit.roles.Count > 0
+            && UnitRoleCompatibility.MatchesLabel(unit.roles[0], role);
     }
 
     // Hard Mode: unidades marcadas como banidas não entram na lista de compras da IA.
@@ -561,7 +562,7 @@ public partial class AIShoppingPlanner
             && !unit.roles.Contains(UnitRole.FogoIndireto)
             && !unit.roles.Contains(UnitRole.Transportador)
             && !unit.roles.Contains(UnitRole.Interceptador)
-            && !unit.roles.Contains(UnitRole.AtaqueAereo)
+            && !UnitRoleCompatibility.CanSatisfy(unit.roles, UnitRole.AtaqueAereo)
             && !unit.roles.Contains(UnitRole.Logistica);
     }
 

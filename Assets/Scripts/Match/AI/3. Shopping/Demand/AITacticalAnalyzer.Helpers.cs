@@ -50,7 +50,8 @@ public partial class AITacticalAnalyzer
 
     private static bool IsPrimaryRole(UnitData unit, UnitRole role)
     {
-        return unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role;
+        return unit != null && unit.roles != null && unit.roles.Count > 0
+            && UnitRoleCompatibility.MatchesLabel(unit.roles[0], role);
     }
 
     private static bool IsAntiAirOnlyUnit(UnitData unit)

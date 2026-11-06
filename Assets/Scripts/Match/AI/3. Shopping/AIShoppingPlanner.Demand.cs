@@ -17,9 +17,9 @@ public partial class AIShoppingPlanner
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
                 if (d.domain != Domain.Air) continue;
                 UnitRole r = d.roles[0];
-                if (r == UnitRole.Transportador || (r == UnitRole.AtaqueAereo && d.eliteLevel == 0))
+                if (r == UnitRole.Transportador || (UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo) && d.eliteLevel == 0))
                     enemyHelicos++;
-                else if (r == UnitRole.AtaqueAereo && d.eliteLevel >= 1)
+                else if (UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo) && d.eliteLevel >= 1)
                     enemyBombers++;
             }
 
@@ -70,7 +70,7 @@ public partial class AIShoppingPlanner
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
                 if (d.domain != Domain.Air) continue;
                 UnitRole r = d.roles[0];
-                if (r == UnitRole.Interceptador || (r == UnitRole.AtaqueAereo && d.eliteLevel >= 1))
+                if (r == UnitRole.Interceptador || (UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo) && d.eliteLevel >= 1))
                     enemyFighters++;
             }
 
@@ -126,7 +126,7 @@ public partial class AIShoppingPlanner
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
                 if (d.domain != Domain.Air) continue;
                 UnitRole r = d.roles[0];
-                if (r == UnitRole.Transportador || (r == UnitRole.AtaqueAereo && d.eliteLevel == 0))
+                if (r == UnitRole.Transportador || (UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo) && d.eliteLevel == 0))
                     enemyHelicos++;
             }
 
@@ -148,7 +148,7 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.roles[0] == UnitRole.AtaqueAereo && d.eliteLevel == 0) active++;
+                if (UnitRoleCompatibility.MatchesLabel(d.roles[0], UnitRole.AtaqueAereo) && d.eliteLevel == 0) active++;
             }
 
         int demand = Mathf.Max(0, desired - active);
@@ -172,7 +172,7 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.roles[0] == UnitRole.AtaqueAereo && d.eliteLevel == 0) activeApaches++;
+                if (UnitRoleCompatibility.MatchesLabel(d.roles[0], UnitRole.AtaqueAereo) && d.eliteLevel == 0) activeApaches++;
             }
 
         bool offensivePlan = snapshot.Stance == AIStance.Offensive

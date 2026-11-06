@@ -40,7 +40,13 @@ public enum UnitRole
     // política de shopping própria — compra de início de jogo focada nos nós
     // INTERMEDIÁRIOS do eixo, enquanto o APC só gera demanda depois que os nós
     // iniciais do eixo foram conquistados.
-    TransportadorAereo = 15
+    TransportadorAereo = 15,
+    // Disruptor de captura (autor, 2026-11-06): "Voce nao vai fazer dinheiro nao!".
+    // Caca quem faz dinheiro para o inimigo — capturador capturando, transportador,
+    // capturador — em vez de orbitar o capitao. Sub-rotulo de AtaqueAereo (o shopping o
+    // conta como ataque aereo; ver MatchesLabel), familia Assalto. O que ele caca sai das
+    // ARMAS da ficha, nao do rotulo: nada aqui sabe que e um helicoptero.
+    DisruptorDeCaptura = 16
 }
 
 /// <summary>
@@ -91,6 +97,7 @@ public static class UnitRoleCompatibility
 
             case UnitRole.Assalto:
             case UnitRole.AtaqueAereo:
+            case UnitRole.DisruptorDeCaptura:
             case UnitRole.Interceptador:
             case UnitRole.ArtilheiroCombatente:
                 return UnitRoleFamily.Assalto;
@@ -136,6 +143,7 @@ public static class UnitRoleCompatibility
             case UnitRole.Assalto:
             case UnitRole.Interceptador:
             case UnitRole.AtaqueAereo:
+            case UnitRole.DisruptorDeCaptura:
             case UnitRole.Antiaereo:
             case UnitRole.CapturadorCombatente:
             case UnitRole.ArtilheiroCombatente:
@@ -189,9 +197,28 @@ public static class UnitRoleCompatibility
                     || requestedRole == UnitRole.FogoIndireto;
             case UnitRole.TransportadorAereo:
                 return requestedRole == UnitRole.Transportador;
+            case UnitRole.DisruptorDeCaptura:
+                return requestedRole == UnitRole.AtaqueAereo;
             default:
                 return false;
         }
+    }
+
+    /// <summary>
+    /// O rotulo (roles[0], a essencia) E o pedido, ou um SUB-rotulo dele que o codigo
+    /// deve tratar como o mesmo. Hoje so: DisruptorDeCaptura conta como AtaqueAereo.
+    ///
+    /// Existe porque dezenas de pontos testam `roles[0] == AtaqueAereo` estrito (shopping,
+    /// combate aereo, rally, carona aerea). Sem um ponto unico, criar o sub-rotulo tirava
+    /// o Apache de todos eles em silencio. Mais estreito que CanSatisfy de proposito:
+    /// CapturadorCombatente satisfaz Assalto, mas nao E um Assalto na essencia.
+    /// </summary>
+    public static bool MatchesLabel(UnitRole actualRole, UnitRole requestedRole)
+    {
+        if (actualRole == requestedRole)
+            return true;
+        return requestedRole == UnitRole.AtaqueAereo
+            && actualRole == UnitRole.DisruptorDeCaptura;
     }
 
     public static bool CanSatisfy(UnitData data, UnitRole requestedRole)
@@ -239,6 +266,8 @@ public static class UnitRoleCompatibility
                 : UnitRole.FogoIndireto;
         if (primary == UnitRole.TransportadorAereo)
             return UnitRole.Transportador;
+        if (primary == UnitRole.DisruptorDeCaptura)
+            return UnitRole.AtaqueAereo;
         return primary;
     }
 

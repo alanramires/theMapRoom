@@ -1460,7 +1460,7 @@ public partial class AIController
     {
         if (unit == null || data == null || unit.IsUnderRepair)
             return false;
-        if (data.roles == null || data.roles.Count == 0 || data.roles[0] != UnitRole.AtaqueAereo)
+        if (data.roles == null || data.roles.Count == 0 || !UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.AtaqueAereo))
             return false;
         if (unit.MaxAmmo > 0 && unit.CurrentAmmo <= 0)
             return false;
