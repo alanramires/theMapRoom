@@ -486,7 +486,68 @@ public partial class AIController
             $"tier={best.transporterTier} " +
             $"route={best.passengerRouteState} " +
             $"promessa={(followsPromise ? "sim" : "nao")}.");
+        if (TryBuildRideWaitOpportunityKill(passenger, snapshot, action, best, paths, out var opportunisticKill))
+            return opportunisticKill;
         return action;
+    }
+
+    private bool TryBuildRideWaitOpportunityKill(UnitManager passenger, AIWorldSnapshot snapshot,
+        PlayerAction waitingAction, MelhorEmbarqueOption meeting,
+        Dictionary<Vector3Int, List<Vector3Int>> paths, out PlayerAction attack)
+    {
+        attack = null;
+        if (waitingAction == null || waitingAction.SensorAction != SensorActionType.None
+            || !waitingAction.HasMoveTo || passenger.IsUnderRepair || meeting == null) return false;
+        var from = passenger.CurrentCellPosition; from.z = 0;
+        var occupied = BuildOccupied(passenger);
+        var enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        UnitManager bestTarget = null;
+        Vector3Int bestCell = from;
+        int bestDpq = int.MinValue, bestLoss = int.MaxValue;
+        float bestThreat = float.MaxValue;
+        int bestSteps = int.MaxValue;
+        string bestReason = "";
+        int weaponRange = Mathf.Max(1, GetFireSupportMaxWeaponRange(passenger));
+        float expectedThreat = CalculateThreatLevel(waitingAction.MoveTo, snapshot.AITeam);
+        foreach (var pair in paths)
+        {
+            var cell = pair.Key;
+            // No chase: keep the exact planned endpoint, or another boarding position at the SAME LZ.
+            if (cell != waitingAction.MoveTo && SectorManager.HexDistance(cell, meeting.lzCell) != 1f) continue;
+            if (cell != from && (occupied.Contains(cell)
+                || (plannedDestinations != null && plannedDestinations.Contains(cell)))) continue;
+            if (cell != waitingAction.MoveTo && IsOwnProductionCell(cell, snapshot.AITeam)) continue;
+            foreach (var enemy in enemies)
+            {
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked
+                    || SectorManager.HexDistance(cell, enemy.CurrentCellPosition) > weaponRange
+                    || !CanAttackTargetFrom(from, cell, passenger, enemy)
+                    || !PassesAttackDecision(passenger, enemy, cell, false, out var decision)
+                    || !TrySimulateAttackForAI(passenger, enemy, cell, out var sim)
+                    || !sim.Simulation.killGuaranteed || !sim.Simulation.attackerSurvives || sim.AttackerLoss > 1) continue;
+                // Full position DPQ includes terrain/construction and unit rules, not terrain alone.
+                int dpq = sim.AttackerDpq.Points;
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                if (threat > expectedThreat + 0.001f) continue;
+                int steps = GetPathStepCount(paths, cell);
+                bool better = dpq > bestDpq || (dpq == bestDpq && (sim.AttackerLoss < bestLoss
+                    || (sim.AttackerLoss == bestLoss && (threat < bestThreat
+                        || (Mathf.Approximately(threat, bestThreat) && steps < bestSteps)))));
+                if (!better) continue;
+                bestTarget = enemy; bestCell = cell; bestDpq = dpq; bestLoss = sim.AttackerLoss;
+                bestThreat = threat; bestSteps = steps;
+                bestReason = $"abate garantido, perda={sim.AttackerLoss} HP, DPQ={dpq}, encontro preservado; {decision}";
+            }
+        }
+        if (bestTarget == null) return false;
+        attack = BuildAttackBatch(passenger, snapshot.AITeam, from, bestCell,
+            bestTarget.InstanceId.ToString(), bestTarget.CurrentCellPosition, paths);
+        attack.DebugLabel = $"abate oportunista enquanto espera carona: #{bestTarget.InstanceId}; {bestReason}";
+        Debug.Log($"{TL("Capturador")} {passenger.InstanceId} ataca #{bestTarget.InstanceId} via {bestCell} "
+            + $"enquanto espera #{meeting.transporter.InstanceId} na LZ {meeting.lzCell}: {bestReason}");
+        TraceAIReviewCandidate("Capturador.CaronaCombate", "Attack", bestCell, bestTarget.InstanceId.ToString(), true,
+            "ride_wait_safe_kill", bestReason);
+        return true;
     }
 
     /// <summary>

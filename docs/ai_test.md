@@ -202,3 +202,12 @@ AI Step informa capturando e prioridade=atrasarCaptura no motivo. Teste tools/ai
 Marca T6/slot1, passo13: Chinook #18 fez somente vacate (3,5)->(4,6) antes de Pickup, embora estivesse na banda Air. TryBuildEmptyTransportCaptureTargetVacateAction agora consulta OccupancyResolver.CanEndMove com o capturador e apenas aquele transportador. Se podem coexistir, nao gera acao de desocupacao e deixa o roteador continuar normalmente em reparo/Pickup/papel. Nao acrescenta ordem de esperar nem impõe um destino de retorno; o fluxo normal escolhe quem buscar. Bloqueio real na superficie continua sujeito a desocupacao.
 
 Compilacao e tools/ai_test/verificar_chinook_ocupacao_aerea.cs passaram fora do Play: mesmo hex em Air nao intercepta Pickup; em Land o aliado ainda gera desocupacao. Nenhuma acao executada.
+
+### Abate oportunista durante encontro de carona (06/11/2026)
+
+Marca T7/slot0, passo15: Soldado #25 seguia para encontro com Chinook #24 enquanto Soldado inimigo #19 (3 HP) estava proximo. Depois de esgotar embarques imediatos/estendidos e planejar o encontro, o capturador agora avalia abate oportunista. Exige sensor legal, AttackDecision aprovado, abate garantido, sobrevivencia e perda prevista de no maximo 1 HP. Nao altera o destino da missao nem a fila de carona.
+
+Considera somente a parada planejada ou outra celula Tactical adjacente a mesma LZ, para preservar o encontro. Entre alternativas elegiveis, DPQ real de combate e o primeiro criterio; depois menor perda, menor ameaca e menor deslocamento. Nao aceita exposicao maior que na parada originalmente planejada nem nova parada em produtora/destino reservado. Embarque imediato e recuperacao continuam primeiro; o adiamento para o transportador escolher a coleta tambem permanece. AI Step registra abate oportunista enquanto espera carona com DPQ, perda prevista e LZ.
+
+Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Play, usando sensores e simulacao reais: 10 vs3 em planicie, melhor DPQ entre posicoes equivalentes (floresta vs planicie), LZ preservada, embarque imediato, recuperacao e recusa de luta sem abate. Nenhuma acao executada; falta repetir a marca no mapa real.
+
