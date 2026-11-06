@@ -37,6 +37,16 @@ public partial class AIController
     // vencer trocas globais marginais; distancia/necessidade real ainda podem quebrar. Dial de ajuste.
     private const float PreviousObjectiveHysteresisBonus = 15f;
 
+    // Capturador que MATERIALIZA a captura do objetivo nesta rodada (Tatico dele, pelo
+    // envelope de captura) leva este desconto no custo de atribuicao. A matriz mede
+    // passos e os termos de continuidade (-8/-6/+12/histerese -15/eixo) engoliam a
+    // diferenca de 1 hex: "fecha agora" e "fecha no turno que vem" empatavam, e a ordem
+    // do laco decidia (T2 azul: #4 tinha Bravo no Tatico e foi para Papa; #3 levou 2
+    // turnos ate Bravo). Maior que a histerese de proposito: quando os dois chegam no
+    // MESMO turno o desconto se anula e a histerese continua decidindo — e so ai que
+    // trocar nao ganha nada. Peso de custo, nao alcance em hex: a banda e da unidade.
+    private const float TacticalCaptureAssignmentBonus = 20f;
+
     // Hard Mode dobra a demanda de capturadores por setor, mas com teto proprio para
     // aumentar pressao territorial sem explodir setores grandes em demanda absurda de
     // infantaria (cap normal 4 -> teto hard 6).
@@ -1019,6 +1029,7 @@ public partial class AIController
                 Vector3Int  uc  = u.CurrentCellPosition; uc.z = 0;
                 var planPaths   = UnitMovementPathRules.CalcularCaminhosValidos(
                     boardTilemap, u, PlanBudget, terrainDatabase);
+                UnitReachEnvelope captureTactical = BuildPlanCaptureTactical(u);
                 for (int oj = 0; oj < nObj; oj++)
                 {
                     Vector3Int tc = assignableObjs[oj].cell;
@@ -1035,7 +1046,11 @@ public partial class AIController
                         u,
                         assignableObjs[oj].obj.Sector,
                         aiTeam);
-                    distMatrix[ui, oj] = Mathf.Max(0.1f, rawDist * riskMultipliers[oj] + continuityCost);
+                    float tacticalBonus = captureTactical != null && captureTactical.CanAct(tc)
+                        ? -TacticalCaptureAssignmentBonus
+                        : 0f;
+                    distMatrix[ui, oj] = Mathf.Max(0.1f,
+                        rawDist * riskMultipliers[oj] + continuityCost + tacticalBonus);
                 }
             }
 
@@ -1055,6 +1070,10 @@ public partial class AIController
             }
             freeCapturers.RemoveRange(0, nu);
         }
+
+        // Passo 5b-2: troca pelo Tatico entre quem JA tem vaga (o plano persiste; a matriz
+        // acima so ve capturador livre).
+        SwapCapturersForTacticalCapture(plan, aiTeam);
 
         // Passo 5c: assaltos prim�rios
         {
@@ -1728,6 +1747,122 @@ public partial class AIController
         }
 
         return bestDist <= 2f ? bestSector : ConstructionSector.None;
+    }
+
+    // Folga, em passos de plano, que a troca pelo Tatico aceita no objetivo que o capturador
+    // B cede: quem herda (A) pode estar ate isto mais longe dele do que B estava.
+    private const float TacticalSwapMaxDelaySteps = 2f;
+
+    // Troca pelo Tatico ("antes do tiro vem o dinheiro"). O plano PERSISTE entre turnos:
+    // o capturador alocado num turno anterior fica na vaga e nunca volta para a matriz de
+    // atribuicao — o desconto de Tatico la nao o alcanca (T2 azul: #4 tinha Bravo no Tatico e
+    // continuava em Papa mesmo com replan).
+    //
+    // Par (A em X, B em Y) troca quando:
+    //   A NAO fecha X nesta rodada, B fecha X nesta rodada (Tatico de captura dele),
+    //   B NAO fecha Y nesta rodada (nao perde captura imediata para ganhar outra), e
+    //   A chega em Y no maximo TacticalSwapMaxDelaySteps passos depois de B.
+    // Fica de fora: defesa, rally, invasao, revezamento (HandoffEligible tem herdeiro gravado)
+    // e quem vai sair do predio (HandoffVacaterIds). Unidade que ja agiu tem Tatico vazio e
+    // nao troca — o replan do meio do turno nao bagunca quem ja andou.
+    private void SwapCapturersForTacticalCapture(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        var entries = new List<(SectorObjective obj, SlotNeed slot, UnitManager unit, Vector3Int cell)>();
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj.Status == ObjectiveStatus.Defending
+                || obj.HandoffEligible
+                || obj.ObjectiveType != AIObjectiveType.CaptureSector)
+                continue;
+            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
+            if (tgt == null)
+                continue;
+            Vector3Int cell = tgt.CurrentCellPosition; cell.z = 0;
+            foreach (SlotNeed slot in obj.Slots)
+            {
+                if (!slot.Filled || slot.Role != UnitRole.Capturador)
+                    continue;
+                UnitManager u = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (u == null || u.IsUnderRepair || u.IsEmbarked
+                    || plan.HandoffVacaterIds.Contains(u.InstanceId))
+                    continue;
+                entries.Add((obj, slot, u, cell));
+            }
+        }
+        if (entries.Count < 2)
+            return;
+
+        var tacticalCache = new Dictionary<int, UnitReachEnvelope>();
+        bool ClosesNow(UnitManager u, Vector3Int cell)
+        {
+            if (!tacticalCache.TryGetValue(u.InstanceId, out UnitReachEnvelope env))
+            {
+                env = BuildPlanCaptureTactical(u);
+                tacticalCache[u.InstanceId] = env;
+            }
+            return env != null && env.CanAct(cell);
+        }
+
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var a = entries[i];
+            if (ClosesNow(a.unit, a.cell))
+                continue;
+            for (int j = 0; j < entries.Count; j++)
+            {
+                var b = entries[j];
+                if (i == j || a.obj == b.obj)
+                    continue;
+                if (!ClosesNow(b.unit, a.cell) || ClosesNow(b.unit, b.cell))
+                    continue;
+                float aToY = PlanAssignmentDistance(a.unit, b.cell);
+                float bToY = PlanAssignmentDistance(b.unit, b.cell);
+                if (aToY > bToY + TacticalSwapMaxDelaySteps)
+                    continue;
+
+                a.slot.AssignedUnitId = b.unit.InstanceId;
+                b.slot.AssignedUnitId = a.unit.InstanceId;
+                ApplyPlanHUD(b.unit, a.obj);
+                ApplyPlanHUD(a.unit, b.obj);
+                Debug.Log($"{TL("Plan")}[TrocaTatico] Unit{b.unit.InstanceId} {b.obj.Sector}→{a.obj.Sector} " +
+                          $"(fecha nesta rodada) | Unit{a.unit.InstanceId} {a.obj.Sector}→{b.obj.Sector} " +
+                          $"(dist {aToY:F0} vs {bToY:F0} do anterior)");
+                entries[i] = (a.obj, a.slot, b.unit, a.cell);
+                entries[j] = (b.obj, b.slot, a.unit, b.cell);
+                break;
+            }
+        }
+    }
+
+    // Mesma medida da matriz de atribuicao: passos do caminho valido, senao distancia
+    // terrestre do SectorManager, senao hex.
+    private float PlanAssignmentDistance(UnitManager unit, Vector3Int target)
+    {
+        Vector3Int uc = unit.CurrentCellPosition; uc.z = 0;
+        var paths = UnitMovementPathRules.CalcularCaminhosValidos(boardTilemap, unit, 30, terrainDatabase);
+        if (paths != null && paths.TryGetValue(target, out List<Vector3Int> path) && path.Count > 0)
+            return path.Count;
+        if (SectorManager.TryGetLandMovementDistance(uc, target, out int cost))
+            return cost;
+        return SectorManager.HexDistance(uc, target);
+    }
+
+    // Tatico de CAPTURA da unidade: onde ela materializa a captura nesta rodada. Mesmo
+    // pedido do QueroCarona (Capture/Terrestre), so a banda Tatica. Null = a unidade nao
+    // captura ou o envelope nao montou; o desconto simplesmente nao entra.
+    private UnitReachEnvelope BuildPlanCaptureTactical(UnitManager unit)
+    {
+        if (unit == null || unit.IsEmbarked)
+            return null;
+        return UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = unit,
+            BoardMap = boardTilemap,
+            TerrainDatabase = terrainDatabase,
+            Intent = ReachIntent.Capture,
+            SubStep = ReachSubStep.Terrestre,
+            Band = ReachBand.Tactical,
+        });
     }
 
     private float CalculateSectorContinuityAssignmentCost(UnitManager unit, ConstructionSector targetSector, TeamId aiTeam)
