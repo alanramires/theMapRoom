@@ -498,6 +498,15 @@ public partial class AIController
         if (selected.Count == 0)
             return false;
 
+        // GANANCIA: "antes do tiro vem o dinheiro". Quem nao tem rota para o PROPRIO alvo
+        // desta LZ continuava a bordo, mesmo com predio livre dando sopa ao lado (AI Step T4
+        // amarelo: #6 desceu em Golf, #9 seguiu a bordo rumo a Foxtrot, em outra ilha). Se
+        // ele captura algo no Tatico dele a partir de um ponto livre desta LZ, desce junto
+        // como oportunista. O plano dele nao muda; o resto (trabalhar a pe, nao reembarcar)
+        // fica com o capturador.
+        AppendGreedyOpportunisticDrops(
+            transporter, passengers, best.cell, selected, consumer);
+
         Vector3Int fromCell = transporter.CurrentCellPosition;
         fromCell.z = 0;
         List<Vector3Int> movePath = null;
@@ -519,6 +528,113 @@ public partial class AIController
                 transporter, snapshot.AITeam, fromCell, selected,
                 best.cell, movePath);
         return true;
+    }
+
+    private void AppendGreedyOpportunisticDrops(
+        UnitManager transporter,
+        List<UnitManager> passengers,
+        Vector3Int lzCell,
+        List<PodeDesembarcarOption> selected,
+        string consumer)
+    {
+        if (transporter == null || passengers == null || selected == null)
+            return;
+
+        var droppedIds = new HashSet<int>();
+        var usedCells = new HashSet<Vector3Int>();
+        for (int i = 0; i < selected.Count; i++)
+        {
+            if (selected[i]?.passengerUnit != null)
+                droppedIds.Add(selected[i].passengerUnit.InstanceId);
+            if (selected[i] != null)
+            {
+                Vector3Int c = selected[i].disembarkCell;
+                c.z = 0;
+                usedCells.Add(c);
+            }
+        }
+
+        List<PodeDesembarcarOption> lzOptions = null;
+        for (int p = 0; p < passengers.Count; p++)
+        {
+            UnitManager passenger = passengers[p];
+            if (passenger == null || droppedIds.Contains(passenger.InstanceId))
+                continue;
+            if (!PodeCapturarSensor.HasAnyCaptureKey(passenger))
+                continue;
+
+            lzOptions ??= SimulateDisembarkFromCell(transporter, lzCell);
+            if (lzOptions == null)
+                return;
+
+            for (int o = 0; o < lzOptions.Count; o++)
+            {
+                PodeDesembarcarOption option = lzOptions[o];
+                if (option == null || option.passengerUnit != passenger)
+                    continue;
+                Vector3Int spot = option.disembarkCell;
+                spot.z = 0;
+                if (usedCells.Contains(spot))
+                    continue;
+                if (!TryFindGreedyCaptureFromSpot(passenger, spot, out Vector3Int captureCell))
+                    continue;
+
+                selected.Add(option);
+                usedCells.Add(spot);
+                droppedIds.Add(passenger.InstanceId);
+                Debug.Log($"{TL("Transporte")} {consumer} {transporter.InstanceId} ganancia: " +
+                          $"#{passenger.InstanceId} desce em {spot} junto (capturavel livre {captureCell} " +
+                          "no Tatico dele; vira oportunista, plano mantido)");
+                break;
+            }
+        }
+    }
+
+    // A partir do ponto de desembarque, o passageiro alcanca no Tatico dele (MP cheio, custo
+    // real) um capturavel que ele pode capturar, sem aliado em cima e fora dos destinos ja
+    // planejados? Nada e movido: mapa de custo a partir do ponto, e o PodeCapturar com o
+    // portao de embarcado desligado — a pergunta e "onde eu largo este passageiro?", a mesma
+    // que o transporte ja faz (PodeCapturarSensor, applyEmbarkedGate).
+    private bool TryFindGreedyCaptureFromSpot(UnitManager passenger, Vector3Int spot, out Vector3Int captureCell)
+    {
+        captureCell = spot;
+        spot.z = 0;
+        Dictionary<Vector3Int, int> costFromSpot =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap, passenger, spot,
+                Mathf.Max(0, passenger.GetMovementRange()), terrainDatabase);
+        if (costFromSpot == null)
+            costFromSpot = new Dictionary<Vector3Int, int>();
+        if (!costFromSpot.ContainsKey(spot))
+            costFromSpot[spot] = 0;
+
+        int bestCost = int.MaxValue;
+        bool found = false;
+        foreach (KeyValuePair<Vector3Int, int> entry in costFromSpot)
+        {
+            Vector3Int cell = entry.Key;
+            cell.z = 0;
+            ConstructionManager building =
+                ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+            if (building == null || !building.IsCapturable)
+                continue;
+            if (plannedDestinations != null && plannedDestinations.Contains(cell))
+                continue;
+            if (UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap, cell, passenger, alliedOnly: true))
+                continue;
+            if (!PodeCapturarSensor.TryGetCaptureTargetAtCell(
+                    passenger, boardTilemap, cell, SensorMovementMode.MoveuAndando,
+                    out _, out _, out _, matchController, applyEmbarkedGate: false))
+                continue;
+            if (entry.Value < bestCost)
+            {
+                bestCost = entry.Value;
+                captureCell = cell;
+                found = true;
+            }
+        }
+        return found;
     }
 
     private static IReadOnlyDictionary<int, int> BuildPassengerRouteLimits(
