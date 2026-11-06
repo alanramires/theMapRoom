@@ -16,6 +16,7 @@ public partial class AIController
         public int id, turn, slot, stage, boardRevision, moneyBefore, moneyAfter;
         public string status, decision, mission, reasons, commands, result;
         public string current_stance, stanceSource;
+        public string shoppingSavingSummary;
         public int schemaVersion;
         public string sessionId, recordedUtc, actionJson, rawReasons, coverage, filePath, markNote;
         public bool markedStrange, hasStateBeforeDecision, hasStateBeforeExecution;
@@ -772,6 +773,7 @@ public partial class AIController
 
     private string aiDecisionReasons = "";
     private string aiShoppingSummary = "";
+    private string aiShoppingSavingSummary;
     private int aiReviewSequence;
     private bool aiReviewVisible = true;
     private bool aiReviewApproved;
@@ -888,6 +890,7 @@ public partial class AIController
     private List<AIShoppingPlanner.ShoppingOrder> DecideShoppingForReview(AIWorldSnapshot snapshot)
     {
         RememberAIReviewStance(snapshot, "shopping_snapshot");
+        aiShoppingSavingSummary = null;
         if (!aiStep) return AIShoppingPlanner.Decide(snapshot);
         BeginAIReviewCapture();
         aiReviewActorId = null;
@@ -895,13 +898,14 @@ public partial class AIController
         try
         {
             var orders = AIShoppingPlanner.Decide(snapshot);
+            aiShoppingSavingSummary = AIShoppingPlanner.LastSavingSummary;
             var text = new System.Text.StringBuilder("Plano de compras deste turno:\n");
             if (orders != null)
                 foreach (var order in orders)
                     if (order.UnitToBuy != null && order.Building != null)
                         text.AppendLine($"{order.UnitToBuy.name} ${order.UnitToBuy.cost} em {FormatCell(order.Building.CurrentCellPosition)}");
-            if (!string.IsNullOrEmpty(AIShoppingPlanner.LastSavingSummary))
-                text.AppendLine(AIShoppingPlanner.LastSavingSummary);
+            if (!string.IsNullOrEmpty(aiShoppingSavingSummary))
+                text.AppendLine(aiShoppingSavingSummary);
             aiShoppingSummary = text.ToString();
             return orders;
         }
@@ -945,6 +949,8 @@ public partial class AIController
             moneyBefore = matchController.GetActualMoney(matchController.ActiveSlotId),
             status = "pendente", decision = BuildDebugStepDescription(action),
             mission = DescribeAIReviewMission(action), commands = commands.ToString(),
+            shoppingSavingSummary = currentAIStage == 3 && action.ActionType == PlayerActionType.Shopping
+                ? aiShoppingSavingSummary : null,
             reasons = (action.ActionType == PlayerActionType.Shopping ? aiShoppingSummary + "\n" : "")
                 + (currentAIStage == 2 || currentAIStage == 3 ? aiDecisionReasons : "Etapa automatica do turno.")
         };
@@ -1233,6 +1239,13 @@ public partial class AIController
             decisionStyle.normal.textColor = new Color(1f, 0.88f, 0.5f);
             GUILayout.Label("DECISAO", new GUIStyle(textStyle) { fontStyle = FontStyle.Bold });
             GUILayout.Label(record.decision, decisionStyle);
+            if (record.stage == 3 && !string.IsNullOrWhiteSpace(record.shoppingSavingSummary))
+            {
+                GUILayout.Space(6f);
+                var savingStyle = new GUIStyle(textStyle) { fontStyle = FontStyle.Bold };
+                savingStyle.normal.textColor = new Color(0.65f, 0.9f, 1f);
+                GUILayout.Label(record.shoppingSavingSummary, savingStyle);
+            }
             GUILayout.EndVertical();
             GUILayout.Label("MISSAO\n" + record.mission, textStyle);
             GUILayout.Label("MOTIVOS (logs reais da IA)\n" + (string.IsNullOrWhiteSpace(record.reasons) ? "Nenhum motivo registrado. Ative Show AI Logs." : record.reasons), textStyle);
