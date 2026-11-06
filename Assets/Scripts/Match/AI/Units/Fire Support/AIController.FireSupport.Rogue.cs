@@ -84,14 +84,32 @@ public partial class AIController
             }
         }
 
+        // ANTIAEREO: o alvo conhecido vem ANTES do rendezvous. Para ele, por a aeronave inimiga
+        // no alcance maximo ja e a escolta do capturador; o rendezvous encontrava celula e
+        // retornava sem nem avaliar o Apache a vista (AI Step T6 azul: SAM #44 foi a (5,16),
+        // de onde nao alcancava ninguem). Artilharia segue na ordem validada: rendezvous primeiro,
+        // senao o Obus larga o capturador para perseguir alvo.
+        bool airDefenseFirst = unit.TryGetUnitData(out UnitData fsData) && fsData != null
+            && UnitRoleCompatibility.CanSatisfy(fsData, UnitRole.Antiaereo);
+        Vector3Int rangeStepCell = fromCell;
+        string rangeStepReason = null;
+        if (airDefenseFirst
+            && TryRogueFireSupportKnownTargetRangeStep(unit, snapshot, fromCell, paths, occupied,
+                null, fromCell, out rangeStepCell, out rangeStepReason))
+        {
+            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue antiaereo aproxima alvo conhecido via {rangeStepCell} antes do rendezvous ({rangeStepReason})");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, rangeStepCell, paths);
+        }
+
         PlayerAction rogueRendezvous = TryRogueFireSupportRendezvousAction(unit, snapshot, fromCell, paths, occupied);
         if (rogueRendezvous != null)
             return rogueRendezvous;
 
-        if (TryRogueFireSupportKnownTargetRangeStep(unit, snapshot, fromCell, paths, occupied,
+        if (!airDefenseFirst
+            && TryRogueFireSupportKnownTargetRangeStep(unit, snapshot, fromCell, paths, occupied,
                 null,
                 fromCell,
-                out Vector3Int rangeStepCell, out string rangeStepReason))
+                out rangeStepCell, out rangeStepReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rogue aproxima alvo conhecido via {rangeStepCell} ({rangeStepReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, rangeStepCell, paths);
