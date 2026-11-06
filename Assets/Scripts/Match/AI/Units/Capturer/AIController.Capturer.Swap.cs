@@ -78,8 +78,35 @@ public partial class AIController
                     && !candidateIds.Contains(u.InstanceId))
                     candidateIds.Add(u.InstanceId);
         }
-        if (capturable == null || candidateIds.Count == 0) return null;
+        if (capturable == null) return null;
         Vector3Int capCell = occCell;
+
+        // VIZINHANCA: qualquer capturador do time cujo Tatico (movimento deste turno) cobre o
+        // hex, mesmo apontando pra outro objetivo. Os donos (slots/alvo designado) entram
+        // primeiro e, como a comparacao e estrita, levam o empate. Quem ja esta em cima de um
+        // capturavel nao-nosso fica de fora: tira-lo de la largaria uma captura por outra.
+        // (AI Step T6 amarelo: Soldado #8, 4 HP, na cidade de Echo com um 10 HP rumo a Hotel
+        // logo abaixo; o parceiro de Echo estava a 5h e o swap nao via mais ninguem.)
+        foreach (UnitManager u in UnitManager.AllActive)
+        {
+            if (u == null || u.TeamId != aiTeam || u.InstanceId == occupant.InstanceId
+                || candidateIds.Contains(u.InstanceId))
+                continue;
+            if (u.HasActed || u.IsDead || u.IsEmbarked) continue;
+            if (!u.TryGetUnitData(out UnitData uData) || uData == null
+                || UnitRoleCompatibility.ResolveCompositionRole(uData) != UnitRole.Capturador)
+                continue;
+            Vector3Int uCell = u.CurrentCellPosition; uCell.z = 0;
+            if (SectorManager.HexDistance(uCell, capCell) > u.RemainingMovementPoints) continue;
+            ConstructionManager underU = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, uCell);
+            if (underU != null && underU.TeamId != aiTeam)
+            {
+                int busyRounds = RodadasAteFechar(u, underU);
+                if (busyRounds > 0 && busyRounds < int.MaxValue) continue;
+            }
+            candidateIds.Add(u.InstanceId);
+        }
+        if (candidateIds.Count == 0) return null;
 
         UnitManager best  = null;
         int         bestRounds = RodadasAteFechar(occupant, capturable);
