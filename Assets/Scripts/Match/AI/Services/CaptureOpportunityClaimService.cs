@@ -1507,3 +1507,98 @@ public static class CaptureOpportunityClaimService
         }
     }
 }
+
+/// <summary>
+/// Registro de APROXIMACOES (autor, 2026-11-06): quem esta indo para cada predio no
+/// "trabalha enquanto espera carona", e a que custo. Nao reserva e nao barra ninguem — a
+/// corrida continua livre. Serve ao VEICULO na hora de escolher o par: tirar da corrida o
+/// LIDER (ele ia fechar o predio) e caro; tirar o ultimo e barato ("quer saber, os caras
+/// vao la pegar, minha carona chegou").
+///
+/// Vale a rodada atual e a anterior: o veiculo costuma agir antes dos passageiros, entao le
+/// o que eles escreveram no turno passado. So em memoria — depois de um load nasce vazio e o
+/// primeiro turno se comporta como antes. Limpo a cada cena carregada (estado de partida nao
+/// atravessa partidas).
+/// </summary>
+public static class CaptureApproachLedger
+{
+    private struct Approach
+    {
+        public int UnitId;
+        public int SlotIndex;
+        public Vector3Int Cell;
+        public int Cost;
+        public int Turn;
+    }
+
+    private static readonly Dictionary<int, Approach> ByUnit = new Dictionary<int, Approach>();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetOnDomainLoad()
+    {
+        ByUnit.Clear();
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded;
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private static void OnSceneLoaded(UnityEngine.SceneManagement.Scene scene,
+        UnityEngine.SceneManagement.LoadSceneMode mode) => ByUnit.Clear();
+
+    /// <summary>Esta unidade esta indo para este predio, a este custo (passos a pe).</summary>
+    public static void Record(UnitManager unit, Vector3Int cell, int cost, int turn)
+    {
+        if (unit == null)
+            return;
+        cell.z = 0;
+        ByUnit[unit.InstanceId] = new Approach
+        {
+            UnitId = unit.InstanceId,
+            SlotIndex = unit.SlotIndex,
+            Cell = cell,
+            Cost = Mathf.Max(0, cost),
+            Turn = turn
+        };
+    }
+
+    /// <summary>
+    /// Posicao desta unidade na corrida pelo predio dela. racers = quantos aliados (ela
+    /// inclusa) disputam o mesmo predio; rank 0 = lider (menor custo). Falso se ela nao esta
+    /// em corrida nenhuma valida.
+    /// </summary>
+    public static bool TryGetStanding(UnitManager unit, int currentTurn,
+        out int rank, out int racers, out Vector3Int cell)
+    {
+        rank = 0;
+        racers = 0;
+        cell = Vector3Int.zero;
+        if (unit == null || !ByUnit.TryGetValue(unit.InstanceId, out Approach mine)
+            || !IsFresh(mine, currentTurn))
+            return false;
+
+        cell = mine.Cell;
+        foreach (KeyValuePair<int, Approach> entry in ByUnit)
+        {
+            Approach other = entry.Value;
+            if (other.SlotIndex != mine.SlotIndex || other.Cell != mine.Cell
+                || !IsFresh(other, currentTurn) || !IsRacerAlive(other.UnitId))
+                continue;
+            racers++;
+            if (other.UnitId != mine.UnitId
+                && (other.Cost < mine.Cost
+                    || (other.Cost == mine.Cost && other.UnitId < mine.UnitId)))
+                rank++;
+        }
+        return racers > 0;
+    }
+
+    private static bool IsFresh(Approach approach, int currentTurn)
+        => approach.Turn == currentTurn || approach.Turn == currentTurn - 1;
+
+    private static bool IsRacerAlive(int unitId)
+    {
+        foreach (UnitManager unit in UnitManager.AllActive)
+            if (unit != null && unit.InstanceId == unitId)
+                return !unit.IsDead && !unit.IsEmbarked; // embarcou = saiu da corrida
+        return false;
+    }
+}

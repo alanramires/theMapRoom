@@ -928,12 +928,19 @@ public static class MelhorEmbarqueService
                     }
                 }
 
+                // CORRIDA PELO PREDIO (CaptureApproachLedger): entre passageiros que correm
+                // a pe para o mesmo predio, o veiculo leva quem esta mais ATRAS. Tirar o
+                // lider custa caro (ele ia fechar); cada posicao atras do lider barateia.
+                // Fora de corrida, ou correndo sozinho, nada muda.
+                float raceAdjustment = ResolveRaceAdjustment(passenger, out string raceDiagnostic);
+
                 float optionScore = 100000f
                     - distance * 100f
                     + destinationGain
                     - routePenalty
                     - rescueApproachPenalty
                     + rideNeedAdjustment
+                    + raceAdjustment
                     + slotWeight * SlotWeightScale;
                 var option = new MelhorEmbarqueOption
                 {
@@ -982,6 +989,7 @@ public static class MelhorEmbarqueService
                         $"adiantaDestino={destinationGain / DestinationGainPerHex:+0;-0;0}mp " +
                         $"carona={disposition} " +
                         $"ajusteCarona={rideNeedAdjustment:0} " +
+                        raceDiagnostic +
                         $"peso={slotWeight:+0;-0;0} " +
                         $"(traz={unitsBrought} " +
                         $"desloca={seatsDisplaced})"
@@ -1745,6 +1753,30 @@ public static class MelhorEmbarqueService
             displaced += Mathf.Min(lost, demand);
         }
         return displaced;
+    }
+
+    // Escala: a carona pedida vale ~1000-2000 e cada MP que a LZ adianta o destino, 300.
+    // Tirar o lider de uma corrida precisa pesar mais que isso; cada posicao atras do
+    // lider devolve um pouco, para o ultimo da fila ser o preferido.
+    private const float RaceLeaderPenalty = 3000f;
+    private const float RacePositionBonus = 600f;
+
+    private static float ResolveRaceAdjustment(UnitManager passenger, out string diagnostic)
+    {
+        diagnostic = string.Empty;
+        MatchController match = AIController.Instance != null ? AIController.Instance.Match : null;
+        if (passenger == null || match == null)
+            return 0f;
+        if (!CaptureApproachLedger.TryGetStanding(passenger, match.CurrentTurn,
+                out int rank, out int racers, out Vector3Int raceCell)
+            || racers < 2)
+            return 0f;
+
+        float adjustment = rank == 0
+            ? -RaceLeaderPenalty
+            : rank * RacePositionBonus;
+        diagnostic = $"corrida={raceCell.x},{raceCell.y} posicao={rank + 1}/{racers} ajusteCorrida={adjustment:+0;-0;0} ";
+        return adjustment;
     }
 
     private static float ResolveRideNeedAdjustment(

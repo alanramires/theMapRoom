@@ -343,6 +343,23 @@ public partial class AIController
                         passenger, snapshot, fromCell, paths, out PlayerAction work))
                     return work;
 
+                // ESPERAR NAO E EM CIMA DA FABRICA. Sem trabalho a pe, a espera tranca a
+                // compra daquele produtor no fim do turno (AI Step T4 azul: #26 aguardando
+                // carona em (1,14), na propria Fabrica Leve). Sai para o lado — a melhor
+                // celula fora de produtora no alcance — e espera ali; a carona o acha.
+                if (IsOwnProductionCell(fromCell, snapshot.AITeam)
+                    && TryFindProductionUnlockVacateCell(
+                        passenger, snapshot, fromCell, paths, BuildOccupied(passenger),
+                        out Vector3Int vacateCell, out string vacateReason))
+                {
+                    Debug.Log($"{TL("Capturador")} {passenger.InstanceId} aguarda carona FORA da " +
+                              $"produtora: libera {fromCell} via {vacateCell} ({vacateReason})");
+                    PlayerAction vacate = BuildVacateBatch(
+                        passenger, snapshot.AITeam, fromCell, vacateCell, paths);
+                    vacate.DebugLabel = "aguarda Melhor LZ de Embarque fora da produtora";
+                    return vacate;
+                }
+
                 PlayerAction hold = BuildMoveBatch(
                     passenger,
                     snapshot.AITeam,
@@ -670,6 +687,9 @@ public partial class AIController
         }
         if (best == null)
             return false;
+
+        // Registra a aproximacao: o veiculo le isto na hora de escolher quem tirar da corrida.
+        CaptureApproachLedger.Record(unit, bestCell, bestSteps, snapshot.TurnNumber);
 
         // Chega neste turno: captura.
         if (paths.ContainsKey(bestCell) && !occupied.Contains(bestCell))
