@@ -25,6 +25,7 @@ da cena. Um mapa novo tem de pedir autoria, não código.
 | versão | título | relatório |
 |---|---|---|
 | v10.0.0 | A IA lance a lance aprende o mapa (o de trás paga, o veículo escolhe o par, a estrada atravessa o QG, núcleo por família e ilha sem ligação) | [relatório](docs/relatorio_v10.0.0.md) |
+| v10.0.1 | A ilha sem ponte, porta por porta (counter, elite, operação, AA e vigilância sabem da ilha; alocador pelo Tático; blitz só com rota terrestre; LZ do Chinook pousado) | [relatório](docs/relatorio_v10.0.1.md) |
 
 ---
 
