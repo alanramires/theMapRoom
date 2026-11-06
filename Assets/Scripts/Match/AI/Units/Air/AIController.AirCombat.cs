@@ -984,8 +984,8 @@ public partial class AIController
     // com nevoa honesta e o aparelho nao fica rodando pelas beiradas.
     // So entra alvo que ALGUMA arma desta unidade acerta na camada atual dele
     // (WeaponData.SupportsOperationOn). A legalidade do tiro continua no PodeMirar.
-    // Era uma ordem fixa de faixas (capturando > transporte > capturador): a moeda unica
-    // e a mesma do tiro no Tatico (PredictDeniedCapturePower).
+    // Captura em andamento tem precedencia. Dentro da mesma faixa, usa o poder
+    // de captura, seguido da distancia; no tiro Tactical, usa o dano previsto.
     private bool TryResolveCaptureInterdictionAnchor(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -999,6 +999,7 @@ public partial class AIController
 
         UnitManager best = null;
         int bestPower = 0;
+        bool bestCapturing = false;
         int bestDistance = int.MaxValue;
         if (visibleEnemies != null)
         {
@@ -1017,12 +1018,14 @@ public partial class AIController
                 Vector3Int cell = enemy.CurrentCellPosition;
                 cell.z = 0;
                 int distance = AIActionReachCoordinator.CubicDistance(fromCell, cell);
-                if (power > bestPower
-                    || (power == bestPower && distance < bestDistance)
-                    || (power == bestPower && distance == bestDistance
+                bool capturing = IsCapturingForeignBuilding(enemy, cell);
+                if (PreferDisruptorCaptureTier(capturing, power, bestCapturing, bestPower)
+                    || (capturing == bestCapturing && power == bestPower && distance < bestDistance)
+                    || (capturing == bestCapturing && power == bestPower && distance == bestDistance
                         && best != null && enemy.InstanceId < best.InstanceId))
                 {
                     best = enemy;
+                    bestCapturing = capturing;
                     bestPower = power;
                     bestDistance = distance;
                 }
@@ -1136,9 +1139,18 @@ public partial class AIController
     {
         ConstructionManager building =
             ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return building != null
-            && building.IsCapturable
-            && !PlayerSlotRelations.AreAllies(enemy, building);
+        return enemy != null && !enemy.IsDead && !enemy.IsEmbarked
+            && building != null && building.IsCapturable
+            && !PlayerSlotRelations.AreAllies(enemy, building)
+            && PodeCapturarSensor.TryGetCaptureTargetAtCell(enemy, boardTilemap, cell,
+                SensorMovementMode.MoveuParado, out _, out _, out _, matchController,
+                applyFogOfWar: false, knownConstruction: building);
+    }
+
+    // Lexicographic priority: capture underway first; combat value breaks ties within a tier.
+    private static bool PreferDisruptorCaptureTier(bool capturing, float score, bool bestCapturing, float bestScore)
+    {
+        return capturing != bestCapturing ? capturing : score > bestScore;
     }
 
     // Capturavel que NAO e do inimigo (nosso ou neutro), o mais perto de algum predio
@@ -1326,6 +1338,7 @@ public partial class AIController
             out bool hasAttackableAircraft,
             out bool hasPreferredAttackableAircraft);
         bool isDisruptor = IsCaptureDisruptor(unit);
+        bool bestCapturing = false;
 
         for (int i = 0; i < candidates.Count; i++)
         {
@@ -1407,8 +1420,10 @@ public partial class AIController
                 - GetPathStepCount(paths, cell) * 8f
                 - enemy.InstanceId * 0.001f;
 
-            if (score > bestScore)
+            bool capturing = isDisruptor && deniedCapture > 0 && IsCapturingForeignBuilding(enemy, enemyCell);
+            if (PreferDisruptorCaptureTier(capturing, score, bestCapturing, bestScore))
             {
+                bestCapturing = capturing;
                 bestScore = score;
                 bestCell = cell;
                 bestTarget = enemy;
@@ -1420,7 +1435,7 @@ public partial class AIController
                     $"value={targetValueScore:F0} posture={postureScore:F0} " +
                     $"weapon={weaponName} hp={enemy.CurrentHP} " +
                     $"noMove={attacksFromCurrentCell}{combatScoreReason} " +
-                    (isDisruptor ? $"capturaNegada={deniedCapture} " : "") +
+                    (isDisruptor ? $"capturaNegada={deniedCapture} capturando={capturing} prioridade={(capturing ? "atrasarCaptura" : "poderDeCaptura")} " : "") +
                     $"{attackDecisionReason}";
             }
         }

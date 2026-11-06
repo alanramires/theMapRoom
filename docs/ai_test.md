@@ -189,3 +189,10 @@ Marca T5/slot1, passo21: Chinook #30 entregava #32 em Foxtrot e soltava #33 (mis
 A prioridade promovida vale enquanto esse passageiro continuar a bordo, e e usada tanto na navegacao quanto na ordem/requisito da LZ. E preferencia de planejamento em memoria, recalculada apos carregar uma partida; nao altera FIFO confirmado das vagas nem missoes originais. O antigo principal pode descer como oportunista se houver trabalho livre na LZ. Oportunistas nao contam novamente os alvos ja incluidos nessa entrega nem os atendidos por capturadores comprometidos em terra; podem usar outro predio ou reforcar alvo sob pressao. Fallback aereo sem alvo util nao libera capturador automaticamente; escape por bloqueio continua preservado.
 
 Validacao fora do Play: compilacao e tools/ai_test/verificar_passageiro_prioritario.cs passaram em cena temporaria descartada, com sensores e caminhos reais. Casos: compromisso/acao, promocao, ordem da LZ, prioridade estavel, fim da preferencia apos desembarque, outro predio no mesmo setor, alvo oportunista distinto, reforco sob pressao e preservacao das missoes. Falta repetir a marca no mapa real para avaliar a nova rota escolhida.
+
+### Disruptor prioriza captura em andamento (06/11/2026)
+
+Marca T5/slot1, passo14: Apache #29 preferiu negar 7 de poder de captura ao #4 fora de predio, em vez de 6 ao #14 sobre predio. O ranking agora compara primeiro a faixa capturando: alvo vivo, desembarcado, sobre construcao nao aliada que o PodeCapturarSensor confirma que ele pode capturar. Para o tiro, exige dano previsto que negue poder de captura; a aprovacao de ataque continua anterior a essa prioridade. Dentro da mesma faixa conserva o score de combate. A ancora de interdicao usa a mesma precedencia antes de poder de captura/distancia. Outros atacantes conservam o ranking existente.
+
+AI Step informa capturando e prioridade=atrasarCaptura no motivo. Teste tools/ai_test/verificar_disruptor_capturando.cs passou fora do Play: sensor real, exclusao de transporte/embarcado/morto/aliado, regressao 6 vs 7 e ranking interno. Compilacao passou; repetir a marca para validar a escolha no tabuleiro real.
+
