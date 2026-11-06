@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -278,14 +278,19 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         bool allowStuck = false)
     {
-        if (allowStuck || options.Count <= 1) return options;
+        bool airCapturePolicy = options.Exists(o => o != null && IsAirCapturePassenger(o.passengerUnit));
+        if (allowStuck || (!airCapturePolicy && options.Count <= 1)) return options;
         var filtered = new List<PodeDesembarcarOption>();
         foreach (PodeDesembarcarOption opt in options)
         {
             bool targetFound = TryResolveCourierPassengerTarget(
                 opt.passengerUnit, plan, snapshot, Vector3Int.zero,
                 opt.passengerUnit.CurrentCellPosition, out Vector3Int target);
-            if (!targetFound) { filtered.Add(opt); continue; }
+            if (!targetFound)
+            {
+                if (!IsAirCapturePassenger(opt.passengerUnit)) filtered.Add(opt);
+                continue;
+            }
             Vector3Int dc = opt.disembarkCell; dc.z = 0;
             float dist = SectorManager.HexDistance(dc, target);
             // A faixa é do PASSAGEIRO a partir do alvo (PassageiroChegaAoAlvo), não o
@@ -303,7 +308,7 @@ public partial class AIController
         }
         // Safety: never return empty — if every passenger is out of range keep all.
         // This prevents the helicopter from carrying cargo forever when it gets stuck.
-        return filtered.Count > 0 ? filtered : options;
+        return airCapturePolicy ? filtered : (filtered.Count > 0 ? filtered : options);
     }
 
 

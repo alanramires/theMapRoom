@@ -19,6 +19,11 @@ public partial class AIController
         List<UnitManager> passengers,
         TeamObjectivePlan plan = null)
     {
+        if (transporter != null && airDeliveryPrimary.TryGetValue(transporter, out var promoted))
+        {
+            if (promoted != null && promoted.IsEmbarked && passengers.Contains(promoted)) return promoted;
+            airDeliveryPrimary.Remove(transporter);
+        }
         // Fila FIFO por turno confirmado. Em empate, a ordem fisica das vagas
         // (slotIndex/seatIndex, ja materializada na lista runtime) decide.
         UnitManager oldest = null;
@@ -44,6 +49,119 @@ public partial class AIController
     }
 
 
+    private readonly Dictionary<UnitManager, UnitManager> airDeliveryPrimary = new Dictionary<UnitManager, UnitManager>();
+
+    private void PromoteUnservedAirPassenger(UnitManager carrier, List<UnitManager> cargo,
+        TeamObjectivePlan plan, AIWorldSnapshot snapshot, Vector3Int fallback)
+    {
+        // A delivery preference, not a board mutation. Keep it until the promoted passenger leaves.
+        if (airDeliveryPrimary.TryGetValue(carrier, out var remembered)
+            && remembered != null && remembered.IsEmbarked && cargo.Contains(remembered)) return;
+        airDeliveryPrimary.Remove(carrier);
+        var original = ResolvePrimaryPassenger(carrier, cargo, plan);
+        if (!IsCapturerPassenger(original) || original.IsUnderRepair) return;
+        if (!TryResolvePassengerDesignatedMissionTarget(original, out var originalTarget)
+            && !TryResolveCourierPassengerTargetCore(original, plan, snapshot, fallback,
+                carrier.CurrentCellPosition, out originalTarget)) return;
+        if (TryResolveUnservedAirCapture(original, originalTarget, plan, snapshot, null, out _)) return;
+        foreach (var candidate in OrderPassengersForDelivery(carrier, cargo))
+        {
+            if (candidate == original || candidate.IsUnderRepair
+                || !TryResolveCourierPassengerTarget(candidate, plan, snapshot, fallback,
+                    carrier.CurrentCellPosition, out var target)) continue;
+            airDeliveryPrimary[carrier] = candidate;
+            Debug.Log($"{TL("Transporte")} heli {carrier.InstanceId} promove passageiro #{candidate.InstanceId} para {target}; "
+                + $"entrega de #{original.InstanceId} em {originalTarget} ja atendida; antigo principal vira oportunista.");
+            return;
+        }
+    }
+
+    private bool TryResolveCourierPassengerTarget(UnitManager passenger, TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot, Vector3Int assignedSectorTarget, Vector3Int fallbackCell, out Vector3Int target)
+    {
+        if (IsAirCapturePassenger(passenger) && TryResolvePassengerDesignatedMissionTarget(passenger, out target))
+            return TryResolveUnservedAirCapture(passenger, target, plan, snapshot, null, out target);
+        if (!TryResolveCourierPassengerTargetCore(passenger, plan, snapshot, assignedSectorTarget, fallbackCell, out target)) return false;
+        return TryResolveUnservedAirCapture(passenger, target, plan, snapshot, null, out target);
+    }
+
+    private bool IsAirCapturePassenger(UnitManager passenger)
+    {
+        return IsCapturerPassenger(passenger)
+            && (!passenger.AIHasDesignatedMission || passenger.AIDesignatedMissionIntent == AIPlanRuntimeIntent.Capture)
+            && passenger.EmbarkedTransporter != null
+            && passenger.EmbarkedTransporter.TryGetUnitData(out var carrierData) && carrierData.IsAircraft()
+            && !passenger.IsUnderRepair;
+    }
+
+    // One concrete task per delivered capturer, unless confirmed pressure justifies reinforcement.
+    private bool TryResolveUnservedAirCapture(UnitManager passenger, Vector3Int original,
+        TeamObjectivePlan plan, AIWorldSnapshot snapshot, HashSet<Vector3Int> claimed, out Vector3Int target)
+    {
+        target = original; target.z = 0;
+        if (!IsAirCapturePassenger(passenger) || snapshot == null) return true;
+        var building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, target);
+        if (building == null || !building.IsCapturable) return true; // Non-capture mission.
+        bool Usable(ConstructionManager b)
+        {
+            var cell = b.CurrentCellPosition; cell.z = 0;
+            bool pressure = IsCaptureTargetUnderConfirmedPressure(cell, snapshot);
+            if (!pressure && ((claimed != null && claimed.Contains(cell))
+                || IsAirDeliveryCaptureAlreadyServed(cell, plan, snapshot))) return false;
+            return PodeCapturarSensor.TryGetCaptureTargetAtCell(passenger, boardTilemap, cell,
+                SensorMovementMode.MoveuAndando, out _, out _, out _, matchController, applyEmbarkedGate: false);
+        }
+        if (Usable(building)) return true;
+        ConstructionManager best = null; float distance = float.MaxValue;
+        foreach (var alternative in ConstructionManager.AllActive)
+        {
+            if (alternative == null || alternative == building || alternative.gameObject.scene != passenger.gameObject.scene
+                || alternative.Sector != building.Sector || alternative.Sector == ConstructionSector.None
+                || !alternative.IsCapturable || !Usable(alternative)) continue;
+            float d = SectorManager.HexDistance(original, alternative.CurrentCellPosition);
+            if (d < distance) { distance = d; best = alternative; }
+        }
+        if (best == null) return false;
+        target = best.CurrentCellPosition; target.z = 0;
+        return true;
+    }
+
+    private bool IsAirDeliveryCaptureAlreadyServed(Vector3Int target, TeamObjectivePlan plan, AIWorldSnapshot snapshot)
+    {
+        var building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, target);
+        if (building == null || snapshot?.MyUnits == null) return false;
+        foreach (var ally in snapshot.MyUnits)
+        {
+            if (ally == null || ally.IsDead || ally.IsEmbarked || ally.HasActed || ally.IsUnderRepair
+                || !PodeCapturarSensor.HasAnyCaptureKey(ally)) continue;
+            bool committed = ally.CurrentCellPosition == target;
+            if (ally.AIDesignatedMissionIntent == AIPlanRuntimeIntent.Capture
+                && TryResolvePassengerDesignatedMissionTarget(ally, out var missionCell) && missionCell == target) committed = true;
+            // Sector assignment is sufficient only when it identifies a unique capturable building.
+            if (!committed && plan?.Objectives != null)
+            {
+                var objective = plan.Objectives.Find(x => x.Sector == building.Sector && x.Slots != null
+                    && x.Slots.Exists(n => n.Filled && n.AssignedUnitId == ally.InstanceId));
+                if (objective != null)
+                {
+                    int eligible = 0;
+                    foreach (var b in ConstructionManager.AllActive)
+                        if (b != null && b.gameObject.scene == ally.gameObject.scene && b.Sector == building.Sector
+                            && b.IsCapturable && PodeCapturarSensor.TryGetCaptureTargetAtCell(ally, boardTilemap,
+                                b.CurrentCellPosition, SensorMovementMode.MoveuAndando, out _, out _, out _, matchController)) eligible++;
+                    committed = eligible == 1;
+                }
+            }
+            if (!committed || !PodeCapturarSensor.TryGetCaptureTargetAtCell(ally, boardTilemap, target,
+                    SensorMovementMode.MoveuAndando, out _, out _, out _, matchController)) continue;
+            var paths = UnitMovementPathRules.CalcularCaminhosValidos(boardTilemap, ally,
+                Mathf.Max(0, ally.RemainingMovementPoints), terrainDatabase);
+            if (paths != null && paths.ContainsKey(target)) return true;
+        }
+        return false;
+    }
+
+
     private static bool IsPassengerInPlanSlot(UnitManager passenger, TeamObjectivePlan plan)
     {
         if (plan == null || passenger == null || plan.Objectives == null) return false;
@@ -59,7 +177,7 @@ public partial class AIController
     // For each passenger, picks the best delivery cell, preferring immediate capture chances
     // that do not pull the courier away from its current delivery route.
 
-    private bool TryResolveCourierPassengerTarget(
+    private bool TryResolveCourierPassengerTargetCore(
         UnitManager passenger,
         TeamObjectivePlan plan,
         AIWorldSnapshot snapshot,

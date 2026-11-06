@@ -76,6 +76,7 @@ public partial class AIController
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, evacPaths, evacOccupied);
         }
 
+        PromoteUnservedAirPassenger(unit, passengers, plan, snapshot, assignedSectorTarget);
         UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);
         bool targetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot,
             assignedSectorTarget, fromCell, out Vector3Int primaryTarget);

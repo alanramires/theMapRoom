@@ -172,3 +172,20 @@ resultado é uma tabela de divergências sem ninguém jogar.
 
 Não está feito. O cuidado é o mesmo da regra 2: perguntar à IA **no estado exato**
 antes de cada batch, e não no começo do turno.
+
+### AAA prepara cobertura antes de retornar ao HQ (06/11/2026)
+
+Marca T5/slot0, passo18: AAA #38 sem missao escolheu coesao da base (0,15) -> (0,16), embora houvesse aproximacao aerea. O tiro imediato e a aproximacao Operational continuam primeiro. Se ambos falharem, a nova politica procura uma posicao no componente terrestre alcançavel com o mesmo horizonte 30 do capturador que trabalha enquanto espera carona. Cruza essas posicoes com a mobilidade Tactical de turno completo das aeronaves visiveis e o alcance da arma da AAA. E previsao de cobertura, nao promessa de tiro; sensores de combate continuam validando ataques reais.
+
+O comando anda apenas por um destino dos caminhos Tactical atuais, seguindo a rota longa valida. Evita destino ocupado/reservado e parada em produtor; mantem posicao se ja for a melhor cobertura, para coesao nao desfaze-la. Sem aproximacao cobrivel, conserva os fallbacks existentes de escolta/coesao. AI Step registra AAA prepara cobertura, posicao pretendida e aproximacoes cobertas.
+
+Validacao: compilacao e tools/ai_test/verificar_aaa_cobertura.cs passaram fora do Play. O teste cobre progresso limitado a rodada, reserva, ocupacao, produtor, aeronave distante e manutencao de cobertura. Falta repetir o passo marcado na partida para avaliar o posicionamento no mapa real.
+
+
+### Principal atendido promove passageiro secundario; desembarque oportunista distinto (06/11/2026)
+
+Marca T5/slot1, passo21: Chinook #30 entregava #32 em Foxtrot e soltava #33 (missao Juliet) pela mesma captura (14,9), ja tambem atribuida ao #16 em terra. Agora o helicoptero pode promover o secundario quando o alvo do principal ja tem capturador comprometido, capaz de capturar e com acao/rota Tactical disponivel; simples proximidade nao basta. Se houver outro predio util no setor original, a entrega do principal continua util. Pressao confirmada permite reforco no mesmo alvo.
+
+A prioridade promovida vale enquanto esse passageiro continuar a bordo, e e usada tanto na navegacao quanto na ordem/requisito da LZ. E preferencia de planejamento em memoria, recalculada apos carregar uma partida; nao altera FIFO confirmado das vagas nem missoes originais. O antigo principal pode descer como oportunista se houver trabalho livre na LZ. Oportunistas nao contam novamente os alvos ja incluidos nessa entrega nem os atendidos por capturadores comprometidos em terra; podem usar outro predio ou reforcar alvo sob pressao. Fallback aereo sem alvo util nao libera capturador automaticamente; escape por bloqueio continua preservado.
+
+Validacao fora do Play: compilacao e tools/ai_test/verificar_passageiro_prioritario.cs passaram em cena temporaria descartada, com sensores e caminhos reais. Casos: compromisso/acao, promocao, ordem da LZ, prioridade estavel, fim da preferencia apos desembarque, outro predio no mesmo setor, alvo oportunista distinto, reforco sob pressao e preservacao das missoes. Falta repetir a marca no mapa real para avaliar a nova rota escolhida.

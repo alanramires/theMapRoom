@@ -505,7 +505,8 @@ public partial class AIController
         // como oportunista. O plano dele nao muda; o resto (trabalhar a pe, nao reembarcar)
         // fica com o capturador.
         AppendGreedyOpportunisticDrops(
-            transporter, passengers, best.cell, selected, consumer);
+            transporter, passengers, best.cell, selected, consumer, snapshot, plan,
+            new HashSet<Vector3Int>(best.spots.ConvertAll(s => s.target)));
 
         Vector3Int fromCell = transporter.CurrentCellPosition;
         fromCell.z = 0;
@@ -535,7 +536,7 @@ public partial class AIController
         List<UnitManager> passengers,
         Vector3Int lzCell,
         List<PodeDesembarcarOption> selected,
-        string consumer)
+        string consumer, AIWorldSnapshot snapshot, TeamObjectivePlan plan, HashSet<Vector3Int> claimedCaptures)
     {
         if (transporter == null || passengers == null || selected == null)
             return;
@@ -576,10 +577,11 @@ public partial class AIController
                 spot.z = 0;
                 if (usedCells.Contains(spot))
                     continue;
-                if (!TryFindGreedyCaptureFromSpot(passenger, spot, out Vector3Int captureCell))
+                if (!TryFindGreedyCaptureFromSpot(passenger, spot, out Vector3Int captureCell, claimedCaptures, snapshot, plan))
                     continue;
 
                 selected.Add(option);
+                claimedCaptures.Add(captureCell);
                 usedCells.Add(spot);
                 droppedIds.Add(passenger.InstanceId);
                 Debug.Log($"{TL("Transporte")} {consumer} {transporter.InstanceId} ganancia: " +
@@ -595,7 +597,8 @@ public partial class AIController
     // planejados? Nada e movido: mapa de custo a partir do ponto, e o PodeCapturar com o
     // portao de embarcado desligado — a pergunta e "onde eu largo este passageiro?", a mesma
     // que o transporte ja faz (PodeCapturarSensor, applyEmbarkedGate).
-    private bool TryFindGreedyCaptureFromSpot(UnitManager passenger, Vector3Int spot, out Vector3Int captureCell)
+    private bool TryFindGreedyCaptureFromSpot(UnitManager passenger, Vector3Int spot, out Vector3Int captureCell,
+        HashSet<Vector3Int> claimedCaptures = null, AIWorldSnapshot snapshot = null, TeamObjectivePlan plan = null)
     {
         captureCell = spot;
         spot.z = 0;
@@ -618,6 +621,9 @@ public partial class AIController
                 ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
             if (building == null || !building.IsCapturable)
                 continue;
+            if (!IsCaptureTargetUnderConfirmedPressure(cell, snapshot)
+                && ((claimedCaptures != null && claimedCaptures.Contains(cell))
+                    || IsAirDeliveryCaptureAlreadyServed(cell, plan, snapshot))) continue;
             if (plannedDestinations != null && plannedDestinations.Contains(cell))
                 continue;
             if (UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
@@ -1371,6 +1377,15 @@ public partial class AIController
                               $"passageiro #{passenger.InstanceId} -> {target}.");
                 }
             }
+            var deliveryClaims = new HashSet<Vector3Int>();
+            foreach (var passenger in orderedPassengers)
+                if (targets.TryGetValue(passenger.InstanceId, out var address))
+                {
+                    if (!TryResolveUnservedAirCapture(passenger, address, plan, snapshot, deliveryClaims, out var useful))
+                    { targets.Remove(passenger.InstanceId); continue; }
+                    targets[passenger.InstanceId] = useful;
+                    if (IsCapturerPassenger(passenger)) deliveryClaims.Add(useful);
+                }
             return targets.Count > 0;
         }
 
@@ -1684,7 +1699,7 @@ public partial class AIController
         return best != null;
     }
 
-    private static List<UnitManager> OrderPassengersForDelivery(
+    private List<UnitManager> OrderPassengersForDelivery(
         UnitManager transporter,
         List<UnitManager> passengers)
     {
@@ -1699,10 +1714,12 @@ public partial class AIController
             if (byTurn != 0) return byTurn;
             return passengers.IndexOf(a).CompareTo(passengers.IndexOf(b));
         });
+        var primary = ResolvePrimaryPassenger(transporter, passengers);
+        if (primary != null && ordered.Remove(primary)) ordered.Insert(0, primary);
         return ordered;
     }
 
-    private static Dictionary<int, int> BuildPassengerDeliveryPriority(
+    private Dictionary<int, int> BuildPassengerDeliveryPriority(
         UnitManager transporter,
         List<UnitManager> passengers)
     {

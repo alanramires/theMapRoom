@@ -680,7 +680,7 @@ public partial class AIController
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
 
         // AAA barata/porradeira tem politica propria: tiro Tactical e, sem
-        // tiro, aproximacao de alvo aereo Operational. Este ramo precisa vir
+        // tiro, aproximacao Operational e preparacao de cobertura da chegada aerea. Este ramo vem
         // antes do embarque Assault generico.
         if (IsGroundAntiAirOnlyAssault(data))
             return DecideGroundAntiAirAssaultAction(
@@ -1127,6 +1127,15 @@ public partial class AIController
             return approachAction;
         }
 
+        if (TryFindGroundAntiAirCoverageMove(unit, snapshot, fromCell, paths, occupied,
+                out Vector3Int coverageCell, out string coverageReason))
+        {
+            Debug.Log($"{TL("AntiaereoCombatente")} {unit.InstanceId} AAA prepara cobertura via {coverageCell} ({coverageReason})");
+            var coverageAction = BuildMoveBatch(unit, snapshot.AITeam, fromCell, coverageCell, paths);
+            coverageAction.DebugLabel = $"AAA prepara cobertura: {coverageReason}";
+            return coverageAction;
+        }
+
         if (TryFindGroundAntiAirEscortGroupMove(unit, snapshot, assigned, fromCell, paths, occupied, out Vector3Int escortCell, out string escortReason))
         {
             if (escortCell != fromCell)
@@ -1328,6 +1337,97 @@ public partial class AIController
             $"tool={candidate.ToolScore}; {progressionReason}";
         return true;
     }
+
+    // Same strategic search horizon as the capturer's "work while waiting" policy.
+    // The long route picks a job; only the supplied Tactical paths can become a command.
+    private bool TryFindGroundAntiAirCoverageMove(UnitManager unit, AIWorldSnapshot snapshot,
+        Vector3Int fromCell, Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied, out Vector3Int moveCell, out string reason)
+    {
+        moveCell = fromCell; reason = "";
+        var enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        var origins = new List<Vector3Int>();
+        var arrivals = new List<HashSet<Vector3Int>>();
+        var ids = new List<int>();
+        foreach (var enemy in enemies)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.GetDomain() != Domain.Air) continue;
+            var reach = UnitReachEnvelopeService.Build(new UnitReachRequest
+            {
+                Unit = enemy, BoardMap = boardTilemap, TerrainDatabase = terrainDatabase,
+                Intent = ReachIntent.Mobility, SubStep = ReachSubStep.Aereo, Band = ReachBand.Tactical,
+                MovementBudget = Mathf.Max(0, enemy.MaxMovementPoints)
+            });
+            if (reach == null || reach.PathsByDestination.Count == 0) continue;
+            origins.Add(enemy.CurrentCellPosition);
+            arrivals.Add(new HashSet<Vector3Int>(reach.PathsByDestination.Keys));
+            ids.Add(enemy.InstanceId);
+        }
+        if (arrivals.Count == 0) return false;
+        var longPaths = UnitMovementPathRules.CalcularCaminhosValidos(
+            boardTilemap, unit, WorkWhileWaitingBudget, terrainDatabase);
+        if (longPaths == null || longPaths.Count == 0) return false;
+        var producers = new HashSet<Vector3Int>();
+        foreach (var cell in longPaths.Keys)
+            if (IsOwnProductionCell(cell, snapshot.AITeam)) producers.Add(cell);
+        if (!TryChooseGroundAntiAirCoverage(fromCell, longPaths, paths, occupied,
+                plannedDestinations, producers, origins, arrivals,
+                Mathf.Max(1, GetFireSupportMaxWeaponRange(unit)), out moveCell, out var guardCell, out reason))
+            return false;
+        reason = $"cobertura={FormatCell(guardCell)} aeronavesVisiveis=[{string.Join(",", ids)}] {reason}";
+        return true;
+    }
+
+    private static bool TryChooseGroundAntiAirCoverage(Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> longPaths,
+        Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths,
+        HashSet<Vector3Int> occupied, HashSet<Vector3Int> reserved, HashSet<Vector3Int> producers,
+        List<Vector3Int> enemyOrigins, List<HashSet<Vector3Int>> arrivals, int weaponRange,
+        out Vector3Int moveCell, out Vector3Int guardCell, out string reason)
+    {
+        moveCell = guardCell = fromCell; reason = "";
+        float bestScore = float.MinValue;
+        foreach (var pair in longPaths)
+        {
+            Vector3Int cell = pair.Key;
+            if (pair.Value == null || pair.Value.Count == 0 || producers.Contains(cell)
+                || (cell != fromCell && (occupied.Contains(cell) || (reserved != null && reserved.Contains(cell))))) continue;
+            int covered = 0, approachCells = 0;
+            float distance = float.MaxValue;
+            for (int i = 0; i < arrivals.Count; i++)
+            {
+                int intersections = 0;
+                foreach (var arrival in arrivals[i])
+                    if (SectorManager.HexDistance(cell, arrival) <= weaponRange) intersections++;
+                if (intersections == 0) continue;
+                covered++;
+                approachCells += Mathf.Min(25, intersections);
+                distance = Mathf.Min(distance, SectorManager.HexDistance(cell, enemyOrigins[i]));
+            }
+            if (covered == 0) continue;
+            Vector3Int step = fromCell;
+            if (cell != fromCell)
+            {
+                // Follow the real long route, as the capturer does; never steer across water.
+                for (int j = pair.Value.Count - 1; j >= 0; j--)
+                {
+                    var candidate = pair.Value[j];
+                    if (candidate == fromCell) break;
+                    if (tacticalPaths.ContainsKey(candidate) && !occupied.Contains(candidate)
+                        && !producers.Contains(candidate) && (reserved == null || !reserved.Contains(candidate)))
+                    { step = candidate; break; }
+                }
+                if (step == fromCell) continue;
+            }
+            float score = covered * 10000f + approachCells * 5f - distance * 250f - pair.Value.Count * 15f;
+            if (score < bestScore || (Mathf.Approximately(score, bestScore)
+                && (cell.y > guardCell.y || (cell.y == guardCell.y && cell.x >= guardCell.x)))) continue;
+            bestScore = score; moveCell = step; guardCell = cell;
+            reason = $"aproximacoesCobertas={covered} passosRota={pair.Value.Count}; prepara posicao, sem tiro garantido";
+        }
+        return bestScore > float.MinValue;
+    }
+
 
     private bool TryFindGroundAntiAirEscortGroupMove(
         UnitManager unit,
