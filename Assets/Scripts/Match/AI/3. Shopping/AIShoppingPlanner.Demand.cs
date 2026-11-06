@@ -2998,7 +2998,22 @@ public partial class AIShoppingPlanner
             MergeRoleDemand(demands, bomber, false);
         }
 
-        if (HasEnemyAirProduction(snapshot)
+        // Vigilancia aerea so quando ha O QUE ACHAR: com o terreno revelado, ver o ceu de longe
+        // nao acrescenta quase nada — o que o radar ganha e DETECTAR furtivo. Entao pede:
+        // nevoa total (a visao vale por si) OU o inimigo pode pôr furtivo aereo em campo
+        // (um produtor dele oferece, ou ja ha um visivel). Caca/bombardeiro furtivo exigem
+        // aeroporto especial que nao esta no jogo: "tem aeroporto" sozinho comprava Radar
+        // Movel no T2 do Peixe Pequeno com o troco que o Apache nao cabia.
+        bool airSurveillanceWorth = IsTotalFogMatch()
+            || EnemyCanFieldAirStealth(snapshot);
+        if (!airSurveillanceWorth
+            && log
+            && HasEnemyAirProduction(snapshot)
+            && CountActiveDedicatedAirSurveillance(snapshot) == 0)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + "vigilancia aerea: sem demanda — tabuleiro revelado e o inimigo nao produz furtivo aereo");
+        if (airSurveillanceWorth
+            && HasEnemyAirProduction(snapshot)
             && CountActiveDedicatedAirSurveillance(snapshot) == 0)
         {
             AIShoppingDemand surveillance = NewRoleDemand(
@@ -4287,12 +4302,59 @@ public partial class AIShoppingPlanner
         return false;
     }
 
+    // Nevoa total = o terreno fora da visao fica preto. Sem MatchController, conservador:
+    // trata como nevoa (mantem o comportamento antigo da demanda).
+    private static bool IsTotalFogMatch()
+    {
+        MatchController match = AIController.Instance != null ? AIController.Instance.Match : null;
+        if (match == null)
+            return true;
+        return match.IsFogOfWarDebugEnabled && match.EnableTotalWar;
+    }
+
+    // O inimigo consegue pôr furtivo AEREO em campo? Pergunta a ficha (stealth skills), nao
+    // o nome: um produtor inimigo que o oferece, ou um ja visivel/lembrado no snapshot.
+    private static bool EnemyCanFieldAirStealth(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return false;
+        if (snapshot.EnemyUnits != null)
+            foreach (UnitManager enemy in snapshot.EnemyUnits)
+                if (enemy != null && !enemy.IsDead
+                    && enemy.TryGetUnitData(out UnitData data)
+                    && IsAirStealth(data))
+                    return true;
+        if (snapshot.EnemyBuildings != null)
+            foreach (ConstructionManager building in snapshot.EnemyBuildings)
+            {
+                if (building == null || building.OfferedUnits == null)
+                    continue;
+                for (int i = 0; i < building.OfferedUnits.Count; i++)
+                    if (IsAirStealth(building.OfferedUnits[i]))
+                        return true;
+            }
+        return false;
+    }
+
+    private static bool IsAirStealth(UnitData data)
+        => data != null && data.domain == Domain.Air && data.IsStealthUnit();
+
+    // O inimigo pode pôr submarino em campo? Mesmo formato do furtivo aereo: um ja visivel,
+    // ou um produtor dele que OFERECE ficha de dominio Submarine. "Tem porto" sozinho nao
+    // basta — porto que so faz superficie nao pede quem enxergue o submerso.
     private static bool HasEnemySubmarineCapability(AIWorldSnapshot snapshot)
     {
         if (CountEnemyDomain(snapshot, Domain.Submarine) > 0) return true;
+        if (snapshot?.EnemyBuildings == null) return false;
         foreach (ConstructionManager building in snapshot.EnemyBuildings)
-            if (building != null && building.TryResolveConstructionData(out ConstructionData data)
-                && data != null && data.isHarbor) return true;
+        {
+            if (building == null || building.OfferedUnits == null) continue;
+            for (int i = 0; i < building.OfferedUnits.Count; i++)
+            {
+                UnitData offered = building.OfferedUnits[i];
+                if (offered != null && offered.domain == Domain.Submarine) return true;
+            }
+        }
         return false;
     }
 
