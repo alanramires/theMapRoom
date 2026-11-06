@@ -35,24 +35,60 @@ public partial class AIController
         if (!occupant.TryGetUnitData(out UnitData data) || data == null
             || UnitRoleCompatibility.ResolveCompositionRole(data) != UnitRole.Capturador) return null;
 
-        SectorObjective objective = ResolveAssignedObjective(occupant, plan);
-        if (objective == null) return null;
-
-        ConstructionManager capturable = FindCapturableInSector(objective.Sector, aiTeam);
-        if (capturable == null) return null;
-        Vector3Int capCell = capturable.CurrentCellPosition; capCell.z = 0;
         Vector3Int occCell = occupant.CurrentCellPosition;  occCell.z = 0;
-        if (occCell != capCell) return null;
+        SectorObjective objective = ResolveAssignedObjective(occupant, plan);
+        ConstructionManager capturable = objective != null
+            ? FindCapturableInSector(objective.Sector, aiTeam)
+            : null;
+        var candidateIds = new List<int>();
+        if (capturable != null)
+        {
+            Vector3Int ownCapCell = capturable.CurrentCellPosition; ownCapCell.z = 0;
+            if (ownCapCell != occCell)
+                capturable = null;
+        }
+        if (capturable != null)
+        {
+            foreach (SlotNeed slot in objective.Slots)
+                if (slot.Role == UnitRole.Capturador && slot.Filled)
+                    candidateIds.Add(slot.AssignedUnitId);
+        }
+        else
+        {
+            // PREDIO DE OUTRO OBJETIVO. O ocupante parou em cima de um capturavel que nao e o
+            // dele (a caminho do proprio), e o dono do predio — o capturador do objetivo daquele
+            // setor, ou quem o tem como alvo designado — chega neste turno e fecha antes. Ficar
+            // e capturar tranca o dono do lado de fora (AI Step T6 azul: Soldado #14, 4 HP,
+            // capturando a cidade de Charlie com o #26, 10 HP, a 2 hexes; a trava de "alvo de
+            // outro" olha o claim publicado, que estava vazio). A regua continua RodadasAteFechar.
+            capturable = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, occCell);
+            if (capturable == null || capturable.TeamId == aiTeam) return null;
+            foreach (SectorObjective other in plan.Objectives)
+            {
+                if (other == null || other == objective || other.Sector != capturable.Sector
+                    || other.Slots == null)
+                    continue;
+                foreach (SlotNeed slot in other.Slots)
+                    if (slot.Role == UnitRole.Capturador && slot.Filled)
+                        candidateIds.Add(slot.AssignedUnitId);
+            }
+            foreach (UnitManager u in UnitManager.AllActive)
+                if (u != null && u.TeamId == aiTeam && u.AIHasDesignatedCaptureTarget
+                    && u.AIDesignatedCaptureTargetInstanceId == capturable.InstanceId
+                    && !candidateIds.Contains(u.InstanceId))
+                    candidateIds.Add(u.InstanceId);
+        }
+        if (capturable == null || candidateIds.Count == 0) return null;
+        Vector3Int capCell = occCell;
 
         UnitManager best  = null;
         int         bestRounds = RodadasAteFechar(occupant, capturable);
 
-        foreach (SlotNeed slot in objective.Slots)
+        foreach (int candidateId in candidateIds)
         {
-            if (slot.Role != UnitRole.Capturador || !slot.Filled) continue;
-            if (slot.AssignedUnitId == occupant.InstanceId) continue;
+            if (candidateId == occupant.InstanceId) continue;
 
-            UnitManager candidate = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            UnitManager candidate = FindActiveUnit(candidateId, aiTeam);
             if (candidate == null || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked) continue;
             int candidateRounds = RodadasAteFechar(candidate, capturable);
             if (candidateRounds >= bestRounds) continue;
