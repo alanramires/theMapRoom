@@ -385,16 +385,39 @@ public class UnitDataEditor : Editor
 
     // `roles` continua sendo List<UnitRole> na serializacao (o codigo da IA le roles[0] e
     // roles.Count), mas o inspector expoe um campo unico: cada unidade tem um papel so.
+    // roles[0] e a ESSENCIA (familia, comportamento, magnetico); roles[1], opcional, e o papel
+    // SECUNDARIO: um rotulo que a ficha tambem satisfaz (UnitRoleCompatibility.CanSatisfy
+    // percorre a lista toda). Ex.: Bombardeiro = AtaqueAereo + DisruptorDeCaptura — conta
+    // como elite da linha do Disruptor sem mudar o comportamento dele. "None" remove.
     private static void DrawSingleUnitRoleField(SerializedProperty rolesProperty)
     {
         if (rolesProperty.arraySize == 0)
             rolesProperty.InsertArrayElementAtIndex(0);
-        else if (rolesProperty.arraySize > 1)
-            rolesProperty.arraySize = 1;
+        else if (rolesProperty.arraySize > 2)
+            rolesProperty.arraySize = 2;
 
         EditorGUILayout.PropertyField(
             rolesProperty.GetArrayElementAtIndex(0),
-            new GUIContent("Unit Role"));
+            new GUIContent("Unit Role", "Essência: família, comportamento e magnético da unidade."));
+
+        UnitRole secondary = rolesProperty.arraySize > 1
+            ? (UnitRole)rolesProperty.GetArrayElementAtIndex(1).intValue
+            : UnitRole.None;
+        UnitRole chosen = (UnitRole)EditorGUILayout.EnumPopup(
+            new GUIContent(
+                "Unit Secondary Role",
+                "Rótulo que a ficha também satisfaz (contagem, linha do elite, demandas), sem mudar o comportamento. None = sem papel secundário."),
+            secondary);
+        if (chosen == secondary)
+            return;
+        if (chosen == UnitRole.None)
+        {
+            rolesProperty.arraySize = 1;
+            return;
+        }
+        if (rolesProperty.arraySize < 2)
+            rolesProperty.arraySize = 2;
+        rolesProperty.GetArrayElementAtIndex(1).intValue = (int)chosen;
     }
 
     private static void DrawAiTargetPreferenceByClassSection(SerializedProperty listProperty)

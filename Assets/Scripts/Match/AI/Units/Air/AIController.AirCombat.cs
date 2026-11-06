@@ -813,6 +813,20 @@ public partial class AIController
             return interdictionCell;
         }
 
+        // NEGA A ESCOLTA (autor, 2026-11-06): o Bombardeiro e Disruptor de segunda linha — o
+        // Apache nega o poder de captura; ele nega a ESCOLTA do poder de captura (assalto e
+        // fogo de suporte inimigos), e sem escolta vai no capturador. Quem: AtaqueAereo de
+        // essencia com DisruptorDeCaptura como papel secundario, sem vaga no plano.
+        if (!isRebel
+            && IsEscortDenialUnit(unit)
+            && TryResolveEscortDenialAnchor(
+                unit, fromCell, visibleEnemies,
+                out Vector3Int escortCell, out string escortTier))
+        {
+            tier = escortTier;
+            return escortCell;
+        }
+
         if (hasCaptain)
         {
             tier = $"CapturerMagnet:#{capturer.InstanceId}";
@@ -1037,31 +1051,86 @@ public partial class AIController
         return false;
     }
 
-    // Poder de captura que esta unidade CARREGA: o HP dela se tem chave de captura
-    // (PodeCapturarSensor.GetCapturePower: base = HP) mais o de cada embarcado que
-    // captura, recursivo. A pe, no Chinook ou no navio de desembarque, a mesma conta.
-    private static int CombinedCapturePower(UnitManager unit)
+    private static bool IsEscortDenialUnit(UnitManager unit)
     {
-        return CombinedCapturePower(unit, new HashSet<UnitManager>());
+        return unit != null
+            && !unit.AIHasAssignedPlan
+            && unit.TryGetUnitData(out UnitData data)
+            && data != null
+            && data.roles != null
+            && data.roles.Count > 1
+            && data.roles[0] == UnitRole.AtaqueAereo
+            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.DisruptorDeCaptura);
     }
 
-    private static int CombinedCapturePower(UnitManager unit, HashSet<UnitManager> processed)
+    // Faixa 0: escolta — inimigo da familia Assalto ou Fogo de Suporte que alguma arma acerta.
+    // Faixa 1: sem escolta visivel, o capturador (poder de captura combinado). Dentro da
+    // faixa, o mais perto. So entra alvo que alguma arma acerta na camada dele.
+    private bool TryResolveEscortDenialAnchor(
+        UnitManager unit,
+        Vector3Int fromCell,
+        List<UnitManager> visibleEnemies,
+        out Vector3Int anchor,
+        out string tier)
     {
-        if (unit == null || unit.IsDead || !processed.Add(unit))
-            return 0;
-        int power = PodeCapturarSensor.HasAnyCaptureKey(unit)
-            ? PodeCapturarSensor.GetCapturePower(unit)
-            : 0;
-        IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
-        if (seats != null)
-            for (int i = 0; i < seats.Count; i++)
+        anchor = fromCell;
+        tier = null;
+        if (visibleEnemies == null)
+            return false;
+
+        UnitManager best = null;
+        int bestRank = int.MaxValue;
+        int bestDistance = int.MaxValue;
+        int bestPower = 0;
+        for (int i = 0; i < visibleEnemies.Count; i++)
+        {
+            UnitManager enemy = visibleEnemies[i];
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            if (!enemy.TryGetUnitData(out UnitData enemyData) || enemyData == null)
+                continue;
+            if (!CanAnyWeaponHitLayer(unit, enemy.GetDomain(), enemy.GetHeightLevel()))
+                continue;
+
+            UnitRoleFamily family = UnitRoleCompatibility.ResolveFamily(enemyData);
+            int rank;
+            int power = 0;
+            if (family == UnitRoleFamily.Assalto || family == UnitRoleFamily.FogoDeSuporte)
+                rank = 0;
+            else if ((power = CombinedCapturePower(enemy)) > 0)
+                rank = 1;
+            else
+                continue;
+
+            Vector3Int cell = enemy.CurrentCellPosition;
+            cell.z = 0;
+            int distance = AIActionReachCoordinator.CubicDistance(fromCell, cell);
+            bool better = rank < bestRank
+                || (rank == bestRank && rank == 1 && power > bestPower)
+                || (rank == bestRank && (rank == 0 || power == bestPower) && distance < bestDistance);
+            if (better)
             {
-                UnitManager child = seats[i] != null ? seats[i].embarkedUnit : null;
-                if (child != null && child.IsEmbarked)
-                    power += CombinedCapturePower(child, processed);
+                best = enemy;
+                bestRank = rank;
+                bestDistance = distance;
+                bestPower = power;
             }
-        return power;
+        }
+        if (best == null)
+            return false;
+
+        anchor = best.CurrentCellPosition;
+        anchor.z = 0;
+        best.TryGetUnitData(out UnitData bestData);
+        tier = bestRank == 0
+            ? $"NegaEscolta:{UnitRoleCompatibility.ResolveFamily(bestData)}#{best.InstanceId}"
+            : $"NegaEscolta:SemEscolta:PoderDeCaptura={bestPower}#{best.InstanceId}";
+        return true;
     }
+
+    // Poder de captura que a unidade carrega: fato do sensor, fonte unica com o shopping.
+    private static int CombinedCapturePower(UnitManager unit)
+        => PodeCapturarSensor.GetCombinedCapturePower(unit);
 
     private bool IsCapturingForeignBuilding(UnitManager enemy, Vector3Int cell)
     {
