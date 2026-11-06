@@ -1714,6 +1714,14 @@ public partial class AIController
         if (target == null || !target.TryGetUnitData(out UnitData targetData) || targetData == null)
             return true;
 
+        // "Ar primeiro" e doutrina de CACA. O Disruptor mede o alvo em poder de captura
+        // negado, nao em dominio: com uma aeronave atacavel, o soldado recem-desembarcado
+        // ao lado nem entrava na conta (AI Step T4 amarelo: Apache #17 atirou no Chinook #2
+        // VAZIO, capturaNegada=0, com o Soldado #3 colado). Para ele, todo alvo legal entra
+        // e o score decide.
+        if (IsCaptureDisruptor(attacker))
+            return true;
+
         bool targetIsAircraft = targetData.domain == Domain.Air;
         if (hasAttackableAircraft && !targetIsAircraft)
             return false;
