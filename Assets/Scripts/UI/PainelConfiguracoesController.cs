@@ -15,6 +15,11 @@ using UnityEngine.InputSystem;
 ///   Modo Turbo    → AIController.iaRapida        gravado (PreferenciasDoJogador)
 ///   Ação Direta   → MatchController.atalhoContextual  gravado
 ///   Tela Cheia    → Screen.fullScreen            ESPELHO da tela, nunca gravado
+///   Volume geral  → AudioListener.volume         gravado; vale na hora, em toda cena
+///   Volume música → trilhas (× o geral)           gravado; vale na hora
+///
+/// Volume: setas esquerda/direita mudam 10% na linha selecionada (cima/baixo navegam),
+/// Enter sobe 10% e dá a volta, mouse e dedo arrastam a barra.
 ///
 /// Os dois primeiros valem na próxima partida (o Awake de cada dono lê a preferência) e,
 /// se a partida já estiver aberta, na hora.
@@ -32,6 +37,9 @@ public sealed class PainelConfiguracoesController : MonoBehaviour
     [SerializeField] private Toggle toggleModoTurbo;
     [SerializeField] private Toggle toggleAcaoDireta;
     [SerializeField] private Toggle toggleTelaCheia;
+    [Header("Volume (opcional — sem ligação, acha pelo nome: Slider_volume_geral / Slider_volume_musica)")]
+    [SerializeField] private Slider sliderVolumeGeral;
+    [SerializeField] private Slider sliderVolumeMusica;
     [SerializeField] private Button buttonVoltar;
     [SerializeField] private Button buttonSobre;
 
@@ -195,6 +203,64 @@ public sealed class PainelConfiguracoesController : MonoBehaviour
             toggle.isOn = !toggle.isOn;
         else if (item is Button button)
             button.onClick?.Invoke();
+        else if (item is Slider slider && EhVolume(slider))
+            // Enter no volume sobe 10% e dá a volta (100% → 0%), como na Mi'Larhys:
+            // quem só tem o Enter (controle remoto) também chega em qualquer valor.
+            slider.value = slider.value >= 0.999f ? 0f : Passo(slider.value, +1);
+    }
+
+    // ── Volume ────────────────────────────────────────────────────────────
+
+    private const float PassoVolume = 0.1f;
+
+    private bool EhVolume(Slider slider) =>
+        slider != null && (slider == sliderVolumeGeral || slider == sliderVolumeMusica);
+
+    private static float Passo(float valor, int direcao) =>
+        Mathf.Clamp01(Mathf.Round((valor + direcao * PassoVolume) * 10f) / 10f);
+
+    /// <summary>
+    /// Seta esquerda/direita com uma linha de volume selecionada: muda o valor e devolve
+    /// true (a seta não navega). Fora de volume, false — a seta segue navegando.
+    /// </summary>
+    public bool AjustarVolumeSelecionado(int direcao)
+    {
+        GameObject atual = EventSystem.current != null ? EventSystem.current.currentSelectedGameObject : null;
+        Slider slider = atual != null ? atual.GetComponent<Slider>() : null;
+        if (!EhVolume(slider) || !slider.interactable)
+            return false;
+        slider.value = Passo(slider.value, direcao);
+        return true;
+    }
+
+    private void OnVolumeGeral(float valor)
+    {
+        PreferenciasDoJogador.SetVolumeGeral(valor);
+        AtualizarRotuloVolume(sliderVolumeGeral);
+        cursorController?.PlayCursorMoveSfx(); // ouve o novo volume na hora
+    }
+
+    private void OnVolumeMusica(float valor)
+    {
+        PreferenciasDoJogador.SetVolumeMusica(valor);
+        AtualizarRotuloVolume(sliderVolumeMusica);
+    }
+
+    // O "70%" ao lado da barra: filho chamado "Valor" (TMP ou Text). Sem ele, só a barra.
+    private static void AtualizarRotuloVolume(Slider slider)
+    {
+        if (slider == null)
+            return;
+        Transform valor = slider.transform.Find("Valor");
+        if (valor == null && slider.transform.parent != null)
+            valor = slider.transform.parent.Find("Valor");
+        if (valor == null)
+            return;
+        string texto = $"{Mathf.RoundToInt(slider.value * 100f)}%";
+        TMP_Text tmp = valor.GetComponent<TMP_Text>();
+        if (tmp != null) { tmp.text = texto; return; }
+        Text legado = valor.GetComponent<Text>();
+        if (legado != null) legado.text = texto;
     }
 
     private void SelecionarAtual(bool playSfx)
@@ -332,6 +398,8 @@ public sealed class PainelConfiguracoesController : MonoBehaviour
             return;
         }
 
+        if (TeclaEsquerda() && AjustarVolumeSelecionado(-1)) return;
+        if (TeclaDireita() && AjustarVolumeSelecionado(+1)) return;
         if (TeclaCima() || TeclaEsquerda()) { Navigate(-1); return; }
         if (TeclaBaixo() || TeclaDireita()) { Navigate(+1); return; }
         if (TeclaConfirmar()) { ConfirmCurrentSelection(); return; }
@@ -409,6 +477,19 @@ public sealed class PainelConfiguracoesController : MonoBehaviour
                 PreferenciasDoJogador.AcaoDireta(match != null && match.AtalhoContextual));
         if (toggleTelaCheia != null)
             toggleTelaCheia.SetIsOnWithoutNotify(Screen.fullScreen);
+        foreach (Slider s in new[] { sliderVolumeGeral, sliderVolumeMusica })
+        {
+            if (s == null) continue;
+            s.minValue = 0f;
+            s.maxValue = 1f;
+            s.wholeNumbers = false;
+        }
+        if (sliderVolumeGeral != null)
+            sliderVolumeGeral.SetValueWithoutNotify(PreferenciasDoJogador.VolumeGeral);
+        if (sliderVolumeMusica != null)
+            sliderVolumeMusica.SetValueWithoutNotify(PreferenciasDoJogador.VolumeMusica);
+        AtualizarRotuloVolume(sliderVolumeGeral);
+        AtualizarRotuloVolume(sliderVolumeMusica);
     }
 
     private void Ligar()
@@ -429,6 +510,10 @@ public sealed class PainelConfiguracoesController : MonoBehaviour
                 gesto = toggleTelaCheia.gameObject.AddComponent<GestoTelaCheia>();
             gesto.dono = this;
         }
+        if (sliderVolumeGeral != null)
+            sliderVolumeGeral.onValueChanged.AddListener(OnVolumeGeral);
+        if (sliderVolumeMusica != null)
+            sliderVolumeMusica.onValueChanged.AddListener(OnVolumeMusica);
         if (buttonVoltar != null)
             buttonVoltar.onClick.AddListener(Fechar);
         if (buttonSobre != null)
@@ -491,6 +576,20 @@ public sealed class PainelConfiguracoesController : MonoBehaviour
             else if (toggleTelaCheia == null
                 && (rotulo.Contains("cheia") || rotulo.Contains("fullscreen") || rotulo.Contains("full screen")))
                 toggleTelaCheia = toggles[i];
+        }
+
+        if (sliderVolumeGeral == null || sliderVolumeMusica == null)
+        {
+            Slider[] sliders = GetComponentsInChildren<Slider>(true);
+            for (int i = 0; i < sliders.Length; i++)
+            {
+                string nome = sliders[i].name.ToLowerInvariant();
+                if (!nome.Contains("volume")) continue;
+                if (sliderVolumeMusica == null && (nome.Contains("music") || nome.Contains("musica")))
+                    sliderVolumeMusica = sliders[i];
+                else if (sliderVolumeGeral == null && (nome.Contains("geral") || nome.Contains("master")))
+                    sliderVolumeGeral = sliders[i];
+            }
         }
 
         if (buttonVoltar == null || buttonSobre == null)

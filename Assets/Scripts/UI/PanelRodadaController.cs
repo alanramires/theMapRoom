@@ -768,6 +768,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         float categoryVolume = ResolveCurrentClipCategoryVolume(isRoundMusic);
         float masterVolume = isRoundMusic
             ? (musicAudioManager != null ? musicAudioManager.GetMasterMusicVolume() : 1f)
+                * PreferenciasDoJogador.VolumeMusica
             : (cursorController != null ? cursorController.GetMasterSfxVolume() : 1f);
         audioSource.volume = Mathf.Clamp01(categoryVolume * masterVolume);
     }

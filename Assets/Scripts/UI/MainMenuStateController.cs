@@ -531,6 +531,10 @@ public class MainMenuStateController : MonoBehaviour
             return;
         }
 
+        // Numa linha de volume, esquerda/direita mexem no valor em vez de navegar.
+        if (WasLeftPressed() && config.AjustarVolumeSelecionado(-1)) return;
+        if (WasRightPressed() && config.AjustarVolumeSelecionado(+1)) return;
+
         if (WasUpPressed() || WasLeftPressed())
         {
             config.Navigate(-1);

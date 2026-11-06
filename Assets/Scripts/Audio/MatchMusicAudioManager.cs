@@ -84,6 +84,10 @@ public class MatchMusicAudioManager : MonoBehaviour
         ApplyAudioSourceDefaults();
     }
 
+    // Volume da música mudou nas Configurações: a trilha tocando se ajusta na hora.
+    private void OnEnable() => PreferenciasDoJogador.VolumeMusicaMudou += RefreshOutputVolume;
+    private void OnDisable() => PreferenciasDoJogador.VolumeMusicaMudou -= RefreshOutputVolume;
+
     private void Start()
     {
         if (ShouldSuppressPlaybackForPrivacyGate())
@@ -909,7 +913,9 @@ public class MatchMusicAudioManager : MonoBehaviour
 
         float teamMultiplier = ResolveCurrentClipVolumeMultiplier();
         float runtimeScale = hasRuntimeVolumeOverride ? runtimeVolumeOverride : 1f;
-        audioSource.volume = Mathf.Clamp01(musicVolume * teamMultiplier * runtimeScale);
+        // Preferência do jogador por cima da mixagem (o geral já vem do AudioListener).
+        audioSource.volume = Mathf.Clamp01(musicVolume * teamMultiplier * runtimeScale
+            * PreferenciasDoJogador.VolumeMusica);
     }
 
     private float ResolveCurrentClipVolumeMultiplier()
