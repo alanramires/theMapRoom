@@ -1433,9 +1433,43 @@ public partial class AIShoppingPlanner
         {
             AIShoppingDemand airDemand = demands.Find(d => d != null && d.Count > 0
                 && d.Origin != null && d.Origin.Contains(airOrigin));
-            if (reserve <= 0 || airDemand == null)
+            if (airDemand == null)
                 continue;
-            int release = Mathf.Min(reserve, EstimateDemandCost(snapshot, airDemand));
+            int demandCost = EstimateDemandCost(snapshot, airDemand);
+            int unitCost = demandCost > 0 ? demandCost / airDemand.Count : 0;
+            if (unitCost <= 0)
+                continue;
+            int spendableBefore = remaining - reserve - conscriptionTax;
+            if (spendableBefore >= unitCost)
+                continue; // ja cabe sem tocar na poupanca
+            // NAO CABE NEM ROMPENDO: segura e passa a vez. O imposto de conscricao continua
+            // (a massa sai), o resto do caixa fica guardado pra peca — no mesmo horizonte da
+            // poupanca do elite (EliteSaveTurns). Liberar a reserva sem fechar a peca so
+            // soltava o dinheiro: Caca B de $16000 com $15000 livres nao saiu, e os $6750 do
+            // Bombardeiro (prometido em T3) viraram Apache + Chinook (AI Step T6 amarelo).
+            if (spendableBefore + reserve < unitCost)
+            {
+                int saveTurns = AIController.Instance != null ? AIController.Instance.EliteSaveTurns : 1;
+                int reach = remaining - conscriptionTax + Mathf.Max(0, snapshot.IncomePerTurn) * saveTurns;
+                if (saveTurns > 0 && unitCost <= reach)
+                {
+                    int hold = Mathf.Max(reserve, remaining - conscriptionTax);
+                    Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                        + $"{airOrigin} segura o caixa ({hold}) e passa a vez: peca de {unitCost} nao cabe "
+                        + $"em livre={spendableBefore}+reserva={reserve}; alcance em {saveTurns} turno(s)={reach} "
+                        + $"— imposto de conscricao ({conscriptionTax}) segue");
+                    reserve = hold;
+                    reserveTarget = airDemand;
+                    lastSavingTargetLabel = $"{airOrigin} ${unitCost}";
+                    hasStrategicReserve = reserve > 0;
+                    break;
+                }
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                    + $"{airOrigin} fora de alcance: peca de {unitCost} > {reach} em {saveTurns} turno(s) "
+                    + $"— poupanca ({reserve}) mantida");
+                continue;
+            }
+            int release = Mathf.Min(reserve, demandCost);
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                 + $"{airOrigin} libera {release} da reserva elite ({reserve}): {airDemand.Reason}");
             reserve -= release;
