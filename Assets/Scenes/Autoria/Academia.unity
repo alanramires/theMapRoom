@@ -1573,7 +1573,7 @@ SpriteRenderer:
   m_SortingLayer: 3
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 23999d8ad8c12c947a0e062f8c29de74, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -1871,6 +1871,42 @@ RectTransform:
   m_AnchoredPosition: {x: -3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!21 &52200032
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &53766244
 GameObject:
   m_ObjectHideFlags: 0
@@ -6446,7 +6482,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1560798306}
+  - {fileID: 52200032}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -8569,7 +8605,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 3000
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -8581,7 +8617,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 1500
     startMoneyApplied: 1
   - teamId: 3
     flipX: 1
@@ -19229,7 +19265,7 @@ SpriteRenderer:
   m_SortingLayer: 3
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 23999d8ad8c12c947a0e062f8c29de74, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -20859,15 +20895,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c977c91d2fbf50646aae73f411153f05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AIController
+  aiStep: 0
   matchController: {fileID: 327617512}
   replayManager: {fileID: 1679592218}
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  showAILogs: 1
+  showAILogs: 0
   showAIUnitHUD: 0
-  startOnPause: 1
-  iaRapida: 1
+  startOnPause: 0
+  iaRapida: 0
   hardMode: 0
   easyMode: 0
   strongWeakSidePolitic: 0
@@ -20875,6 +20912,7 @@ MonoBehaviour:
   massacreEnterForceRatio: 0.66
   massacreExitForceRatio: 0.58
   massacreUnitCapFillRatio: 0.85
+  massacreUnitCapExitFillRatio: 0.45
   conscriptionWhenLosing: 0
   emulateStage0: 1
   emulateStage1: 1
@@ -22206,7 +22244,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1560798306}
+  - {fileID: 52200032}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -28479,7 +28517,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1560798306}
+  - {fileID: 52200032}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -33939,7 +33977,7 @@ SpriteRenderer:
   m_SortingLayer: 3
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 23999d8ad8c12c947a0e062f8c29de74, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -34306,7 +34344,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1560798306}
+  - {fileID: 52200032}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -34692,7 +34730,7 @@ SpriteRenderer:
   m_SortingLayer: 3
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 23999d8ad8c12c947a0e062f8c29de74, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -36589,11 +36627,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugManager
-  aiDebugShortcutsEnabled: 1
-  debugShortcutsEnabled: 1
-  resetPlanOnDebugStage: 1
-  panelRodadaDesativadoPvpDebug: 1
-  gravarDiagnosticoNoSave: 1
+  aiDebugShortcutsEnabled: 0
+  debugShortcutsEnabled: 0
+  resetPlanOnDebugStage: 0
+  panelRodadaDesativadoPvpDebug: 0
+  gravarDiagnosticoNoSave: 0
   diagnosticoMaxEntradas: 2000
 --- !u!1 &1078503185
 GameObject:
@@ -41500,7 +41538,7 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 30
     capturedIncoming: 1500
-    sellingRule: 1
+    sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
@@ -47252,42 +47290,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1553563239}
   m_CullTransparentMesh: 1
---- !u!21 &1560798306
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1563150490
 GameObject:
   m_ObjectHideFlags: 0
@@ -53140,12 +53142,9 @@ Tilemap:
   - serializedVersion: 2
     m_RefCount: 113
     m_Data: {fileID: 21300000, guid: d20bb1a1afca80945a51508ec460f907, type: 3}
-  - serializedVersion: 2
-    m_RefCount: 0
-    m_Data: {fileID: 21300000, guid: 3d40b38523f815f40a2da17357fe373c, type: 3}
   m_TileMatrixArray:
   - serializedVersion: 2
-    m_RefCount: 1515
+    m_RefCount: 561
     m_Data:
       e00: 1
       e01: 0
@@ -55765,6 +55764,7 @@ MonoBehaviour:
         victoryStars: []
     IsTurnMarker: 0
     DebugLabel: 
+    AIReviewJson: 
   currentRecord:
     TurnNumber: 0
     ActingTeam: 0
@@ -61090,19 +61090,27 @@ MonoBehaviour:
   beachManager: {fileID: 0}
   sectorInfos:
   - sector: 0
-    representativeConstruction: {fileID: 1324405033}
-    representativeCell: {x: -3, y: -2, z: 0}
-    representativeLabel: Porto Ferro
-    totalCapturePointsMax: 30
-    totalCurrentCapturePoints: 30
-    constructionCount: 1
-    isFullyControlled: 1
-    isDisputed: 0
+    representativeConstruction: {fileID: 173148297}
+    representativeCell: {x: 18, y: 0, z: 0}
+    representativeLabel: Aeroporto
+    totalCapturePointsMax: 200
+    totalCurrentCapturePoints: 200
+    constructionCount: 8
+    isFullyControlled: 0
+    isDisputed: 1
     hasPartialCapture: 0
     controllingTeam: -1
     controllingSlotIndex: -1
-    statusText: Controlado por neutro
+    statusText: Em disputa
     constructions:
+    - instanceId: 17
+      displayName: Cidade
+      cell: {x: 28, y: -3, z: 0}
+      ownerTeam: -1
+      ownerSlotIndex: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 34282899}
     - instanceId: 1
       displayName: Porto Ferro
       cell: {x: -3, y: -2, z: 0}
@@ -61111,8 +61119,91 @@ MonoBehaviour:
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 1324405033}
-    riskEntries: []
-    sectorDistances: []
+    - instanceId: 18
+      displayName: Cidade
+      cell: {x: 25, y: -2, z: 0}
+      ownerTeam: -1
+      ownerSlotIndex: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 428513803}
+    - instanceId: 12
+      displayName: "F\xE1brica Leve"
+      cell: {x: 17, y: -1, z: 0}
+      ownerTeam: 0
+      ownerSlotIndex: 0
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 391740845}
+    - instanceId: 13
+      displayName: Aeroporto
+      cell: {x: 18, y: 0, z: 0}
+      ownerTeam: 0
+      ownerSlotIndex: 0
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 173148297}
+    - instanceId: 16
+      displayName: Cidade
+      cell: {x: 26, y: 1, z: 0}
+      ownerTeam: -1
+      ownerSlotIndex: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 984719112}
+    - instanceId: 15
+      displayName: Cidade
+      cell: {x: 25, y: 5, z: 0}
+      ownerTeam: -1
+      ownerSlotIndex: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 1003139716}
+    - instanceId: 14
+      displayName: "F\xE1brica Leve"
+      cell: {x: 29, y: 6, z: 0}
+      ownerTeam: 1
+      ownerSlotIndex: 1
+      currentCapturePoints: 30
+      capturePointsMax: 30
+      source: {fileID: 1318891998}
+    riskEntries:
+    - SlotIndex: 1
+      Team: 1
+      RiskRatio: 0.5
+      RiskLevel: 2
+    - SlotIndex: 0
+      Team: 0
+      RiskRatio: 0.5
+      RiskLevel: 2
+    sectorDistances:
+    - SlotIndex: 1
+      Team: 1
+      Entries:
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 14
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+    - SlotIndex: 0
+      Team: 0
+      Entries:
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 12
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 13
+        Distance: 0
+        VehicleDistance: 0
+        AirDistance: 0
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     closestNeighbor1: -1
     closestNeighbor1Distance: 3.4028235e+38
     closestNeighbor2: -1

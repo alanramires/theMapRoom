@@ -33,6 +33,8 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   visao: 1
+  ev: 1
+  blockLoS: 1
   baseMovementCost: 1
   isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
@@ -102,7 +104,7 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 30
     capturedIncoming: 1500
-    sellingRule: 1
+    sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: b4eaf3943a963694c82f0fd32248224c, type: 2}

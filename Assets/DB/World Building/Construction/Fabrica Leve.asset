@@ -93,7 +93,7 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 30
     capturedIncoming: 1500
-    sellingRule: 1
+    sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}

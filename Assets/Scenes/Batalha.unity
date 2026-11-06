@@ -1042,7 +1042,7 @@ MonoBehaviour:
   - teamId: 2
     flipX: 0
     flipXOverride: 0
-    isAI: 1
+    isAI: 0
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -1054,7 +1054,7 @@ MonoBehaviour:
   - teamId: 3
     flipX: 1
     flipXOverride: 0
-    isAI: 1
+    isAI: 0
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -9118,7 +9118,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c977c91d2fbf50646aae73f411153f05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AIController
-  aiStep: 1
+  aiStep: 0
   matchController: {fileID: 327617512}
   replayManager: {fileID: 1679592218}
   turnStateManager: {fileID: 1900915756}
@@ -9128,13 +9128,14 @@ MonoBehaviour:
   showAIUnitHUD: 1
   startOnPause: 1
   iaRapida: 0
-  hardMode: 1
+  hardMode: 0
   easyMode: 0
   strongWeakSidePolitic: 0
   conscriptionDoctrine: 0
   massacreEnterForceRatio: 0.66
   massacreExitForceRatio: 0.58
-  massacreUnitCapFillRatio: 0.85
+  massacreUnitCapFillRatio: 0.5
+  massacreUnitCapExitFillRatio: 0.45
   conscriptionWhenLosing: 0
   emulateStage0: 1
   emulateStage1: 1
@@ -12079,7 +12080,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 400
+      value: 520
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_LocalPosition.x
@@ -12115,7 +12116,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -93.10131
+      value: -153.10132
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -13174,7 +13175,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3105420475645158433, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 'ALPHA BUILD v0.3 - Oububro/2026
+      value: 'ALPHA BUILD v0.3 - November/2026
 
         EM DESENVOLVIMENTO'
       objectReference: {fileID: 0}

@@ -161,7 +161,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 400
+      value: 520
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_LocalPosition.x
@@ -197,7 +197,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -93.10131
+      value: -153.10132
       objectReference: {fileID: 0}
     - target: {fileID: 8912710099120609079, guid: 34683238f0b636e4999e6eb0ec189732, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -9084,6 +9084,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c977c91d2fbf50646aae73f411153f05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AIController
+  aiStep: 0
   matchController: {fileID: 327617512}
   replayManager: {fileID: 1679592218}
   turnStateManager: {fileID: 1900915756}
@@ -9100,6 +9101,7 @@ MonoBehaviour:
   massacreEnterForceRatio: 0.66
   massacreExitForceRatio: 0.58
   massacreUnitCapFillRatio: 0.85
+  massacreUnitCapExitFillRatio: 0.45
   conscriptionWhenLosing: 0
   emulateStage0: 1
   emulateStage1: 1
@@ -10780,6 +10782,8 @@ MonoBehaviour:
   debugShortcutsEnabled: 0
   resetPlanOnDebugStage: 0
   panelRodadaDesativadoPvpDebug: 0
+  gravarDiagnosticoNoSave: 1
+  diagnosticoMaxEntradas: 2000
 --- !u!1 &1087893317
 GameObject:
   m_ObjectHideFlags: 0
@@ -12040,6 +12044,7 @@ MonoBehaviour:
         victoryStars: []
     IsTurnMarker: 0
     DebugLabel: 
+    AIReviewJson: 
   currentRecord:
     TurnNumber: 0
     ActingTeam: 0
@@ -12967,6 +12972,12 @@ PrefabInstance:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
       value: 0 / turn
+      objectReference: {fileID: 0}
+    - target: {fileID: 3105420475645158433, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
+      propertyPath: m_text
+      value: 'ALPHA BUILD v0.2 - November/2026
+
+        EM DESENVOLVIMENTO'
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled
