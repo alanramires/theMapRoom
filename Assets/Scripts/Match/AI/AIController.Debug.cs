@@ -900,6 +900,8 @@ public partial class AIController
                 foreach (var order in orders)
                     if (order.UnitToBuy != null && order.Building != null)
                         text.AppendLine($"{order.UnitToBuy.name} ${order.UnitToBuy.cost} em {FormatCell(order.Building.CurrentCellPosition)}");
+            if (!string.IsNullOrEmpty(AIShoppingPlanner.LastSavingSummary))
+                text.AppendLine(AIShoppingPlanner.LastSavingSummary);
             aiShoppingSummary = text.ToString();
             return orders;
         }

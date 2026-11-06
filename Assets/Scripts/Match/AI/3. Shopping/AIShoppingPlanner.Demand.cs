@@ -1276,6 +1276,8 @@ public partial class AIShoppingPlanner
         public AIShoppingDemand Demand;
         public int DemandIndex;
         public int Score;
+        // Parcela do imposto de conscricao do produtor, devolvida ao carrinho quando ele o usa.
+        public int TaxRefund;
     }
 
     private sealed class RoleShoppingCart
@@ -1342,6 +1344,8 @@ public partial class AIShoppingPlanner
         var occupied = BuildProductionOccupiedCells();
         var usedBuildings = new HashSet<ConstructionManager>();
         int remaining = snapshot.Budget;
+        LastSavingSummary = null;
+        lastSavingTargetLabel = null;
 
         // DOUTRINA DO ENXAME (Agressivo/conscriptionDoctrine): imposto de conscrição. Reserva o
         // custo do corpo Army mais barato de CADA produtor do exército livre — o carrinho
@@ -1354,12 +1358,13 @@ public partial class AIShoppingPlanner
         // barato fura a fila de armor-first. Válvula: em Fase de Massacre a doutrina pausa (o caixa
         // inteiro volta pras demandas e a máquina de elite existente assume).
         int conscriptionTax = 0;
+        var conscriptionTaxShares = new Dictionary<ConstructionManager, int>();
         bool conscriptionActive = false;
         if (AIController.Instance != null && AIController.Instance.ConscriptionDoctrine)
             conscriptionActive = !ResolveMassacrePhase(snapshot, AIController.Instance);
         if (conscriptionActive)
         {
-            conscriptionTax = ComputeConscriptionTax(snapshot, occupied);
+            conscriptionTax = ComputeConscriptionTax(snapshot, occupied, conscriptionTaxShares);
             if (conscriptionTax > 0)
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] doutrina do "
                     + $"enxame: imposto de conscrição={conscriptionTax} — demandas só gastam acima da "
@@ -1414,6 +1419,31 @@ public partial class AIShoppingPlanner
                 + $"origem={reserveBreakingEmergency.Origin} rompe reserva estrategica ({reserve})");
             reserve = 0;
             hasStrategicReserve = false;
+        }
+        // PODER DE CAPTURA INIMIGO EM TRANSITO ROMPE A POUPANCA DO ELITE, perdendo ou nao: tres
+        // Chinooks carregados nao esperam dois turnos de economia (AI Step T3 amarelo: $10151
+        // guardados para o Bombardeiro, nenhum Apache). O compromisso continua gravado; quando
+        // os pares de Disruptor fecharem, a demanda some e a poupanca volta sozinha.
+        AIShoppingDemand disruptorDemand = demands.Find(d => d != null && d.Count > 0
+            && string.Equals(d.Origin, "disruptor", System.StringComparison.Ordinal));
+        if (reserve > 0 && disruptorDemand != null)
+        {
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"poder de captura inimigo em transito rompe a reserva elite ({reserve}): "
+                + $"{disruptorDemand.Reason}");
+            reserve = 0;
+            hasStrategicReserve = false;
+        }
+        {
+            var saving = new System.Text.StringBuilder();
+            if (hasStrategicReserve)
+                saving.Append($"Poupança: ${reserve} para {lastSavingTargetLabel ?? FormatDemandCapability(reserveTarget)} (fora do carrinho)");
+            if (conscriptionTax > 0)
+            {
+                if (saving.Length > 0) saving.Append('\n');
+                saving.Append($"Imposto de conscrição: ${conscriptionTax} (massa garantida em cada produtor do exército)");
+            }
+            LastSavingSummary = saving.Length > 0 ? saving.ToString() : null;
         }
 
         // CONCENTRAÇÃO: conta quantos prédios podem PRODUZIR de fato neste turno (podem produzir e a
@@ -1476,7 +1506,8 @@ public partial class AIShoppingPlanner
         RoleShoppingCart cart = BuildBestRoleShoppingCart(
             snapshot, demands, counterPressure, occupied, remaining - reserve - conscriptionTax,
             macroLosing, concentrateSpend, concentrateEmergency, expansionCapturerTarget,
-            breakStrategicReserve ? null : eliteCommitment?.unitId);
+            breakStrategicReserve ? null : eliteCommitment?.unitId,
+            conscriptionTaxShares);
         if (cart != null)
         {
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] carrinho "
@@ -1590,10 +1621,14 @@ public partial class AIShoppingPlanner
         bool concentrateSpend,
         bool concentrateEmergency,
         int expansionCapturerTarget,
-        string committedEliteUnitId)
+        string committedEliteUnitId,
+        Dictionary<ConstructionManager, int> conscriptionTaxShares = null)
     {
-        if (snapshot?.MyBuildings == null || demands == null || demands.Count == 0
-            || spendableBudget <= 0)
+        if (snapshot?.MyBuildings == null || demands == null || demands.Count == 0)
+            return null;
+        // Com imposto, o carrinho pode ter saldo livre zero e ainda comprar no produtor
+        // taxado (a parcela dele volta). Sem imposto, segue o teste antigo.
+        if (spendableBudget <= 0 && (conscriptionTaxShares == null || conscriptionTaxShares.Count == 0))
             return null;
 
         var buildings = new List<ConstructionManager>();
@@ -1637,13 +1672,15 @@ public partial class AIShoppingPlanner
         foreach (ConstructionManager building in buildings)
         {
             var next = new List<RoleShoppingCart>(beam.Count * 2);
+            int taxRefund = conscriptionTaxShares != null
+                && conscriptionTaxShares.TryGetValue(building, out int share) ? share : 0;
             foreach (RoleShoppingCart state in beam)
             {
                 // Não comprar também é uma escolha válida: caixa sem demanda elegível é preservado.
                 next.Add(state);
                 foreach (UnitData unit in building.OfferedUnits)
                 {
-                    if (unit == null || unit.cost <= 0 || unit.cost > state.RemainingBudget
+                    if (unit == null || unit.cost <= 0 || unit.cost > state.RemainingBudget + taxRefund
                         || unit.militaryForce == MilitaryForce.Navy
                         || (!concentrateEmergency && !IsEliteChainAvailable(unit, snapshot)))
                         continue;
@@ -1665,6 +1702,7 @@ public partial class AIShoppingPlanner
                             Unit = unit,
                             Demand = demand,
                             DemandIndex = demandIndex,
+                            TaxRefund = taxRefund,
                             Score = ScoreRoleShoppingCandidate(
                                 snapshot, unit, demand, spendableBudget,
                                 counterPressure, macroLosing, concentrateSpend),
@@ -1694,7 +1732,9 @@ public partial class AIShoppingPlanner
         bool firstCoverage = !cart.CoveredDemand[demandIndex];
         cart.Items.Add(candidate);
         cart.RemainingDemand[demandIndex]--;
-        cart.RemainingBudget -= candidate.Unit.cost;
+        // O produtor taxado que o carrinho usa devolve a parcela do imposto: o corpo de massa
+        // que ela garantia nao vai mais ser comprado ali.
+        cart.RemainingBudget -= candidate.Unit.cost - candidate.TaxRefund;
         cart.Spent += candidate.Unit.cost;
         cart.FulfilledCount++;
         cart.QualityScore += candidate.Score;
@@ -1856,6 +1896,8 @@ public partial class AIShoppingPlanner
             else if (unit.eliteLevel != existing.eliteLevel
                 || UnitRoleCompatibility.ResolveCompositionRole(unit) != existing.role)
                 invalidReason = "dados da unidade mudaram";
+            else if (IsCommitmentOutsideCutOffEliteLine(snapshot, demands, unit, existing))
+                invalidReason = "fora da linha do elite (ilha sem ligacao: a ficha nao declara DisruptorDeCaptura)";
             bool valid = invalidReason == null;
             if (!valid)
             {
@@ -1925,6 +1967,32 @@ public partial class AIShoppingPlanner
             + $"novo compromisso elite: {bestUnit.displayName} ${bestUnit.cost} "
             + $"papel={commitment.role} elite={commitment.eliteLevel}");
         return commitment;
+    }
+
+    // Compromisso de elite de ATAQUE AEREO na ilha cortada cuja ficha NAO declara
+    // DisruptorDeCaptura: a linha agora e o Disruptor e ninguem mais o pede — so a ruptura
+    // (parede de artilharia), e essa demanda, viva, o mantem. Com o rotulo na ficha (o
+    // Bombardeiro como Disruptor secundario), o compromisso fica.
+    // Compromisso de counter (counterEscalation) nunca cai aqui: tem sua propria persistencia.
+    private static bool IsCommitmentOutsideCutOffEliteLine(
+        AIWorldSnapshot snapshot, List<AIShoppingDemand> demands,
+        UnitData unit, AIElitePurchaseCommitment commitment)
+    {
+        if (unit == null || commitment == null || commitment.counterEscalation)
+            return false;
+        if (!IsGroundCutOffFromEnemy(snapshot, log: false))
+            return false;
+        if (UnitRoleCompatibility.ResolveCompositionRole(unit) != UnitRole.AtaqueAereo
+            || UnitRoleCompatibility.CanSatisfy(unit, UnitRole.DisruptorDeCaptura))
+            return false;
+        if (demands != null)
+            foreach (AIShoppingDemand demand in demands)
+                if (demand != null && demand.Count > 0
+                    && string.Equals(demand.Origin, "breakthrough", System.StringComparison.Ordinal)
+                    && UnitRoleCompatibility.CanSatisfy(unit, demand.Role)
+                    && unit.eliteLevel >= demand.MinEliteLevel)
+                    return false;
+        return true;
     }
 
     private static void EnsureEliteCommitmentDemand(
@@ -2389,6 +2457,11 @@ public partial class AIShoppingPlanner
     // Decide quanto de caixa segurar para um elite ou uma capacidade crítica prioritária
     // alcançável em poucos turnos. O excedente continua disponível para compras menores.
     // Retorna 0 quando não há nada para poupar (guloso normal).
+    // Para o AI Step: o que o turno guardou FORA do carrinho, em texto (poupanca do elite com
+    // o nome da unidade, imposto de conscricao). Reescrito a cada compra por papeis.
+    public static string LastSavingSummary { get; private set; }
+    private static string lastSavingTargetLabel;
+
     private static int ComputeStrategicSavingReserve(
         AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands,
@@ -2411,6 +2484,7 @@ public partial class AIShoppingPlanner
             return 0;
 
         int targetCost = 0;
+        string targetUnitName = null;
         if (commitment != null)
         {
             target = FindDemandForEliteCommitment(demands, commitment);
@@ -2419,6 +2493,9 @@ public partial class AIShoppingPlanner
             if (target != null && committedUnit != null)
             {
                 targetCost = committedUnit.cost;
+                // O log dizia a DEMANDA que casou com o compromisso ("Counter/Infantry...")
+                // em vez da UNIDADE poupada (Bombardeiro $22000).
+                targetUnitName = committedUnit.displayName;
                 if (targetCost <= remaining && availableNow)
                     return 0;
             }
@@ -2472,8 +2549,13 @@ public partial class AIShoppingPlanner
         int maintenanceReserve = Mathf.CeilToInt(projectedAfterTarget * maintenancePct);
         int spendableNow = Mathf.Max(0, projectedAfterTarget - maintenanceReserve);
         reserve = Mathf.Clamp(remaining - spendableNow, 0, remaining);
+        if (targetUnitName == null)
+            targetUnitName = FindBestOfferedUnitForDemand(snapshot, target)?.displayName;
+        lastSavingTargetLabel = targetUnitName != null
+            ? $"{targetUnitName} ${targetCost}"
+            : $"{FormatDemandCapability(target)} ${targetCost}";
         Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] poupando p/ "
-            + $"{FormatDemandCapability(target)} custo={targetCost} renda={income} maxTurnos={maxTurns} "
+            + $"{lastSavingTargetLabel} ({FormatDemandCapability(target)}) renda={income} maxTurnos={maxTurns} "
             + $"coreOperacional={(coreReady ? "pronto" : "comprometido")} unidades={armySize} "
             + $"maturidade={maturity:P0} margem={maintenancePct:P0} "
             + $"saldoPosAlvo={projectedAfterTarget} manutencao={maintenanceReserve} "
@@ -2985,6 +3067,29 @@ public partial class AIShoppingPlanner
                     ? UnitRole.AntiaereoCombatente : UnitRole.Antiaereo;
                 MergeRoleDemand(demands, NewRoleDemand(UnitRole.Antiaereo, desiredAA - activeAA, 8,
                     "threat", $"aeronaves visiveis={visibleAir}", true, exact), false);
+            }
+        }
+
+        // DISRUPTOR: o espelho do capturador no shopping. O counter enxerga CLASSE (helicoptero
+        // pede antiaereo) e nao enxerga DINHEIRO; tres Chinooks inimigos carregados passavam sem
+        // pedir quem os caca. Transporte inimigo visivel levando poder de captura pede Disruptor
+        // em PARES ("concentrar, nao dividir": um Apache danifica, dois abatem). Sem fabrica que
+        // ofereca Disruptor, nao nasce (gate inaplicavel).
+        int loadedCarriers = CountEnemyCapturePowerInTransit(snapshot, out int capturePowerInTransit);
+        if (loadedCarriers > 0 && CanAnyOwnProducerOffer(snapshot, UnitRole.DisruptorDeCaptura))
+        {
+            int desiredDisruptors = Mathf.Min(DisruptorDemandCap, 2 * Mathf.CeilToInt(loadedCarriers / 2f));
+            int activeDisruptors = CountActiveDisruptors(snapshot);
+            if (activeDisruptors < desiredDisruptors)
+            {
+                // So o Disruptor de linha (nao elite): a demanda caca TRANSPORTE em transito.
+                // O elite (Bombardeiro, que tambem e Disruptor) vem pela progressao.
+                AIShoppingDemand disruptor = NewRoleDemand(UnitRole.DisruptorDeCaptura,
+                    desiredDisruptors - activeDisruptors, 12, "disruptor",
+                    $"poder de captura inimigo em transito={capturePowerInTransit} em {loadedCarriers} "
+                    + $"transporte(s); Disruptores={activeDisruptors}/{desiredDisruptors} (em pares)", false);
+                disruptor.MaxEliteLevel = 0;
+                MergeRoleDemand(demands, disruptor, false);
             }
         }
 
@@ -3725,6 +3830,17 @@ public partial class AIShoppingPlanner
     private static int ComputeConscriptionTax(
         AIWorldSnapshot snapshot, HashSet<Vector3Int> occupied)
     {
+        return ComputeConscriptionTax(snapshot, occupied, null);
+    }
+
+    // shares (opcional): a parcela de CADA produtor taxado. O carrinho devolve a parcela do
+    // produtor que ele mesmo usar — sem isso o corpo comprado pelo carrinho num produtor
+    // taxado era pago duas vezes (o imposto ja o garantia). AI Step T3 amarelo: 3 Soldados
+    // do carrinho nos produtores taxados + $3000 de imposto parados.
+    private static int ComputeConscriptionTax(
+        AIWorldSnapshot snapshot, HashSet<Vector3Int> occupied,
+        Dictionary<ConstructionManager, int> shares)
+    {
         if (snapshot.MyBuildings == null)
             return 0;
         int tax = 0;
@@ -3751,6 +3867,8 @@ public partial class AIShoppingPlanner
                     cheapest = u.cost;
             }
             tax += cheapest;
+            if (shares != null && cheapest > 0)
+                shares[building] = cheapest;
         }
         return tax;
     }
@@ -3954,12 +4072,25 @@ public partial class AIShoppingPlanner
         public bool CutOff;
     }
 
-    private static EliteLine ResolveEliteLine(AIWorldSnapshot snapshot, UnitRole role)
+    // forElite: a pergunta e "qual e o ELITE desta linha?". Na ilha cortada o assalto no ar
+    // e o Disruptor (Apache). O elite dele e quem a FICHA declara Disruptor — o Bombardeiro,
+    // com DisruptorDeCaptura como papel secundario: "bombardeiros sao excelentes disruptores,
+    // mas brilham contra MBT e artilharia" (autor, 2026-11-06), e a progressao dele e o que
+    // obriga o inimigo a comprar caca. Ficha elite sem o rotulo nao entra. A escolta das
+    // operacoes (forElite=false) segue pedindo AtaqueAereo. A poupanca deste elite cede a
+    // demanda de Disruptor (poder de captura inimigo em transito).
+    private static EliteLine ResolveEliteLine(AIWorldSnapshot snapshot, UnitRole role, bool forElite = false)
     {
         if (!IsGroundCutOffFromEnemy(snapshot))
             return new EliteLine { Role = role };
         if (role == UnitRole.Assalto)
-            return new EliteLine { Role = UnitRole.AtaqueAereo, Family = UnitRoleFamily.Assalto, Domain = global::Domain.Air, CutOff = true };
+            return new EliteLine
+            {
+                Role = forElite ? UnitRole.DisruptorDeCaptura : UnitRole.AtaqueAereo,
+                Family = UnitRoleFamily.Assalto,
+                Domain = global::Domain.Air,
+                CutOff = true
+            };
         if (role == UnitRole.FogoIndireto)
             return new EliteLine { Role = UnitRole.Antiaereo, Family = UnitRoleFamily.FogoDeSuporte, CutOff = true };
         return new EliteLine { Role = role };
@@ -3989,7 +4120,7 @@ public partial class AIShoppingPlanner
     {
         if (activeRoleCount <= 0)
             return;
-        EliteLine line = ResolveEliteLine(snapshot, role);
+        EliteLine line = ResolveEliteLine(snapshot, role, forElite: true);
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
             if (unit != null && unit.TryGetUnitData(out UnitData data)
@@ -4061,7 +4192,7 @@ public partial class AIShoppingPlanner
             ? Mathf.Max(pressureRatio, safeRatio)
             : pressureRatio;
         int desiredElite = Mathf.CeilToInt(activeRoleCount * targetRatio);
-        EliteLine line = ResolveEliteLine(snapshot, role);
+        EliteLine line = ResolveEliteLine(snapshot, role, forElite: true);
 
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
@@ -4179,6 +4310,61 @@ public partial class AIShoppingPlanner
                 && data.roles != null && data.roles.Count > 0 && data.roles[0] == role)
                 count++;
         return count;
+    }
+
+    // Teto da demanda de Disruptor: dois pares.
+    private const int DisruptorDemandCap = 4;
+
+    // Transportes inimigos visiveis (no snapshot) levando poder de captura a bordo. O proprio
+    // poder do transportador nao conta: a pergunta e "quanto dinheiro esta em transito".
+    // Carga de unidade detectada e inspecao livre do jogador: nao e trapaca de nevoa.
+    private static int CountEnemyCapturePowerInTransit(AIWorldSnapshot snapshot, out int capturePower)
+    {
+        capturePower = 0;
+        int carriers = 0;
+        if (snapshot?.EnemyUnits == null)
+            return 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                continue;
+            int aboard = PodeCapturarSensor.GetCombinedCapturePower(enemy)
+                - (PodeCapturarSensor.HasAnyCaptureKey(enemy) ? PodeCapturarSensor.GetCapturePower(enemy) : 0);
+            if (aboard <= 0)
+                continue;
+            carriers++;
+            capturePower += aboard;
+        }
+        return carriers;
+    }
+
+    private static int CountActiveDisruptors(AIWorldSnapshot snapshot)
+    {
+        int count = 0;
+        if (snapshot?.MyUnits == null)
+            return 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data) && data != null
+                && data.roles != null && data.roles.Count > 0
+                && data.roles[0] == UnitRole.DisruptorDeCaptura)
+                count++;
+        return count;
+    }
+
+    private static bool CanAnyOwnProducerOffer(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        if (snapshot?.MyBuildings == null)
+            return false;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && UnitRoleCompatibility.CanSatisfy(unit, role))
+                    return true;
+        }
+        return false;
     }
 
     private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen)

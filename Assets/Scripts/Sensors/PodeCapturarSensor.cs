@@ -151,6 +151,33 @@ public static class PodeCapturarSensor
     }
 
     /// <summary>
+    /// Poder de captura que esta unidade CARREGA: o dela (se tem chave de captura) mais o
+    /// de cada embarcado que captura, recursivo. A pe, no Chinook ou no navio de
+    /// desembarque, a mesma conta. E o "capitao" do Disruptor de captura e a medida da
+    /// demanda de Disruptor no shopping. Fato da unidade, sem politica.
+    /// </summary>
+    public static int GetCombinedCapturePower(UnitManager unit)
+    {
+        return GetCombinedCapturePower(unit, new HashSet<UnitManager>());
+    }
+
+    private static int GetCombinedCapturePower(UnitManager unit, HashSet<UnitManager> processed)
+    {
+        if (unit == null || unit.IsDead || !processed.Add(unit))
+            return 0;
+        int power = HasAnyCaptureKey(unit) ? GetCapturePower(unit) : 0;
+        IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
+        if (seats != null)
+            for (int i = 0; i < seats.Count; i++)
+            {
+                UnitManager child = seats[i] != null ? seats[i].embarkedUnit : null;
+                if (child != null && child.IsEmbarked)
+                    power += GetCombinedCapturePower(child, processed);
+            }
+        return power;
+    }
+
+    /// <summary>
     /// Retorna a forca efetiva contra uma construcao. Capturas inimigas sem o
     /// pre-requisito de progressao aplicam metade da forca base, arredondada
     /// para baixo e com minimo de 1. Recuperacao aliada nunca recebe essa penalidade.
