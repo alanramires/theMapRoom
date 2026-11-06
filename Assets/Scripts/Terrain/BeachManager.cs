@@ -53,10 +53,12 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
     private readonly List<IslandInfo> islands = new List<IslandInfo>();
     private readonly Dictionary<Vector3Int, IslandInfo> islandByCell = new Dictionary<Vector3Int, IslandInfo>();
     private readonly Dictionary<Vector3Int, TerrainTypeData> islandTerrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
-    private readonly List<IslandInfo> regionIslands = new List<IslandInfo>();
-    private readonly Dictionary<Vector3Int, IslandInfo> regionIslandByCell = new Dictionary<Vector3Int, IslandInfo>();
-    private string regionIslandSourceKey;
-    private RectInt regionIslandBounds;
+    private sealed class RegionIslandCatalog
+    {
+        public readonly List<IslandInfo> Islands = new List<IslandInfo>();
+        public readonly Dictionary<Vector3Int, IslandInfo> ByCell = new Dictionary<Vector3Int, IslandInfo>();
+    }
+    private readonly Dictionary<RectInt, RegionIslandCatalog> regionIslandCatalogs = new Dictionary<RectInt, RegionIslandCatalog>();
     private string islandSourceKey;
     private int islandCheckedFrame = -1;
     public IReadOnlyList<IslandInfo> Islands { get { EnsureIslands(); return islands; } }
@@ -80,16 +82,16 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
     public IReadOnlyList<IslandInfo> GetIslandsInRegion(RectInt region)
     {
         EnsureIslands();
-        if (regionIslandSourceKey == islandSourceKey && regionIslandBounds == region) return regionIslands;
+        if (regionIslandCatalogs.TryGetValue(region, out var cached)) return cached.Islands;
+        var catalog = new RegionIslandCatalog();
         var land = new Dictionary<Vector3Int, TerrainTypeData>();
         foreach (var entry in islandTerrainByCell)
             if (region.Contains(new Vector2Int(entry.Key.x, entry.Key.y))) land.Add(entry.Key, entry.Value);
         TryResolveTopology(out BoardTopologyIndex topology);
-        BuildIslandComponentsInto(land, ResolveMapId(topology, boardTilemap), regionIslands, regionIslandByCell);
-        ApplyIslandMembershipAndNames(regionIslands, regionIslandByCell);
-        regionIslandBounds = region;
-        regionIslandSourceKey = islandSourceKey;
-        return regionIslands;
+        BuildIslandComponentsInto(land, ResolveMapId(topology, boardTilemap), catalog.Islands, catalog.ByCell);
+        ApplyIslandMembershipAndNames(catalog.Islands, catalog.ByCell);
+        regionIslandCatalogs.Add(region, catalog);
+        return catalog.Islands;
     }
 
     private HashSet<TerrainTypeData> ResolveIslandTerrains()
@@ -129,7 +131,7 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
         string source = key.ToString();
         if (source == islandSourceKey) return;
         islands.Clear(); islandByCell.Clear(); islandTerrainByCell.Clear();
-        regionIslandSourceKey = null;
+        regionIslandCatalogs.Clear();
         if (boardTilemap == null || terrainDatabase == null) { islandSourceKey = source; return; }
         var land = new Dictionary<Vector3Int, TerrainTypeData>();
         // Terrain only. A road/bridge overlay never joins two islands across water.

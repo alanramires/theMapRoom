@@ -17,3 +17,10 @@ O recorte e aplicado ANTES da descoberta das ilhas, separando ligacoes por terra
 
 Teste adicional: tools/ai_test/verificar_ilhas_recorte_fixture.cs valida Q3 (4 ilhas e 207 tiles), nomes locais Lima/Delta/Alpha/Golf, troca de recorte e preservacao do catalogo global.
 
+
+### Autoria sem quadrante selecionado
+
+Na cena de autoria reconhecida pelo MundoData, a ausencia de AuthoringQuadrante NAO significa unir o mundo. O BeachManagerEditor enumera os quadrantes e analisa cada retangulo isoladamente antes de somar a visualizacao. A lista identifica o quadrante de cada ilha. Selecionar um quadrante no Map Helper/Axis Editor filtra a exibicao. O cache de GetIslandsInRegion agora e por retangulo, evitando redescobrir ilhas a cada repaint ao mostrar varios quadrantes. O catalogo geografico global continua independente da apresentacao de autoria.
+
+Regressao: tools/ai_test/verificar_ilhas_sem_recorte.cs, com Fixture aberta fora do Play, reproduz AuthoringQuadrante nulo e confirma quatro ilhas em Peixe Pequeno, sem componentes cruzando bordas de quadrantes. Tambem valida selecao Q3 e reuso do cache por retangulo.
+

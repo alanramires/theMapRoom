@@ -13,6 +13,22 @@ public sealed class BeachManagerEditor : Editor
     private static string focusedIslandId;
     private static string IslandPaintKey(BeachManager manager) => "BeachManager.PaintIslands." + manager.gameObject.scene.path;
     private static Color IslandColor(int index) => Color.HSVToRGB(Mathf.Repeat(index * 0.618034f, 1f), 0.7f, 1f);
+    private static readonly Dictionary<string, MundoData> authoringWorlds = new Dictionary<string, MundoData>();
+    private static MundoData AuthoringWorld(BeachManager manager)
+    {
+        if (Application.isPlaying || manager == null) return null;
+        string scene = manager.gameObject.scene.name;
+        if (authoringWorlds.TryGetValue(scene, out var cached)) return cached;
+        foreach (string guid in AssetDatabase.FindAssets("t:MundoData"))
+        {
+            var world = AssetDatabase.LoadAssetAtPath<MundoData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (world != null && world.authoringSceneName == scene)
+            { authoringWorlds[scene] = world; return world; }
+        }
+        authoringWorlds[scene] = null;
+        return null;
+    }
+
     private static RectInt? AuthoringRegion()
     {
         var q = Application.isPlaying ? null : InvasionAxisMap.AuthoringQuadrante;
@@ -20,8 +36,23 @@ public sealed class BeachManagerEditor : Editor
     }
     private static IReadOnlyList<BeachManager.IslandInfo> VisibleIslands(BeachManager manager)
     {
-        var region = AuthoringRegion();
-        return region.HasValue ? manager.GetIslandsInRegion(region.Value) : manager.Islands;
+        var world = AuthoringWorld(manager);
+        if (world == null) return manager.Islands; // Runtime board or a standalone map.
+        var active = InvasionAxisMap.AuthoringQuadrante;
+        var result = new List<BeachManager.IslandInfo>();
+        bool matched = false;
+        foreach (var q in world.AllQuadrantes())
+        {
+            if (active != null && active != q) continue;
+            matched = true;
+            var bounds = new RectInt(q.originX, q.originY, Mathf.Max(1, q.width), Mathf.Max(1, q.height));
+            result.AddRange(manager.GetIslandsInRegion(bounds));
+        }
+        // A helper selecting another world's map must not erase or merge this world's quadrants.
+        if (!matched && active != null)
+            foreach (var q in world.AllQuadrantes())
+                result.AddRange(manager.GetIslandsInRegion(new RectInt(q.originX, q.originY, Mathf.Max(1, q.width), Mathf.Max(1, q.height))));
+        return result;
     }
     private static bool VisibleCell(Vector3Int cell)
     {
@@ -47,6 +78,7 @@ public sealed class BeachManagerEditor : Editor
 
     static BeachManagerEditor()
     {
+        EditorApplication.projectChanged += authoringWorlds.Clear;
         SceneView.duringSceneGui -= DrawAllBeachStrips;
         SceneView.duringSceneGui += DrawAllBeachStrips;
     }
@@ -110,14 +142,20 @@ public sealed class BeachManagerEditor : Editor
 
         BeachManager manager = (BeachManager)target;
         EditorGUILayout.Space(6f);
-        bool painting = paintBeachStripsInSceneProp.boolValue;
+        bool painting = paintBeachStripsInSceneProp.boolValue || SessionState.GetBool(IslandPaintKey(manager), false);
         if (GUILayout.Button(
                 painting
-                    ? "Desligar pintura das faixas de praia"
-                    : "Pintar faixas de praia por cores"))
+                    ? "Desligar pintura (ilhas e praias)"
+                    : "Pintar ilhas e praias por cores"))
         {
             serializedObject.Update();
             paintBeachStripsInSceneProp.boolValue = !painting;
+            SessionState.SetBool(IslandPaintKey(manager), !painting);
+            if (painting && focusedIslandManager == manager)
+            {
+                focusedIslandManager = null;
+                focusedIslandId = null;
+            }
             serializedObject.ApplyModifiedProperties();
             EditorUtility.SetDirty(manager);
             SceneView.RepaintAll();
@@ -148,7 +186,9 @@ public sealed class BeachManagerEditor : Editor
         var authoring = Application.isPlaying ? null : InvasionAxisMap.AuthoringQuadrante;
         EditorGUILayout.HelpBox(authoring != null
             ? $"Recorte do Map Helper / Axis Editor: {authoring.displayName} ({authoring.quadranteId})."
-            : "Mapa inteiro. Na autoria, selecione um quadrante no Map Helper para recortar ilhas e praias.", MessageType.Info);
+            : AuthoringWorld(manager) != null
+                ? "Todos os quadrantes, analisados SEPARADAMENTE. Selecione Peixe Pequeno no Map Helper / Axis Editor para mostrar somente esse mapa."
+                : "Mapa da partida / mapa avulso.", MessageType.Info);
         bool paintIslands = SessionState.GetBool(IslandPaintKey(manager), false);
         bool nextPaint = EditorGUILayout.ToggleLeft("Colorir ilhas no Scene View", paintIslands);
         if (nextPaint != paintIslands)
@@ -168,6 +208,11 @@ public sealed class BeachManagerEditor : Editor
             EditorGUILayout.LabelField($"I{islandIndex + 1} - {island.DisplayName}", EditorStyles.boldLabel);
             if (GUILayout.Button("Focar", GUILayout.Width(55f))) FocusIsland(manager, island);
             EditorGUILayout.EndHorizontal();
+            var world = AuthoringWorld(manager);
+            if (world != null)
+                foreach (var q in world.AllQuadrantes())
+                    if (new RectInt(q.originX, q.originY, Mathf.Max(1, q.width), Mathf.Max(1, q.height)).Contains(new Vector2Int(island.RepresentativeCell.x, island.RepresentativeCell.y)))
+                    { EditorGUILayout.LabelField("Quadrante", $"{q.displayName} ({q.quadranteId})"); break; }
             EditorGUILayout.SelectableLabel(island.IslandId, GUILayout.Height(18f));
             EditorGUILayout.LabelField("Tiles / praias", $"{island.CellCount} / {island.BeachIds.Count}");
             EditorGUILayout.LabelField("Setores", string.Join(", ", island.Sectors), EditorStyles.wordWrappedLabel);
