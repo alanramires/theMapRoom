@@ -195,6 +195,8 @@ public class PanelDebugController : MonoBehaviour
             return;
 
         string command = NormalizeCommand(rawCommand);
+        if (command == "AI SHOW STEP" || command == "AI SHOW STEP ON" || command == "AI SHOW STEP OFF")
+            command = "SHOW AI STEP" + command.Substring("AI SHOW STEP".Length);
         bool executed = false;
 
         if (command == "DESTROY UNIT" || command == "REMOVE UNIT")
@@ -359,6 +361,12 @@ public class PanelDebugController : MonoBehaviour
                 cursorController?.PlayDoneSfx();
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
+        }
+        else if (TryParseSetHistoricalOwnerCommand(command, out bool firstOwner, out int historicalOwnerSlot))
+        {
+            executed = turnStateManager.TrySetHistoricalOwnerUnderCursorFromDebug(firstOwner, historicalOwnerSlot, out string message);
+            if (executed) cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message)) Debug.Log($"[Debug Command] {message}");
         }
         else if (TryParseSetOwnerCommand(command, out int ownerSlot))
         {
@@ -1024,6 +1032,19 @@ public class PanelDebugController : MonoBehaviour
         return int.TryParse(valueToken, out slotValue);
     }
 
+    private static bool TryParseSetHistoricalOwnerCommand(string command, out bool firstOwner, out int slot)
+    {
+        firstOwner = false; slot = -1;
+        if (string.IsNullOrWhiteSpace(command)) return false;
+        const string firstPrefix = "SET FIRST OWNER ";
+        const string originalPrefix = "SET ORIGINAL OWNER ";
+        string value;
+        if (command.StartsWith(firstPrefix)) { firstOwner = true; value = command.Substring(firstPrefix.Length); }
+        else if (command.StartsWith(originalPrefix)) value = command.Substring(originalPrefix.Length);
+        else return false;
+        return int.TryParse(value.Trim(), out slot);
+    }
+
     private static bool TryParseSetOwnerCommand(string normalizedCommand, out int slotValue)
     {
         slotValue = 0;
@@ -1078,6 +1099,8 @@ public class PanelDebugController : MonoBehaviour
             "refuel unit | rearm unit | repair unit\n" +
             "set construction team <slot> (nome legado; -1 deixa neutro)\n" +
             "set owner <slot> (alias; -1 deixa neutro)\n" +
+            "set first owner <slot> (-1 limpa o primeiro dono; nao muda regra de venda)\n" +
+            "set original owner <slot> (-1 = dono original neutro; nao muda dono atual)\n" +
             "set active team <slot> (troca participante ativo sem avancar turno)\n" +
             "set capture points <v>\n" +
             "set selling rules <free|original [slot]|first [slot]|disabled> (prédio no cursor)\n" +
@@ -1091,7 +1114,7 @@ public class PanelDebugController : MonoBehaviour
             "landing | emerge | submerge | take off | fast take off\n" +
             "fow on|off|partial | set fow <0-100>\n" +
             "panelrodada on|off - controla somente a cortina de privacidade\n" +
-            "show ai step [on|off] - alterna/abre/fecha a revisao sem aprovar\n" +
+            "show ai step [on|off] | ai show step [on|off] - alterna/abre/fecha a revisao sem aprovar\n" +
             "show axis | show eixos [slot] - eixos da base ao rally (1 vermelho, 2 laranja, 3 grafite); sem slot segue a vez\n" +
             "hide axis | hide eixos\n" +
             "ai pause | pause ai\n" +

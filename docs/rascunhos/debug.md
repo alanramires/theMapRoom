@@ -126,3 +126,13 @@ Comandos disponiveis no `panel_debug`.
 - A maioria dos comandos exige unidade sob o cursor.
 - Comandos de construcao exigem construcao sob o cursor.
 - `set money`, `set economy` e `fow` dependem de `MatchController`.
+
+### Donos historicos da construcao sob o cursor
+
+- set first owner <slot>: atualiza somente o primeiro dono e marca o registro como definido. Com -1 limpa o primeiro dono, permitindo defini-lo na proxima captura.
+- set original owner <slot>: atualiza somente o dono original. Com -1 registra dono original neutro.
+- set owner <slot>: comando existente, altera o dono ATUAL; -1 deixa neutro.
+
+Os dois novos comandos validam o slot configurado e preservam dono atual, outro dono historico e regra de venda. Os campos ja fazem parte do save. A alternativa existente set selling rules original/first <slot> tambem altera a regra de venda, portanto tem semantica diferente.
+
+Validacao fora do Play: tools/ai_test/verificar_debug_historical_owner.cs; compilacao sem erros.

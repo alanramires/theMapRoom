@@ -196,3 +196,9 @@ Marca T5/slot1, passo14: Apache #29 preferiu negar 7 de poder de captura ao #4 f
 
 AI Step informa capturando e prioridade=atrasarCaptura no motivo. Teste tools/ai_test/verificar_disruptor_capturando.cs passou fora do Play: sensor real, exclusao de transporte/embarcado/morto/aliado, regressao 6 vs 7 e ranking interno. Compilacao passou; repetir a marca para validar a escolha no tabuleiro real.
 
+
+### Chinook no ar nao bloqueia captura na superficie (06/11/2026)
+
+Marca T6/slot1, passo13: Chinook #18 fez somente vacate (3,5)->(4,6) antes de Pickup, embora estivesse na banda Air. TryBuildEmptyTransportCaptureTargetVacateAction agora consulta OccupancyResolver.CanEndMove com o capturador e apenas aquele transportador. Se podem coexistir, nao gera acao de desocupacao e deixa o roteador continuar normalmente em reparo/Pickup/papel. Nao acrescenta ordem de esperar nem impõe um destino de retorno; o fluxo normal escolhe quem buscar. Bloqueio real na superficie continua sujeito a desocupacao.
+
+Compilacao e tools/ai_test/verificar_chinook_ocupacao_aerea.cs passaram fora do Play: mesmo hex em Air nao intercepta Pickup; em Land o aliado ainda gera desocupacao. Nenhuma acao executada.

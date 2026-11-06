@@ -344,6 +344,11 @@ public partial class AIController
             return false;
         }
 
+        // Same hex is not a blockage: an airborne taxi must continue its pickup mission.
+        // Ask the occupancy authority about this transporter only, not other occupants.
+        if (OccupancyResolver.CanEndMove(capturer, fromCell, new[] { unit }))
+            return false;
+
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap,

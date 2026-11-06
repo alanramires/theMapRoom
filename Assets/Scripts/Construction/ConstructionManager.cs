@@ -832,6 +832,21 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
+    public void DebugSetHistoricalOwner(bool firstOwner, int ownerSlot)
+    {
+        if (firstOwner)
+        {
+            firstOwnerSlotIndex = ownerSlot;
+            firstOwnerInitialized = ownerSlot >= 0; // -1 clears the first capture owner.
+        }
+        else
+        {
+            originalOwnerSlotIndex = ownerSlot;
+            originalOwnerInitialized = true; // Original neutral ownership is valid.
+        }
+        RefreshRuntimeVisualState(force: true);
+    }
+
     // Debug/runtime: troca a regra de venda do pr�dio. Para OriginalOwner/FirstOwner, ownerSlot >= 0
     // define (e marca como inicializado) o slot dono correspondente, que � quem `CanProduceUnitsForTeam`
     // usa pra liberar a produ��o. Para FreeMarket/Disabled o ownerSlot � ignorado.

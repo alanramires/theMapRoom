@@ -1290,6 +1290,26 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    public bool TrySetHistoricalOwnerUnderCursorFromDebug(bool firstOwner, int ownerSlot, out string message)
+    {
+        message = string.Empty;
+        if (ownerSlot < -1 || (ownerSlot >= 0 && (matchController == null
+            || !matchController.IsValidPlayerSlot(PlayerSlotId.FromIndex(ownerSlot)))))
+        {
+            message = $"Slot invalido: {ownerSlot}. Use um slot configurado ou -1.";
+            return false;
+        }
+        if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cell, out message))
+            return false;
+        int before = firstOwner ? target.FirstOwnerSlotIndex : target.OriginalOwnerSlotIndex;
+        target.DebugSetHistoricalOwner(firstOwner, ownerSlot);
+        string label = firstOwner ? "First owner" : "Original owner";
+        message = $"{label}: {target.name} slot {before} -> {ownerSlot} em {FormatMapCellWithZ(cell)}."
+            + (firstOwner && ownerSlot == -1 ? " Primeiro dono limpo; a proxima captura o define." : "");
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
     public bool TrySetSellingRulesUnderCursorFromDebug(string ruleToken, int ownerSlot, out string message)
     {
         message = string.Empty;
