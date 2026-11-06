@@ -343,6 +343,15 @@ public partial class AIController
                         passenger, snapshot, fromCell, paths, out PlayerAction work))
                     return work;
 
+                // Sem nada para capturar a pe: anda ate a CABECA DE PRAIA — a celula do
+                // proprio componente mais perto do alvo do plano — e espera la (autor,
+                // 2026-11-06). Ja otimiza a LZ futura. Nao e o bug antigo: o destino sai
+                // das celulas que ele alcanca a pe, nunca da direcao cubica.
+                if (TryBuildAdvanceToBeachhead(
+                        passenger, snapshot, fromCell, paths, rideNeed.evaluatedTarget,
+                        out PlayerAction advance))
+                    return advance;
+
                 // ESPERAR NAO E EM CIMA DA FABRICA. Sem trabalho a pe, a espera tranca a
                 // compra daquele produtor no fim do turno (AI Step T4 azul: #26 aguardando
                 // carona em (1,14), na propria Fabrica Leve). Sai para o lado — a melhor
@@ -724,6 +733,87 @@ public partial class AIController
                   "plano segue pedindo carona)");
         action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
         action.DebugLabel = $"trabalha enquanto espera carona: rumo a {best.Sector}";
+        return true;
+    }
+
+    /// <summary>
+    /// Capturador ilhado sem trabalho a pe e sem carona: escolhe, entre as celulas que ele
+    /// alcanca A PE no proprio componente (caminho valido, orcamento do plano), a mais perto
+    /// do alvo do plano — na ilha, a cabeca de praia voltada para la — e avanca pelo caminho
+    /// ate onde der nesta rodada. Ja estando no ponto mais perto (empate inclusive), nao anda:
+    /// fica esperando, e o MelhorEmbarque encontra a LZ ali. Nunca termina em produtora
+    /// propria nem em celula ocupada ou ja planejada.
+    /// </summary>
+    private bool TryBuildAdvanceToBeachhead(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Vector3Int target,
+        out PlayerAction action)
+    {
+        action = null;
+        target.z = 0;
+        if (unit == null || snapshot == null || paths == null || target == Vector3Int.zero)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> longPaths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, WorkWhileWaitingBudget, terrainDatabase);
+        if (longPaths == null || longPaths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        float currentDistance = SectorManager.HexDistance(fromCell, target);
+        Vector3Int bestCell = fromCell;
+        float bestDistance = currentDistance;
+        int bestSteps = 0;
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> entry in longPaths)
+        {
+            Vector3Int cell = entry.Key;
+            cell.z = 0;
+            if (cell == fromCell || occupied.Contains(cell)
+                || IsOwnProductionCell(cell, snapshot.AITeam)
+                || (plannedDestinations != null && plannedDestinations.Contains(cell)))
+                continue;
+            float distance = SectorManager.HexDistance(cell, target);
+            int steps = entry.Value != null ? entry.Value.Count : 0;
+            if (distance < bestDistance || (distance == bestDistance && bestCell != fromCell && steps < bestSteps))
+            {
+                bestCell = cell;
+                bestDistance = distance;
+                bestSteps = steps;
+            }
+        }
+
+        // Ja no ponto mais perto do alvo (ou sem ganho): espera aqui.
+        if (bestCell == fromCell || bestDistance >= currentDistance)
+            return false;
+
+        List<Vector3Int> route = longPaths[bestCell];
+        Vector3Int moveCell = fromCell;
+        for (int i = route.Count - 1; i >= 0; i--)
+        {
+            Vector3Int step = route[i];
+            step.z = 0;
+            if (step == fromCell)
+                break;
+            if (paths.ContainsKey(step) && !occupied.Contains(step)
+                && !IsOwnProductionCell(step, snapshot.AITeam)
+                && (plannedDestinations == null || !plannedDestinations.Contains(step)))
+            {
+                moveCell = step;
+                break;
+            }
+        }
+        if (moveCell == fromCell)
+            return false;
+
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} sem trabalho a pe: avanca via {moveCell} " +
+                  $"para a cabeca de praia {bestCell} (dist {bestDistance:F0}h do alvo {target}; " +
+                  "espera a carona la)");
+        action = BuildVacateBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        action.DebugLabel = "aguarda carona na cabeca de praia";
         return true;
     }
 
