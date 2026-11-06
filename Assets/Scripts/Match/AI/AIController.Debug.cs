@@ -1217,7 +1217,21 @@ public partial class AIController
         else
         {
             GUILayout.Label($"#{record.id} | T{record.turn} slot {record.slot} fase {record.stage} | {record.status} | caixa ${record.moneyBefore}", textStyle);
-            GUILayout.Label("DECISAO\n" + record.decision, textStyle);
+            var decisionBoxStyle = new GUIStyle(GUI.skin.box)
+            {
+                padding = new RectOffset(10, 10, 8, 8),
+                margin = new RectOffset(0, 0, 6, 10)
+            };
+            GUILayout.BeginVertical(decisionBoxStyle);
+            var decisionStyle = new GUIStyle(textStyle)
+            {
+                fontStyle = FontStyle.Bold,
+                fontSize = (textStyle.fontSize > 0 ? textStyle.fontSize : 12) + 2
+            };
+            decisionStyle.normal.textColor = new Color(1f, 0.88f, 0.5f);
+            GUILayout.Label("DECISAO", new GUIStyle(textStyle) { fontStyle = FontStyle.Bold });
+            GUILayout.Label(record.decision, decisionStyle);
+            GUILayout.EndVertical();
             GUILayout.Label("MISSAO\n" + record.mission, textStyle);
             GUILayout.Label("MOTIVOS (logs reais da IA)\n" + (string.IsNullOrWhiteSpace(record.reasons) ? "Nenhum motivo registrado. Ative Show AI Logs." : record.reasons), textStyle);
             DrawAIReviewParticipants(record, textStyle);
