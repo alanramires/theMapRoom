@@ -1,15 +1,25 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-06, **depois** da tag `v10.0.1`.
+Ponto de retomada. Atualizado em 2026-11-06, **depois** da tag `v10.1.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v10.0.1` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.0.1.md`](relatorio_v10.0.1.md),
-[`relatorio_v10.0.0.md`](relatorio_v10.0.0.md).
+`v10.1.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.1.0.md`](relatorio_v10.1.0.md),
+[`relatorio_v10.0.1.md`](relatorio_v10.0.1.md), [`relatorio_v10.0.0.md`](relatorio_v10.0.0.md).
+
+**A descoberta da v10.1.0: a força aérea nasceu como cópia da terrestre.** Cada marca era uma
+suposição de chão vestida de ar. A regra do ar que apareceu: **o capturador põe dinheiro no
+prédio, o Disruptor tira dinheiro do inimigo** ("você não vai fazer dinheiro não!"). O papel
+`DisruptorDeCaptura` (Apache) tem como capitão o **poder de captura combinado** e atira pelo
+poder negado; o Bombardeiro (Disruptor secundário) nega a **escolta**. O shopping pede
+Disruptor em pares pelo poder de captura em trânsito. Vistos rodando: a âncora CCP, o tiro no
+soldado em vez do Chinook vazio, a demanda rompendo a poupança, o "trabalha enquanto espera".
+O resto só compilou. **O fechamento agora aponta docs de doutrina** (relatório, seção "Docs de
+doutrina"); a skill `consolidar-doutrina` escreve quando o autor quiser.
 
 **A descoberta da v10.0.1: a regra da ilha estava numa porta só.** O pacote 2/2/1 já trocava
 tanque por ar na ilha sem ligação por terra; o counter, o elite, o déficit de operação, a AA
@@ -302,6 +312,24 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v10.1.0 deixou — a força aérea no Peixe Pequeno
+
+1. **Ver rodando o que só compilou:** negação de escolta do Bombardeiro (`NegaEscolta:` no
+   tier), ganância no desembarque (`ganancia: #N desce…`), corrida pesando no MelhorEmbarque
+   (`corrida=x,y posicao=n/m`), espera fora da produtora e cabeça de praia
+   (`AIController.Capturer.Embark.cs`).
+2. **Foco no mesmo alvo** para dois Apaches ("concentrar, não dividir"): não existe; cada um
+   escolhe o seu (`TryResolveCaptureInterdictionAnchor`).
+3. **Docs de doutrina desatualizados:** a lista está no relatório v10.1.0 (Assalto.md,
+   magnetic_tabela.md, Papeis.md, ficha_do_papel.md, Capturador.md, Transporte.md, Shopping.md).
+   Nada pronto para consolidar ainda.
+4. **AICaptain.asset** continua sem leitor — decisão do autor: é o "guru"; migrar um papel por
+   vez, Disruptor como piloto.
+5. **Disruptor não aéreo** (drone de chão, sniper): o pipeline terrestre não tem a âncora CCP, e
+   o shopping o contaria como ataque aéreo.
+6. **Courier escolhe o rumo pelo primeiro passageiro** (`PassengerTarget`), não pelo destino mais
+   perto nem pela missão do transporte.
 
 ### O que a v10.0.1 deixou — ver rodando no Peixe Pequeno
 
@@ -704,6 +732,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **sensor de captura barra embarcado** | simular um passageiro numa célula de desembarque com o `SimulateCaptureSensor` normal nunca dá captura. Quem projeta o desembarque usa `PodeCapturarSensor.TryGetCaptureTargetAtCell(..., applyEmbarkedGate: false)` |
+| **"ar primeiro" vale para todo aéreo** | `ShouldConsiderAirCombatTarget` exclui alvo de chão se há aeronave atacável — é doutrina de caça; o Disruptor passa por fora. Antes de mudar o alvo de um aéreo, ver quem entra nos candidatos |
+| **o editor da ficha cortava `roles` em 1** | agora há Unit Secondary Role (`roles[1]`); qualquer leitura de papel deve usar `CanSatisfy`/`MatchesLabel`, não `roles[0] ==` |
+| **tag antes do churn** | no fechamento da v10.1.0 o churn entrou depois da tag (commit `b2a1213`). A tag não foi movida. Conferir `git status` antes do `git tag` |
 | **o plano persiste entre turnos** | quem já tem vaga não volta para a matriz de atribuição de capturadores. Mudar o custo da matriz não mexe nele, nem com `ai replan`. Antes de mexer num custo, conferir **quem entra** na atribuição |
 | **aeronave pousada é `Land`** | `GetDomain() != Air` não diz "não é aeronave": o Chinook no aeroporto pulava o teste de pouso. Perguntar à ficha (`IsAircraft`) |
 | **grep no arquivo do sensor não segue a delegação** | eu disse que o `PodePousar` não olhava ocupação; ele delega a `AircraftOperationRules`, onde ela mora. Seguir a chamada antes de dizer que um sensor não faz algo |
