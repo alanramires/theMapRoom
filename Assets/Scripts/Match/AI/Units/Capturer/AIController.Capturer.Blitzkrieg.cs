@@ -110,6 +110,14 @@ public partial class AIController
                 holdIfNoAttack = true;
         }
 
+        if (!holdIfNoAttack
+            && !IsBlitzAdvanceLandReachable(unit, advanceSector, snapshot.AITeam, out string noLandRoute))
+        {
+            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} cancela o blitz em {originSector}: {noLandRoute} — captura normal");
+            hardBlitzkriegHandoffs.Remove(unit.InstanceId);
+            return false;
+        }
+
         Vector3Int from = unit.CurrentCellPosition;
         from.z = 0;
         ConstructionManager target = FindCapturableInSector(advanceSector, snapshot.AITeam, from);
@@ -415,6 +423,44 @@ public partial class AIController
         }
 
         return ComputeForwardNeighborSector(sector, team);
+    }
+
+    // A PONTA SO REVEZA SE TEM PARA ONDE IR A PE. Largar um predio aberto para avancar so
+    // vale se o proximo alvo e alcancavel por terra a partir dela; se ele exige travessia
+    // naval ou aerea, ela larga o posto e fica parada na praia (Peixe Pequeno T3: #4 largou
+    // Bravo 10/20 rumo a Lima, do outro lado da agua). Sem rota, o blitz cancela e ela
+    // captura normal — o "o de tras paga" pressupoe que a ponta siga adiante.
+    // "Sem dado" (sem SectorManager, ficha nao terrestre, alvo sem celula) nao bloqueia:
+    // so "sem caminho" bloqueia.
+    private bool IsBlitzAdvanceLandReachable(UnitManager unit, ConstructionSector advanceSector,
+        TeamId team, out string reason)
+    {
+        reason = null;
+        if (unit == null || advanceSector == ConstructionSector.None)
+            return true;
+        if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Land)
+            return true;
+
+        Vector3Int from = unit.CurrentCellPosition;
+        from.z = 0;
+        ConstructionManager target = FindCapturableInSector(advanceSector, team, from);
+        Vector3Int cell;
+        if (target != null)
+            cell = target.CurrentCellPosition;
+        else if (SectorManager.TryGetSectorInfo(advanceSector, out SectorManager.SectorInfo info) && info != null)
+            cell = info.RepresentativeCell;
+        else
+            return true;
+        cell.z = 0;
+
+        if (!SectorManager.TryBuildLandMovementDistanceToTargetMap(cell, data, out Dictionary<Vector3Int, int> map)
+            || map == null || map.Count == 0)
+            return true;
+        if (map.ContainsKey(from))
+            return true;
+
+        reason = $"{advanceSector} ({cell.x},{cell.y}) sem rota terrestre a partir de ({from.x},{from.y})";
+        return false;
     }
 
     private static ConstructionManager FindBlitzkriegConstruction(int instanceId)

@@ -96,6 +96,24 @@ public partial class AIController
             bool frontBlocksTarget = FazHandoffEmProfundidade && assignedPos0 == targetCell
                 && ComputeBlitzkriegForwardSector(obj.Sector, aiTeam) != ConstructionSector.None;
 
+            // Ponta EM CIMA do predio so reveza se o proximo alvo dela e alcancavel por terra
+            // (IsBlitzAdvanceLandReachable). Mesmo calculo de destino da execucao: a ponta de
+            // outro objetivo segue para o dela; a da casa avanca pelo eixo/vizinho a frente.
+            if (assignedPos0 == targetCell)
+            {
+                ConstructionSector leaderAdvance = foreignLeader != null
+                    ? ResolveBlitzkriegAdvanceSector(obj.Sector, ResolveAssignedObjective(assignedUnit, plan), aiTeam)
+                    : FazHandoffEmProfundidade
+                        ? ComputeBlitzkriegForwardSector(obj.Sector, aiTeam)
+                        : ComputeForwardNeighborSector(obj.Sector, aiTeam);
+                if (!IsBlitzAdvanceLandReachable(assignedUnit, leaderAdvance, aiTeam, out string noLandRoute))
+                {
+                    Debug.Log($"{TL("Handoff")}[Skip] Unit{assignedUnit.InstanceId} fica e fecha {obj.Sector} " +
+                              $"({pts}/{max}): {noLandRoute} — blitz cancelado");
+                    continue;
+                }
+            }
+
             UnitManager substitute   = null;
             SlotNeed substituteExistingSlot = null;
             float       bestSubScore = float.MinValue;
