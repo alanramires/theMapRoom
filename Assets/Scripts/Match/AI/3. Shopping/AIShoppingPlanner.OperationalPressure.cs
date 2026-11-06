@@ -44,6 +44,13 @@ public partial class AIShoppingPlanner
         public int ActiveLogistics;
         public int DesiredLogistics;
         public int LogisticsGap;
+        // Fila de carona (PressaoCaronaService): capturador do plano ilhado contra banco aereo livre.
+        public PressaoCaronaLeitura RideQueue;
+        public int RideSeatsPerAirBus;
+        public int RideAirBusesShort;
+        // Preenchidos ao virar demanda: o que as operacoes ja pediam e o piso aplicado.
+        public int RideAirPlanDemand;
+        public int RideAirFloor;
     }
 
     public static OperationalPressureInspection InspectOperationalPressure(
@@ -58,7 +65,53 @@ public partial class AIShoppingPlanner
             return result;
         BuildTransportOperationalPressure(snapshot, result);
         BuildLogisticsOperationalPressure(snapshot, result);
+        BuildRideQueuePressure(snapshot, result);
         return result;
+    }
+
+    // Teto da fila de carona: no maximo +N onibus aereos ACIMA do que as operacoes ja pedem
+    // por turno. 15 ilhados contra 4 bancos dariam ~6 Chinooks de uma vez; sem teto a compra
+    // trocava o vicio da AAA pelo do Chinook.
+    public const int RideQueueMaxExtraAirBuses = 2;
+
+    private static void BuildRideQueuePressure(
+        AIWorldSnapshot snapshot,
+        OperationalPressureInspection result)
+    {
+        if (AIController.Instance == null)
+            return;
+        result.RideQueue = PressaoCaronaService.Read(AIController.Instance, snapshot.AISlotIndex);
+        result.RideSeatsPerAirBus = ResolveCheapestAirTransportSeats(snapshot);
+        int shortage = result.RideQueue.StrandedAirSeatShortage;
+        result.RideAirBusesShort = shortage > 0 && result.RideSeatsPerAirBus > 0
+            ? Mathf.CeilToInt(shortage / (float)result.RideSeatsPerAirBus)
+            : 0;
+    }
+
+    // Bancos do transporte aereo MAIS BARATO que algum produtor nosso oferta (o que a compra
+    // compraria). Zero = nao ha onibus aereo na oferta, e a fila nao vira demanda.
+    private static int ResolveCheapestAirTransportSeats(AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.MyBuildings == null)
+            return 0;
+        UnitData cheapest = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && unit.isTransporter && unit.domain == Domain.Air
+                    && unit.transportSlots != null && unit.transportSlots.Count > 0
+                    && (cheapest == null || unit.cost < cheapest.cost))
+                    cheapest = unit;
+        }
+        if (cheapest == null)
+            return 0;
+        int seats = 0;
+        foreach (var slot in cheapest.transportSlots)
+            seats += Mathf.Max(1, slot.capacity);
+        return seats;
     }
 
     private static void BuildTransportOperationalPressure(
@@ -353,6 +406,33 @@ public partial class AIShoppingPlanner
                 + $"(frota={pressure.ActiveTransports})", false);
             transport.Domain = Domain.Land;
             MergeRoleDemand(demands, transport, false);
+        }
+
+        // FILA DE CARONA: PISO, nao soma. As operacoes de airlift ja pedem Chinook por
+        // objetivo (origem "operation"); a fila so sobe esse numero quando ha mais ilhados do
+        // plano que bancos aereos livres, e no maximo +RideQueueMaxExtraAirBuses. O merge sem
+        // somar (Max) faz o piso: demanda de operacao maior que a fila fica como esta.
+        if (pressure.RideAirBusesShort > 0)
+        {
+            int planAir = 0;
+            foreach (AIShoppingDemand d in demands)
+                if (d != null && d.Count > 0 && d.Role == UnitRole.Transportador && d.Domain == Domain.Air)
+                    planAir += d.Count;
+            int floor = Mathf.Min(pressure.RideAirBusesShort, planAir + RideQueueMaxExtraAirBuses);
+            pressure.RideAirPlanDemand = planAir;
+            pressure.RideAirFloor = floor;
+            if (floor > planAir)
+            {
+                PressaoCaronaLeitura q = pressure.RideQueue;
+                AIShoppingDemand ride = NewRoleDemand(UnitRole.Transportador, floor, 15,
+                    "fila-carona",
+                    $"ilhados do plano={q.Count(PressaoCaronaCategoria.IlhadoComPlano)} "
+                    + $"bancos aereos livres={q.AirSeatsFree}/{q.AirSeatsTotal} "
+                    + $"faltam {pressure.RideAirBusesShort} onibus ({pressure.RideSeatsPerAirBus} bancos cada), "
+                    + $"operacoes pediam {planAir}, piso {floor}", false);
+                ride.Domain = Domain.Air;
+                MergeRoleDemand(demands, ride, false);
+            }
         }
 
         if (pressure.LogisticsGap > 0)

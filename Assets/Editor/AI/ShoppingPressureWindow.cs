@@ -908,6 +908,15 @@ public class ShoppingPressureWindow : EditorWindow
         EditorGUILayout.LabelField(
             $"transportes: cobertura {pressure.ActiveTransports}/{pressure.DesiredTransports}  gap={pressure.TransportGap}",
             _subtle);
+        if (pressure.RideQueue != null)
+            EditorGUILayout.LabelField(
+                $"fila de carona: {PressaoCaronaWindow.Summary(pressure.RideQueue)}  →  "
+                + (pressure.RideAirBusesShort > 0
+                    ? $"faltam {pressure.RideAirBusesShort} ônibus aéreo(s) ({pressure.RideSeatsPerAirBus} bancos cada), "
+                      + $"teto +{AIShoppingPlanner.RideQueueMaxExtraAirBuses} acima das operações"
+                    : "sem falta")
+                + "  (Tools/Transporte/Pressao Carona)",
+                _subtle);
 
         foreach (AIShoppingPlanner.AxisTransportPressureInspection axis in pressure.Axes)
         {
