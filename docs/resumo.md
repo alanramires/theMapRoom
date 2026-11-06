@@ -1,15 +1,28 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-06, **depois** da tag `v10.1.0`.
+Ponto de retomada. Atualizado em 2026-11-06, **depois** da tag `v10.2.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v10.1.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.1.0.md`](relatorio_v10.1.0.md),
-[`relatorio_v10.0.1.md`](relatorio_v10.0.1.md), [`relatorio_v10.0.0.md`](relatorio_v10.0.0.md).
+`v10.2.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.2.0.md`](relatorio_v10.2.0.md),
+[`relatorio_v10.1.0.md`](relatorio_v10.1.0.md), [`relatorio_v10.0.1.md`](relatorio_v10.0.1.md).
+
+**A descoberta da v10.2.0: a compra gastava o dinheiro do elite em qualquer urgência.** Três AAA,
+um Apache, uma Metranca — e os caças nunca nasciam. Romper a poupança passou a ser **no tamanho
+da demanda**, a AA escala (1 urgente por turno), Chinook não conta no anel quando há Disruptor, e
+a escolta que não cabe **segura o caixa e passa a vez** (a mesma régua `EliteSaveTurns` da
+poupança do elite). Com a folga da conscrição (para aos 55% do teto), o Médio comprou Caça B em
+Play. A fila de carona agora é contada (`PressaoCaronaService`): ~4× mais pedidos que bancos,
+quase todos ilhados — **os corpos da conscrição nascem ilhados** quando a ilha de casa fecha.
+
+**A v10.2.0 também preparou o jogo para outra pessoa jogar:** `Tools ▸ Publicação ▸ Checklist`
+(debug das cenas do build, texturas Web 512/1024, Web sem LTO), volume geral e da música no
+`Panel_Config`, estrada inteira no mapa da Campanha. As práticas vieram da Mi'Larhys — ler os
+menus `Tools/Mylarhis/*` e o resumo dela, não só copiar a casca.
 
 **A descoberta da v10.1.0: a força aérea nasceu como cópia da terrestre.** Cada marca era uma
 suposição de chão vestida de ar. A regra do ar que apareceu: **o capturador põe dinheiro no
@@ -312,6 +325,24 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v10.2.0 deixou — compra aérea e o primeiro build para fora
+
+1. **Ver rodando o que só compilou:** swap pelo Tático da vizinhança
+   (`AIController.Capturer.Swap.cs`), o piso de Chinook da fila de carona (origem `fila-carona`
+   no log do carrinho), a estrada do fundo em "Selecione o Mapa" (precisa do "Assar TODOS
+   (quadrantes + fundos)") e a guarda do Panel_helper.
+2. **Por qual caminho o Caça B saiu:** "escolta segura o caixa" num turno e o caça no seguinte,
+   ou caça direto pela folga da conscrição. A próxima marca de compra de caça responde.
+3. **Freio da conscrição pela fila de carona** (parar o imposto quando ilhados > bancos aéreos
+   livres): proposto, decisão do autor.
+4. **Metranca contra inimigo fora da ilha:** a pressão de counter só desconta o `foraDaTerra`
+   ao escolher quem responde; com o Aeroporto ocupado a demanda urgente cai na Fábrica Leve.
+5. **No build Web:** volume persiste ao reabrir? Retrato e logo em 1024 ficaram nítidos?
+6. **Batalha com `isAI` 0 nos dois slots, `aiStep`/`hardMode` desligados, massacre 0.5:** é
+   autoria do autor (commit `6e827eb`); não conferi se a Nova Partida sobrescreve o `isAI`.
+7. **Docs de doutrina:** lista no relatório v10.2.0 (Capturador.md — o swap ainda diz "mesmo
+   objetivo" e "HP cru" —, Shopping.md §6, Transporte.md, FireSupport.md).
 
 ### O que a v10.1.0 deixou — a força aérea no Peixe Pequeno
 
@@ -732,6 +763,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **"Voltar ao debug" só restaura o que o "Preparar" mudou** | flag desligada à mão antes do Preparar não entra no backup (`UserSettings/PublicacaoChecklist.json`). No fechamento da v10.2.0, cinco flags da Batalha (Start On Pause, atalhos, HUD e logs da IA) só voltaram pelo valor do HEAD |
+| **a raiz do prefab é override em cada cena** | aumentar o `Panel_Config` no prefab não chegava nas cenas: tamanho e posição da raiz ficam gravados na instância. Mexer no prefab E nas três instâncias |
+| **liberar a poupança sem fechar a peça** | soltar a reserva do elite para uma demanda que não cabe só entrega o dinheiro a outra demanda. Rompe se compra; senão, segura o caixa |
+| **"trazer a ideia da Mi'Larhys"** | é trazer as práticas (menus `Tools/Mylarhis/*`, resumo dela), não o formato da janela |
 | **sensor de captura barra embarcado** | simular um passageiro numa célula de desembarque com o `SimulateCaptureSensor` normal nunca dá captura. Quem projeta o desembarque usa `PodeCapturarSensor.TryGetCaptureTargetAtCell(..., applyEmbarkedGate: false)` |
 | **"ar primeiro" vale para todo aéreo** | `ShouldConsiderAirCombatTarget` exclui alvo de chão se há aeronave atacável — é doutrina de caça; o Disruptor passa por fora. Antes de mudar o alvo de um aéreo, ver quem entra nos candidatos |
 | **o editor da ficha cortava `roles` em 1** | agora há Unit Secondary Role (`roles[1]`); qualquer leitura de papel deve usar `CanSatisfy`/`MatchesLabel`, não `roles[0] ==` |
