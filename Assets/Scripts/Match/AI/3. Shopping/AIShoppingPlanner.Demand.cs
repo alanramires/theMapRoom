@@ -1424,17 +1424,20 @@ public partial class AIShoppingPlanner
         // Chinooks carregados nao esperam dois turnos de economia (AI Step T3 amarelo: $10151
         // guardados para o Bombardeiro, nenhum Apache). O compromisso continua gravado; quando
         // os pares de Disruptor fecharem, a demanda some e a poupanca volta sozinha.
-        AIShoppingDemand disruptorDemand = demands.Find(d => d != null && d.Count > 0
-            && string.Equals(d.Origin, "disruptor", System.StringComparison.Ordinal));
         // Rompe NO TAMANHO DA DEMANDA, nunca o caixa todo: zerar a reserva abria o dinheiro do
         // Bombardeiro para qualquer um, e a AAA urgente (+250000 no score) levou tudo — AI Step
         // T5 amarelo: Apache + 3 AAA, $2500 de sobra, compromisso de T3 jogado fora.
-        if (reserve > 0 && disruptorDemand != null)
+        // A ESCOLTA (o nosso poder de captura sendo mordido) rompe do mesmo jeito. Contains, e
+        // nao igualdade: o MergeRoleDemand concatena a origem ("operation+escolta").
+        foreach (string airOrigin in new[] { "disruptor", "escolta" })
         {
-            int release = Mathf.Min(reserve, EstimateDemandCost(snapshot, disruptorDemand));
+            AIShoppingDemand airDemand = demands.Find(d => d != null && d.Count > 0
+                && d.Origin != null && d.Origin.Contains(airOrigin));
+            if (reserve <= 0 || airDemand == null)
+                continue;
+            int release = Mathf.Min(reserve, EstimateDemandCost(snapshot, airDemand));
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
-                + $"poder de captura inimigo em transito libera {release} da reserva elite ({reserve}): "
-                + $"{disruptorDemand.Reason}");
+                + $"{airOrigin} libera {release} da reserva elite ({reserve}): {airDemand.Reason}");
             reserve -= release;
             hasStrategicReserve = reserve > 0 && reserveTarget != null;
         }
@@ -3108,6 +3111,29 @@ public partial class AIShoppingPlanner
             }
         }
 
+        // ESCOLTA: o espelho do espelho. O Disruptor nasce do poder de captura INIMIGO em
+        // transito; a escolta nasce do NOSSO sendo mordido: Disruptor inimigo no ar e o nosso
+        // comboio aereo de pe. "Caca B surge como resposta ao numero de disruptores em voo e a
+        // quantidade de chinooks aliados avariados — a operacao de captura esta sendo atrasada
+        // pelos insetos" (autor, 2026-11-06). Comboio e coisa que ANDA: a AA cobre o que esta
+        // parado, o caca vai junto. Sem transporte aereo nosso nao ha quem escoltar; sem fabrica
+        // de Interceptador, gate inaplicavel.
+        int enemyDisruptorsInAir = CountEnemyAirDisruptors(snapshot);
+        int ownAirTransports = CountOwnAirTransports(snapshot, out int damagedAirTransports);
+        if (enemyDisruptorsInAir > 0 && ownAirTransports > 0
+            && CanAnyOwnProducerOffer(snapshot, UnitRole.Interceptador))
+        {
+            int desiredEscorts = Mathf.Min(EscortDemandCap,
+                Mathf.CeilToInt((enemyDisruptorsInAir + damagedAirTransports) / 2f));
+            int activeEscorts = CountAtomicRole(snapshot, UnitRole.Interceptador);
+            if (activeEscorts < desiredEscorts)
+                MergeRoleDemand(demands, NewRoleDemand(UnitRole.Interceptador,
+                    desiredEscorts - activeEscorts, 12, "escolta",
+                    $"disruptores inimigos no ar={enemyDisruptorsInAir}; transportes aereos nossos="
+                    + $"{ownAirTransports} (avariados={damagedAirTransports}); escoltas="
+                    + $"{activeEscorts}/{desiredEscorts}", false), false);
+        }
+
         int enemyArtillery = CountEnemyCombatRole(snapshot, UnitRole.FogoIndireto);
         if (enemyArtillery >= 3 && CountOwnedAirAttack(snapshot, eliteOnly: true) == 0)
         {
@@ -4329,6 +4355,43 @@ public partial class AIShoppingPlanner
 
     // Teto da demanda de Disruptor: dois pares.
     private const int DisruptorDemandCap = 4;
+
+    // Teto da escolta: caca custa o dobro do Apache; um par e meio ja cobre o enxame.
+    private const int EscortDemandCap = 3;
+
+    // Disruptores inimigos aereos visiveis (o rotulo primario, nao o secundario do Bombardeiro:
+    // ele nega a escolta no chao, nao morde o comboio no ar).
+    private static int CountEnemyAirDisruptors(AIWorldSnapshot snapshot)
+    {
+        int count = 0;
+        if (snapshot?.EnemyUnits == null)
+            return 0;
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+            if (enemy != null && !enemy.IsDead && enemy.TryGetUnitData(out UnitData data) && data != null
+                && data.IsAircraft() && data.roles != null && data.roles.Count > 0
+                && data.roles[0] == UnitRole.DisruptorDeCaptura)
+                count++;
+        return count;
+    }
+
+    // Nossos transportes aereos (o comboio a escoltar) e quantos estao avariados.
+    private static int CountOwnAirTransports(AIWorldSnapshot snapshot, out int damaged)
+    {
+        damaged = 0;
+        int count = 0;
+        if (snapshot?.MyUnits == null)
+            return 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || !unit.TryGetUnitData(out UnitData data) || data == null
+                || !data.isTransporter || !data.IsAircraft())
+                continue;
+            count++;
+            if (data.maxHP > 0 && unit.CurrentHP < data.maxHP)
+                damaged++;
+        }
+        return count;
+    }
 
     // Transportes inimigos visiveis (no snapshot) levando poder de captura a bordo. O proprio
     // poder do transportador nao conta: a pergunta e "quanto dinheiro esta em transito".
