@@ -1558,7 +1558,11 @@ public class PanelHelperController : MonoBehaviour
 
     private void EnsureTimeoutProgressBar()
     {
-        if (!Application.isPlaying || timeoutProgressRoot != null || helperRect == null)
+        // Prefab Asset nao tem cena valida: o OnValidate tambem roda nele durante o Play
+        // e o build, e ai isPlaying nao basta — o SetParent e recusado e o objeto novo
+        // fica orfao na raiz da cena.
+        if (!Application.isPlaying || !gameObject.scene.IsValid()
+            || timeoutProgressRoot != null || helperRect == null)
             return;
 
         timeoutProgressRoot = new GameObject("helper_timeout_progress", typeof(RectTransform), typeof(Image));
@@ -4819,7 +4823,10 @@ public class PanelHelperController : MonoBehaviour
         // A alca e apresentacao runtime. OnValidate tambem passa por
         // TryAutoAssignReferences ao inspecionar Prefab Assets; criar/reparentear
         // objetos nesse contexto deixa GameObjects orfaos e pode corromper o prefab.
-        if (!Application.isPlaying || helperRect == null || dragHandleRoot != null)
+        // isPlaying sozinho nao basta: durante o Play o OnValidate roda tambem no Prefab
+        // Asset (cena invalida). Ver EnsureTimeoutProgressBar.
+        if (!Application.isPlaying || !gameObject.scene.IsValid()
+            || helperRect == null || dragHandleRoot != null)
             return;
 
         Transform existing = helperRect.Find("helper_drag_handle");
