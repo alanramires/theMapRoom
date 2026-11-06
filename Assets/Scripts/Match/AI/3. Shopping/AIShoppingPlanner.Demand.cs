@@ -1426,13 +1426,17 @@ public partial class AIShoppingPlanner
         // os pares de Disruptor fecharem, a demanda some e a poupanca volta sozinha.
         AIShoppingDemand disruptorDemand = demands.Find(d => d != null && d.Count > 0
             && string.Equals(d.Origin, "disruptor", System.StringComparison.Ordinal));
+        // Rompe NO TAMANHO DA DEMANDA, nunca o caixa todo: zerar a reserva abria o dinheiro do
+        // Bombardeiro para qualquer um, e a AAA urgente (+250000 no score) levou tudo — AI Step
+        // T5 amarelo: Apache + 3 AAA, $2500 de sobra, compromisso de T3 jogado fora.
         if (reserve > 0 && disruptorDemand != null)
         {
+            int release = Mathf.Min(reserve, EstimateDemandCost(snapshot, disruptorDemand));
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
-                + $"poder de captura inimigo em transito rompe a reserva elite ({reserve}): "
+                + $"poder de captura inimigo em transito libera {release} da reserva elite ({reserve}): "
                 + $"{disruptorDemand.Reason}");
-            reserve = 0;
-            hasStrategicReserve = false;
+            reserve -= release;
+            hasStrategicReserve = reserve > 0 && reserveTarget != null;
         }
         {
             var saving = new System.Text.StringBuilder();
@@ -3054,7 +3058,7 @@ public partial class AIShoppingPlanner
         int visibleAir = CountEnemyAirInRing(snapshot, out int airSeen);
         if (airSeen > visibleAir)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] ameaca aerea: "
-                + $"{visibleAir}/{airSeen} aeronave(s) visiveis dentro do anel — as de fora nao pedem AA urgente");
+                + $"{visibleAir}/{airSeen} aeronave(s) visiveis dentro do anel — as de fora, e transporte quando ha Disruptor na oferta, nao pedem AA urgente");
         if (visibleAir > 0)
         {
             int activeAA = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
@@ -3065,8 +3069,19 @@ public partial class AIShoppingPlanner
                 UnitRole exact = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
                     <= CountAtomicRole(snapshot, UnitRole.Antiaereo)
                     ? UnitRole.AntiaereoCombatente : UnitRole.Antiaereo;
-                MergeRoleDemand(demands, NewRoleDemand(UnitRole.Antiaereo, desiredAA - activeAA, 8,
-                    "threat", $"aeronaves visiveis={visibleAir}", true, exact), false);
+                // ESCALADA: uma AA urgente por turno. A urgencia (+250000) passa na frente de
+                // tudo; de 0 a 3 num turno so (AI Step T5 amarelo) ela comia o caixa inteiro.
+                // O resto disputa como demanda comum, e volta urgente no turno seguinte se a
+                // ameaca seguir no anel.
+                int missing = desiredAA - activeAA;
+                MergeRoleDemand(demands, NewRoleDemand(UnitRole.Antiaereo, 1, 8,
+                    "threat", $"aeronaves visiveis={visibleAir} (1 urgente/turno)", true, exact), false);
+                // Sem ExactRole de proposito: com o mesmo exato, o MergeRoleDemand fundiria esta
+                // na urgente (Urgent |=) e as tres voltariam urgentes. Assim ela se funde com a
+                // vaga antiaerea comum do pacote, se houver.
+                if (missing > 1)
+                    MergeRoleDemand(demands, NewRoleDemand(UnitRole.Antiaereo, missing - 1, 15,
+                        "threat-followup", $"aeronaves visiveis={visibleAir}, restante sem urgencia", false), false);
             }
         }
 
@@ -4351,6 +4366,26 @@ public partial class AIShoppingPlanner
         return count;
     }
 
+    // Custo de atender a demanda: a oferta mais barata que a satisfaz, vezes a contagem.
+    // Sem oferta, zero (nada a liberar).
+    private static int EstimateDemandCost(AIWorldSnapshot snapshot, AIShoppingDemand demand)
+    {
+        if (snapshot?.MyBuildings == null || demand == null || demand.Count <= 0)
+            return 0;
+        int cheapest = int.MaxValue;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && unit.cost > 0 && unit.cost < cheapest
+                    && UnitRoleCompatibility.CanSatisfy(unit, demand.Role))
+                    cheapest = unit.cost;
+        }
+        return cheapest == int.MaxValue ? 0 : cheapest * demand.Count;
+    }
+
     private static bool CanAnyOwnProducerOffer(AIWorldSnapshot snapshot, UnitRole role)
     {
         if (snapshot?.MyBuildings == null)
@@ -4380,6 +4415,12 @@ public partial class AIShoppingPlanner
         if (island != null && island.Island == null && island.Reach == null)
             island = null;
 
+        // UMA AMEACA, UMA RESPOSTA. A ameaca do transporte e o poder de captura que ele leva, e
+        // a resposta a isso e o Disruptor (demanda propria, "disruptor"). Contar o Chinook aqui
+        // tambem pedia AAA para o mesmo alvo (AI Step T5 amarelo: Apache + 3 AAA pelos mesmos tres
+        // Chinooks). Sem Disruptor na oferta, a AA volta a ser a unica resposta e ele conta.
+        bool disruptorAnswersTransports = CanAnyOwnProducerOffer(snapshot, UnitRole.DisruptorDeCaptura);
+
         var ours = new HashSet<Vector3Int>();
         if (snapshot.MyBuildings != null)
             foreach (ConstructionManager b in snapshot.MyBuildings)
@@ -4394,6 +4435,9 @@ public partial class AIShoppingPlanner
                 || data == null || data.domain != Domain.Air)
                 continue;
             seen++;
+            if (disruptorAnswersTransports && data.roles != null && data.roles.Count > 0
+                && UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.Transportador))
+                continue;
 
             // Sem tabuleiro nao ha como medir: conta, como antes (falha conservadora).
             if (board == null)
