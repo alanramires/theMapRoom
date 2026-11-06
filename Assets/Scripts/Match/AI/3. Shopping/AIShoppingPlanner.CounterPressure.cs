@@ -23,6 +23,12 @@ public partial class AIShoppingPlanner
         public float Unmet;
         internal readonly Dictionary<UnitData, float> UnitTypeScores =
             new Dictionary<UnitData, float>();
+        // Parte do score de cada tipo que vem de inimigos FORA DA NOSSA TERRA (ilha sem
+        // ligacao por terra e o inimigo em outra ilha). A ameaca continua contando; quem
+        // perde valor e a RESPOSTA terrestre, que nao chega nele (not_in_reach).
+        internal readonly Dictionary<UnitData, float> UnitTypeOffLandScores =
+            new Dictionary<UnitData, float>();
+        public int OffLandCount;
     }
 
     public sealed class CounterPressureInspection
@@ -47,6 +53,7 @@ public partial class AIShoppingPlanner
         public int SensorContacts;
         public int CombatContacts;
         public int AnonymousThreatSignals;
+        public int OffLandUnits;
 
         public float Get(WeaponCategory category)
         {
@@ -382,6 +389,12 @@ public partial class AIShoppingPlanner
             }
         }
 
+        // Ilha sem ligacao por terra: o inimigo de terra em OUTRA ilha nao e alcancavel por
+        // resposta terrestre. Com a ilha ligada (ou sem dado) a sonda e nula e nada muda.
+        OwnLandProbe ownLand = IsGroundCutOffFromEnemy(snapshot, log: false)
+            ? BuildOwnLandProbe(snapshot)
+            : null;
+
         if (snapshot.EnemyUnits != null)
         foreach (UnitManager enemy in snapshot.EnemyUnits)
         {
@@ -390,7 +403,10 @@ public partial class AIShoppingPlanner
 
             visibleIds.Add(enemy.InstanceId);
             float score = ComputeEnemyCounterWeight(enemy, data, roster);
-            AddPressure(result, byClass, data, score, visible: true);
+            Vector3Int cell = enemy.CurrentCellPosition; cell.z = 0;
+            bool offLand = ownLand != null && !enemy.IsEmbarked && enemy.GetDomain() == Domain.Land
+                && !ownLand.Contains(cell);
+            AddPressure(result, byClass, data, score, visible: true, offLand: offLand);
         }
 
         if (contacts != null)
@@ -413,7 +429,9 @@ public partial class AIShoppingPlanner
                 float recency = Mathf.Lerp(0.35f, 0.85f, 1f - age / (float)lookback);
                 float confidence = Mathf.Clamp01(memory.confidence);
                 float score = ComputeEnemyCounterWeight(null, data, roster) * recency * confidence;
-                AddPressure(result, byClass, data, score, visible: false);
+                Vector3Int last = memory.lastKnownCell; last.z = 0;
+                bool offLand = ownLand != null && data.domain == Domain.Land && !ownLand.Contains(last);
+                AddPressure(result, byClass, data, score, visible: false, offLand: offLand);
             }
         }
 
@@ -519,6 +537,11 @@ public partial class AIShoppingPlanner
         return best;
     }
 
+    // Quanto sobra do encaixe de uma resposta terrestre contra inimigo fora da nossa terra.
+    // Baixa, nao zera: sem nenhuma resposta aerea ofertada, a terrestre ainda e a melhor
+    // que existe (e a invasao religa tudo de qualquer jeito).
+    private const float CounterOffLandReachFactor = 0.1f;
+
     private static float ComputeCounterCoverageFit(UnitData unit, EnemyClassPressureInspection enemyClass)
     {
         if (unit == null || enemyClass == null || enemyClass.UnitTypeScores.Count == 0)
@@ -542,6 +565,17 @@ public partial class AIShoppingPlanner
             float fit = evaluation.IsValid && evaluation.WeaponCategory == enemyClass.CounterCategory
                 ? evaluation.Coverage
                 : 0f;
+            // not_in_reach: resposta TERRESTRE contra inimigo fora da nossa terra vale pouco.
+            // O mesmo fator pesa a compra e a cobertura das nossas unidades: o MBT parado na
+            // ilha nao "cobre" o MBT do outro lado, entao a pressao fica em aberto e a
+            // resposta que chega (Apache, bombardeiro) e que fecha.
+            if (fit > 0f && unit.domain == Domain.Land
+                && enemyClass.UnitTypeOffLandScores.TryGetValue(pair.Key, out float offLand)
+                && offLand > 0f)
+            {
+                float offShare = Mathf.Clamp01(offLand / pair.Value);
+                fit *= 1f - offShare * (1f - CounterOffLandReachFactor);
+            }
             weightedFit += fit * pair.Value;
             totalWeight += pair.Value;
         }
@@ -579,7 +613,8 @@ public partial class AIShoppingPlanner
         Dictionary<GameUnitClass, EnemyClassPressureInspection> byClass,
         UnitData data,
         float score,
-        bool visible)
+        bool visible,
+        bool offLand = false)
     {
         WeaponCategory counter = CounterCategoryFor(data.unitClass);
         if (!byClass.TryGetValue(data.unitClass, out EnemyClassPressureInspection entry))
@@ -597,6 +632,13 @@ public partial class AIShoppingPlanner
         entry.Score += score;
         entry.UnitTypeScores.TryGetValue(data, out float typeScore);
         entry.UnitTypeScores[data] = typeScore + score;
+        if (offLand)
+        {
+            entry.UnitTypeOffLandScores.TryGetValue(data, out float offScore);
+            entry.UnitTypeOffLandScores[data] = offScore + score;
+            entry.OffLandCount++;
+            result.OffLandUnits++;
+        }
         if (visible)
         {
             entry.VisibleCount++;
@@ -895,7 +937,8 @@ public partial class AIShoppingPlanner
                 : eliteCounterExists ? "counter-pressure-prerequisite" : "counter-pressure",
             $"{category}/{(targetClass.HasValue ? targetClass.Value.ToString() : "desconhecido")}"
                 + $" bruto={rawPressure:F1} cobertura={coverage:F1} saldo={unmetPressure:F1}"
-                + $" vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits}",
+                + $" vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits}"
+                + (pressure.OffLandUnits > 0 ? $" foraDaTerra={pressure.OffLandUnits}" : ""),
             forceBasicResponse);
         counterDemand.RequiredWeaponCategory = category;
         if (forceBasicResponse)

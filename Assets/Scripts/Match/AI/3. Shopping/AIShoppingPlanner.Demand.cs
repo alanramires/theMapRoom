@@ -2160,7 +2160,9 @@ public partial class AIShoppingPlanner
     [System.NonSerialized] private static AIWorldSnapshot s_groundRouteSnapshot;
     private static bool s_groundCutOff;
 
-    private static bool IsGroundCutOffFromEnemy(AIWorldSnapshot snapshot)
+    // log:false e para quem le de fora do carrinho (Shopping Pressure no editor, counter):
+    // a janela monta snapshot novo a cada refresh e encheria o Console.
+    private static bool IsGroundCutOffFromEnemy(AIWorldSnapshot snapshot, bool log = true)
     {
         if (snapshot == null)
             return false;
@@ -2169,8 +2171,74 @@ public partial class AIShoppingPlanner
 
         s_groundRouteSnapshot = snapshot;
         s_groundCutOff = ComputeGroundCutOff(snapshot, out string why);
-        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] rota terrestre: {why}");
+        if (log)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] rota terrestre: {why}");
         return s_groundCutOff;
+    }
+
+    // "Esta celula e a NOSSA terra?" — a ilha geografica do QG (BeachManager) ou, sem ela, o
+    // alcance terrestre da ficha de referencia a partir do QG. Uma fonte so para a invasao
+    // (TryFindEnemyOnOwnIsland) e para o counter (not_in_reach). Sem dado responde SIM:
+    // falha conservadora, nao tira valor de resposta nenhuma.
+    private sealed class OwnLandProbe
+    {
+        public BeachManager Beaches;
+        public BeachManager.IslandInfo Island;
+        public Dictionary<Vector3Int, int> Reach;
+        public string Source = "";
+
+        public bool Contains(Vector3Int cell)
+        {
+            cell.z = 0;
+            if (Island != null)
+                return Beaches.TryGetIslandAtCell(cell, out BeachManager.IslandInfo ilha) && ilha == Island;
+            if (Reach != null)
+                return Reach.ContainsKey(cell);
+            return true;
+        }
+    }
+
+    private static OwnLandProbe BuildOwnLandProbe(AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.MyBuildings == null)
+            return null;
+        Vector3Int? ownHq = null;
+        UnitData reference = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null) continue;
+            if (building.IsPlayerHeadQuarter)
+            {
+                Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+                ownHq = cell;
+            }
+            if (building.OfferedUnits != null)
+                foreach (UnitData offered in building.OfferedUnits)
+                    if (offered != null && offered.domain == Domain.Land
+                        && UnitRoleCompatibility.ResolveFamily(offered) == UnitRoleFamily.Assalto
+                        && (reference == null || offered.cost < reference.cost))
+                        reference = offered;
+        }
+        return ownHq.HasValue ? BuildOwnLandProbe(ownHq.Value, reference) : null;
+    }
+
+    private static OwnLandProbe BuildOwnLandProbe(Vector3Int ownHq, UnitData reference)
+    {
+        var probe = new OwnLandProbe();
+        BeachManager beaches = BeachManager.GetOrCreate();
+        if (beaches != null && beaches.TryGetIslandAtCell(ownHq, out BeachManager.IslandInfo ilhaDoQg) && ilhaDoQg != null)
+        {
+            probe.Beaches = beaches;
+            probe.Island = ilhaDoQg;
+            probe.Source = ilhaDoQg.DisplayName;
+            return probe;
+        }
+        probe.Source = "alcance terrestre do QG";
+        if (reference != null
+            && SectorManager.TryBuildLandMovementDistanceToTargetMap(ownHq, reference, out Dictionary<Vector3Int, int> alcance)
+            && alcance != null)
+            probe.Reach = alcance;
+        return probe;
     }
 
     private static bool ComputeGroundCutOff(AIWorldSnapshot snapshot, out string why)
@@ -2252,36 +2320,17 @@ public partial class AIShoppingPlanner
         out UnitManager invader, out string source)
     {
         invader = null;
-        source = "";
-
-        BeachManager beaches = BeachManager.GetOrCreate();
-        if (beaches != null && beaches.TryGetIslandAtCell(ownHq, out BeachManager.IslandInfo ilhaDoQg) && ilhaDoQg != null)
-        {
-            source = ilhaDoQg.DisplayName;
-            foreach (UnitManager enemy in snapshot.EnemyUnits)
-            {
-                // So quem esta EM TERRA invade: aeronave sobrevoando nao e desembarque, e
-                // tanque nao responde a ela (a vaga antiaerea do pacote responde).
-                if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.GetDomain() != Domain.Land) continue;
-                Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
-                if (beaches.TryGetIslandAtCell(ec, out BeachManager.IslandInfo ilha) && ilha == ilhaDoQg)
-                {
-                    invader = enemy;
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        source = "alcance terrestre do QG";
-        if (!SectorManager.TryBuildLandMovementDistanceToTargetMap(ownHq, reference, out Dictionary<Vector3Int, int> alcance)
-            || alcance == null)
+        OwnLandProbe probe = BuildOwnLandProbe(ownHq, reference);
+        source = probe.Source;
+        // Sem ilha e sem alcance nao ha como afirmar invasao (Contains responderia SIM a tudo).
+        if (probe.Island == null && probe.Reach == null)
             return false;
         foreach (UnitManager enemy in snapshot.EnemyUnits)
         {
+            // So quem esta EM TERRA invade: aeronave sobrevoando nao e desembarque, e
+            // tanque nao responde a ela (a vaga antiaerea do pacote responde).
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.GetDomain() != Domain.Land) continue;
-            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
-            if (alcance.ContainsKey(ec))
+            if (probe.Contains(enemy.CurrentCellPosition))
             {
                 invader = enemy;
                 return true;
@@ -2833,6 +2882,19 @@ public partial class AIShoppingPlanner
                     + $"ruptura blindada faltando x{deficit.Count}";
                 demand.Urgent = false;
             }
+            else if (demand.Role == UnitRole.Assalto || demand.Role == UnitRole.FogoIndireto)
+            {
+                // A escolta da operacao (GroundCapture "risky" pede Assaultx1) segue a mesma
+                // linha do pacote e do elite: ilha sem ligacao por terra, assalto e a
+                // familia Assalto NO AR (Apache), fogo e a familia FdS antiaerea. Sem isto
+                // o pacote pedia ar e a operacao comprava Tanque Leve pela porta do lado.
+                EliteLine line = ResolveEliteLine(snapshot, demand.Role);
+                if (line.CutOff)
+                {
+                    demand.Role = line.Role;
+                    ApplyEliteLine(demand, line);
+                }
+            }
             MergeRoleDemand(demands, demand, addCounts: true);
         }
 
@@ -2901,7 +2963,16 @@ public partial class AIShoppingPlanner
                 + $"antiInf={counterPressure.AntiInfantry:F2} "
                 + $"antiTank={counterPressure.AntiTank:F2}");
 
-        int visibleAir = CountEnemyDomain(snapshot, Domain.Air);
+        // So a aeronave DENTRO DO ANEL gera AA urgente: o Tatico dela (onde para e onde atira
+        // neste turno) toca a nossa ilha (quando ilhados) ou prédio/unidade nossa. A largura
+        // do anel e da propria aeronave, nunca um numero fixo. "O oponente tem forca aerea"
+        // continua com a vaga antiaerea do pacote e a Vigilancia, sem urgencia. (Peixe
+        // Pequeno T1: o Chinook recem-comprado no aeroporto do outro canto custava uma AAA
+        // de prioridade 8 antes de qualquer capturador.)
+        int visibleAir = CountEnemyAirInRing(snapshot, out int airSeen);
+        if (airSeen > visibleAir)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] ameaca aerea: "
+                + $"{visibleAir}/{airSeen} aeronave(s) visiveis dentro do anel — as de fora nao pedem AA urgente");
         if (visibleAir > 0)
         {
             int activeAA = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
@@ -3653,7 +3724,12 @@ public partial class AIShoppingPlanner
             int cheapest = 0;
             foreach (UnitData u in building.OfferedUnits)
             {
+                // Massa e corpo NAO-elite. A fabrica pesada que so vende MBT/Obuseiro/SAM nao
+                // tem massa para garantir: taxa-la pelo SAM (12k) reservava um elite que
+                // ninguem comprava e zerava o carrinho (Peixe Pequeno T1: imposto 16k contra
+                // caixa 12,5k, Chinook e Apache barrados, 8,5k parados).
                 if (u == null || u.cost <= 0 || u.militaryForce != MilitaryForce.Army
+                    || u.eliteLevel > 0
                     || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                     continue;
                 if (cheapest == 0 || u.cost < cheapest)
@@ -3848,15 +3924,61 @@ public partial class AIShoppingPlanner
         return false;
     }
 
+    // ───────────────────────────────────────── linha do elite ──
+    // Qual unidade e "o elite de Assalto/Fogo" nesta ilha. Ligada por terra: a composicao
+    // antiga, inalterada (Tanque de Batalha, Obuseiro Movel...). Ilha SEM LIGACAO (e nao
+    // invadida): a mesma troca do pacote 2/2/1 — assalto vira FAMILIA Assalto NO AR
+    // (Bombardeiro, vindo do Apache), fogo vira FAMILIA Fogo de Suporte ANTIAEREA (SAM).
+    // Baixar o score do MBT nao bastaria: pela composicao, so tanque e "Assalto", e ele
+    // seria o unico candidato — comprado ilhado do mesmo jeito.
+    private struct EliteLine
+    {
+        public UnitRole Role;
+        public UnitRoleFamily? Family;
+        public Domain? Domain;
+        public bool CutOff;
+    }
+
+    private static EliteLine ResolveEliteLine(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        if (!IsGroundCutOffFromEnemy(snapshot))
+            return new EliteLine { Role = role };
+        if (role == UnitRole.Assalto)
+            return new EliteLine { Role = UnitRole.AtaqueAereo, Family = UnitRoleFamily.Assalto, Domain = global::Domain.Air, CutOff = true };
+        if (role == UnitRole.FogoIndireto)
+            return new EliteLine { Role = UnitRole.Antiaereo, Family = UnitRoleFamily.FogoDeSuporte, CutOff = true };
+        return new EliteLine { Role = role };
+    }
+
+    private static bool CountsForEliteLine(UnitData data, EliteLine line)
+    {
+        if (data == null)
+            return false;
+        if (!line.Family.HasValue)
+            return UnitRoleCompatibility.ResolveCompositionRole(data) == line.Role;
+        return UnitRoleCompatibility.ResolveFamily(data) == line.Family.Value
+            && (!line.Domain.HasValue || data.domain == line.Domain.Value)
+            && UnitRoleCompatibility.CanSatisfy(data, line.Role);
+    }
+
+    private static void ApplyEliteLine(AIShoppingDemand demand, EliteLine line)
+    {
+        demand.RequiredFamily = line.Family;
+        demand.Domain = line.Domain;
+        if (line.CutOff)
+            demand.Reason += " (ilha sem ligacao por terra)";
+    }
+
     private static void AddEliteProgressionDemand(AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands, UnitRole role, int activeRoleCount, int priority)
     {
         if (activeRoleCount <= 0)
             return;
+        EliteLine line = ResolveEliteLine(snapshot, role);
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
             if (unit != null && unit.TryGetUnitData(out UnitData data)
-                && UnitRoleCompatibility.ResolveCompositionRole(data) == role)
+                && CountsForEliteLine(data, line))
                 currentElite = Mathf.Max(currentElite, data.eliteLevel);
 
         int nextElite = int.MaxValue;
@@ -3866,7 +3988,7 @@ public partial class AIShoppingPlanner
             foreach (UnitData offered in building.OfferedUnits)
             {
                 if (offered == null || offered.eliteLevel <= currentElite
-                    || UnitRoleCompatibility.ResolveCompositionRole(offered) != role
+                    || !CountsForEliteLine(offered, line)
                     || !IsEliteChainAvailable(offered, snapshot))
                     continue;
                 nextElite = Mathf.Min(nextElite, offered.eliteLevel);
@@ -3875,10 +3997,11 @@ public partial class AIShoppingPlanner
         if (nextElite == int.MaxValue)
             return;
 
-        AIShoppingDemand elite = NewRoleDemand(role, 1, priority, "elite",
+        AIShoppingDemand elite = NewRoleDemand(line.Role, 1, priority, "elite",
             $"massa={snapshot.MyUnits.Count} caixa={snapshot.Budget} nivel={currentElite}->{nextElite}", false);
         elite.MinEliteLevel = nextElite;
         elite.MaxEliteLevel = nextElite;
+        ApplyEliteLine(elite, line);
 
         // Só persegue o elite se ele cabe agora ou é alcançável dentro do horizonte de poupança.
         // (Substitui o antigo piso fixo de caixa, que com renda baixa nunca deixava o alvo aparecer.)
@@ -3923,18 +4046,19 @@ public partial class AIShoppingPlanner
             ? Mathf.Max(pressureRatio, safeRatio)
             : pressureRatio;
         int desiredElite = Mathf.CeilToInt(activeRoleCount * targetRatio);
+        EliteLine line = ResolveEliteLine(snapshot, role);
 
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
             if (unit != null && !unit.IsDead
                 && unit.TryGetUnitData(out UnitData data) && data != null
                 && data.eliteLevel > 0
-                && UnitRoleCompatibility.ResolveCompositionRole(data) == role)
+                && CountsForEliteLine(data, line))
                 currentElite++;
 
         int alreadyDemanded = 0;
         foreach (AIShoppingDemand demand in demands)
-            if (demand != null && demand.Count > 0 && demand.Role == role
+            if (demand != null && demand.Count > 0 && demand.Role == line.Role
                 && demand.MinEliteLevel > 0)
                 alreadyDemanded += demand.Count;
 
@@ -3943,7 +4067,7 @@ public partial class AIShoppingPlanner
             return;
 
         AIShoppingDemand quality = NewRoleDemand(
-            role,
+            line.Role,
             missing,
             priority,
             "elite-quality",
@@ -3952,6 +4076,7 @@ public partial class AIShoppingPlanner
                 + $" rallyAtivo={rallyAssemblyActive}",
             false);
         quality.MinEliteLevel = 1;
+        ApplyEliteLine(quality, line);
 
         int saveTurns = AIController.Instance != null ? AIController.Instance.EliteSaveTurns : 0;
         int reach = snapshot.Budget
@@ -4039,6 +4164,81 @@ public partial class AIShoppingPlanner
                 && data.roles != null && data.roles.Count > 0 && data.roles[0] == role)
                 count++;
         return count;
+    }
+
+    private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen)
+    {
+        seen = 0;
+        int inRing = 0;
+        if (snapshot?.EnemyUnits == null)
+            return 0;
+
+        AIController ai = AIController.Instance;
+        UnityEngine.Tilemaps.Tilemap board = ai != null ? ai.BoardTilemapRef : null;
+        OwnLandProbe island = IsGroundCutOffFromEnemy(snapshot, log: false) ? BuildOwnLandProbe(snapshot) : null;
+        if (island != null && island.Island == null && island.Reach == null)
+            island = null;
+
+        var ours = new HashSet<Vector3Int>();
+        if (snapshot.MyBuildings != null)
+            foreach (ConstructionManager b in snapshot.MyBuildings)
+                if (b != null) { Vector3Int c = b.CurrentCellPosition; c.z = 0; ours.Add(c); }
+        if (snapshot.MyUnits != null)
+            foreach (UnitManager u in snapshot.MyUnits)
+                if (u != null && !u.IsDead) { Vector3Int c = u.CurrentCellPosition; c.z = 0; ours.Add(c); }
+
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || !enemy.TryGetUnitData(out UnitData data)
+                || data == null || data.domain != Domain.Air)
+                continue;
+            seen++;
+
+            // Sem tabuleiro nao ha como medir: conta, como antes (falha conservadora).
+            if (board == null)
+            {
+                inRing++;
+                continue;
+            }
+            // Orcamento = movimento CHEIO: e o proximo turno dele. O MP restante do turno
+            // que ele ja jogou deixaria o anel com largura zero.
+            int budget = Mathf.Max(1, enemy.MaxMovementPoints);
+            UnitReachEnvelope envelope = BuildAirRingEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Combat, budget)
+                // Sem arma (transporte puro): a ameaca e onde ele POUSA a carga.
+                ?? BuildAirRingEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Capture, budget);
+            if (envelope != null && TouchesRing(envelope, ours, island))
+                inRing++;
+        }
+        return inRing;
+    }
+
+    private static UnitReachEnvelope BuildAirRingEnvelope(UnitManager unit,
+        UnityEngine.Tilemaps.Tilemap board, TerrainDatabase terrain, ReachIntent intent, int budget)
+    {
+        return UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = unit,
+            BoardMap = board,
+            TerrainDatabase = terrain,
+            Intent = intent,
+            Band = ReachBand.Tactical,
+            MovementBudget = budget,
+            FilterByOperationDomain = false
+        });
+    }
+
+    private static bool TouchesRing(UnitReachEnvelope envelope, HashSet<Vector3Int> ours, OwnLandProbe island)
+    {
+        bool Hit(Vector3Int cell)
+        {
+            cell.z = 0;
+            return ours.Contains(cell) || (island != null && island.Contains(cell));
+        }
+        foreach (Vector3Int cell in envelope.MovementCells)
+            if (Hit(cell)) return true;
+        foreach (Vector3Int cell in envelope.AttackableCells)
+            if (Hit(cell)) return true;
+        return false;
     }
 
     private static int CountEnemyDomain(AIWorldSnapshot snapshot, Domain domain)

@@ -36,6 +36,9 @@ public partial class AIController : MonoBehaviour
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
+    // Leitura para quem nao e partial do AIController (Shopping: anel de ameaca aerea).
+    public Tilemap BoardTilemapRef => boardTilemap;
+    public TerrainDatabase TerrainDatabaseRef => terrainDatabase;
 
     [Header("AI Settings")]
     [Tooltip("Exibe no Console os logs gerais com prefixo [AI].")]
