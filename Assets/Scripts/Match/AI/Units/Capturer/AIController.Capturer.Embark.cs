@@ -333,6 +333,16 @@ public partial class AIController
             // outro componente. Segura e continua emitindo demanda de carona.
             if (rideNeed.isStranded)
             {
+                // ...MAS SEGURAR NAO E TRABALHAR. "Antes do tiro vem o dinheiro":
+                // sem carona materializavel, anda ate o capturavel mais perto
+                // alcancavel A PE (o componente dele, nao o do plano). AI Step T3
+                // amarelo: #19 parado em (13,1) esperando carona para November com
+                // Echo e Foxtrot livres na mesma ilha. O plano e o pedido de carona
+                // continuam; a carona o encontra onde ele estiver.
+                if (TryBuildWorkWhileWaitingForRide(
+                        passenger, snapshot, fromCell, paths, out PlayerAction work))
+                    return work;
+
                 PlayerAction hold = BuildMoveBatch(
                     passenger,
                     snapshot.AITeam,
@@ -591,6 +601,110 @@ public partial class AIController
         }
 
         return request;
+    }
+
+    // Orcamento do "trabalha enquanto espera": o mesmo da matriz de atribuicao do
+    // planner (PlanBudget). Mede alcance A PE no componente da propria unidade.
+    private const int WorkWhileWaitingBudget = 30;
+
+    /// <summary>
+    /// Capturador ilhado (o alvo do plano so se alcanca de carona) e sem carona
+    /// materializavel neste turno: em vez de segurar, vai ao capturavel mais perto que
+    /// ele alcanca a pe. Captura se chega; senao avanca pelo caminho valido ate ele.
+    /// Respeita o predio que e alvo do plano de OUTRO capturador e o destino ja
+    /// planejado por quem agiu antes. Mesma politica do perfil do oportunista
+    /// (FazCapturaOportunista).
+    /// </summary>
+    private bool TryBuildWorkWhileWaitingForRide(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out PlayerAction action)
+    {
+        action = null;
+        if (!FazCapturaOportunista || unit == null || snapshot == null || paths == null)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> longPaths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, WorkWhileWaitingBudget, terrainDatabase);
+        if (longPaths == null || longPaths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        ConstructionManager best = null;
+        Vector3Int bestCell = fromCell;
+        int bestSteps = int.MaxValue;
+        foreach (ConstructionManager building in ConstructionManager.AllActive)
+        {
+            if (building == null || !building.IsCapturable)
+                continue;
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+            if (cell == fromCell)
+                continue;
+            if (!longPaths.TryGetValue(cell, out List<Vector3Int> route) || route == null || route.Count == 0)
+                continue;
+            if (plannedDestinations != null && plannedDestinations.Contains(cell))
+                continue;
+            // Aliado JA em cima do predio: e dele (AI Step T3 amarelo: #19 voltou para a
+            // base atras do predio em que o #10 estava parado).
+            if (UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap, cell, unit, alliedOnly: true))
+                continue;
+            if (!SimulateCaptureSensor(unit, cell, out _))
+                continue;
+            // Mesma cessao do oportunista: designado pelo plano OU capturador mais perto.
+            if (ShouldReserveOpportunisticCaptureForCloserUnit(
+                    unit, snapshot.AITeam, cell, longPaths, out UnitManager reservedFor)
+                && reservedFor != null && reservedFor != unit)
+                continue;
+            if (route.Count < bestSteps)
+            {
+                best = building;
+                bestCell = cell;
+                bestSteps = route.Count;
+            }
+        }
+        if (best == null)
+            return false;
+
+        // Chega neste turno: captura.
+        if (paths.ContainsKey(bestCell) && !occupied.Contains(bestCell))
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} trabalha enquanto espera carona: " +
+                      $"captura {best.Sector} @ {bestCell} (plano segue pedindo carona)");
+            action = BuildCaptureBatch(unit, snapshot.AITeam, fromCell, bestCell, paths);
+            return true;
+        }
+
+        // Senao, o ponto mais adiantado do caminho longo que cabe nesta rodada.
+        List<Vector3Int> longRoute = longPaths[bestCell];
+        Vector3Int moveCell = fromCell;
+        for (int i = longRoute.Count - 1; i >= 0; i--)
+        {
+            Vector3Int step = longRoute[i];
+            step.z = 0;
+            if (step == fromCell)
+                break;
+            if (paths.ContainsKey(step) && !occupied.Contains(step)
+                && (plannedDestinations == null || !plannedDestinations.Contains(step)))
+            {
+                moveCell = step;
+                break;
+            }
+        }
+        if (moveCell == fromCell)
+            return false;
+
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} trabalha enquanto espera carona: " +
+                  $"avanca via {moveCell} para {best.Sector} @ {bestCell} ({bestSteps} passos a pe; " +
+                  "plano segue pedindo carona)");
+        action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        action.DebugLabel = $"trabalha enquanto espera carona: rumo a {best.Sector}";
+        return true;
     }
 
     private bool ShouldRogueCapturerFightBeforeTransport(
