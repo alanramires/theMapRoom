@@ -3849,17 +3849,29 @@ public partial class AIShoppingPlanner
         bool wasActive = ai.MassacrePhaseActive;
         bool byRatio = macro.EnemyForce > 0 && macro.ForceRatio
             >= (wasActive ? ai.MassacreExitForceRatio : ai.MassacreEnterForceRatio);
+        // TETO COM FOLGA: a conscricao cessa cedo (ex.: 55% do limite) para sobrar manobra para
+        // o elite entrar — com o teto em 60 e a valvula em 85% ela so parava em 51 unidades, e
+        // imposto + reserva seguravam o elite a partida toda (autor, 2026-11-06). Histerese:
+        // so volta abaixo do piso de saida.
         int unitCap = ai.Match != null ? ai.Match.MaxUnitsPerTeam : 0;
+        float capRatio = wasActive ? ai.MassacreUnitCapExitFillRatio : ai.MassacreUnitCapFillRatio;
         bool byCap = unitCap > 0 && snapshot.MyUnits.Count
-            >= Mathf.CeilToInt(unitCap * ai.MassacreUnitCapFillRatio);
-        bool active = byRatio || byCap;
+            >= Mathf.CeilToInt(unitCap * capRatio);
+        // DEFESA reativa a conscricao: base ameacada pede corpo agora, nao elite daqui a dois
+        // turnos. Mesmos sinais de defesa do resto do shopping (postura Defensiva, Perdendo).
+        bool defense = snapshot.Stance == AIStance.Defensive || macro.Losing;
+        bool active = (byRatio || byCap) && !defense;
         ai.MassacrePhaseActive = active;
         if (active != wasActive)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                 + (active
                     ? $"FASE DE MASSACRE: conscrição cessa (fr={macro.ForceRatio:P0} "
-                        + $"unidades={snapshot.MyUnits.Count}/{unitCap}) — caixa vira elite"
-                    : $"fim do massacre (fr={macro.ForceRatio:P0}) — conscrição reativada"));
+                        + $"unidades={snapshot.MyUnits.Count}/{unitCap}"
+                        + (byCap && !byRatio ? $", teto {ai.MassacreUnitCapFillRatio:P0}" : "")
+                        + ") — caixa vira elite"
+                    : $"fim do massacre (fr={macro.ForceRatio:P0} unidades={snapshot.MyUnits.Count}/{unitCap}"
+                        + (defense ? ", defesa" : "")
+                        + ") — conscrição reativada"));
         return active;
     }
 

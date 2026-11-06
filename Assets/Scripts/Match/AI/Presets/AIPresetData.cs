@@ -343,6 +343,9 @@ public class AIConscriptionPreset
 
     [Tooltip("Válvula de teto: cessa a massa quando as unidades em campo atingem esta fração do limite por time. Origem: massacreUnitCapFillRatio.")]
     [Range(0.5f, 1f)] public float massacreUnitCapFillRatio = 0.85f;
+
+    [Tooltip("Histerese do teto: a conscrição só volta abaixo desta fração do limite (ou em defesa). Origem: massacreUnitCapExitFillRatio.")]
+    [Range(0.3f, 1f)] public float massacreUnitCapExitFillRatio = 0.45f;
 }
 
 // -------------------------------------------------------------------------------------

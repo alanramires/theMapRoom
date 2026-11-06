@@ -338,6 +338,7 @@ public class AIPresetGeneratorWindow : EditorWindow
         preset.conscricao.massacreEnterForceRatio = Flt(so, "massacreEnterForceRatio");
         preset.conscricao.massacreExitForceRatio = Flt(so, "massacreExitForceRatio");
         preset.conscricao.massacreUnitCapFillRatio = Flt(so, "massacreUnitCapFillRatio");
+        preset.conscricao.massacreUnitCapExitFillRatio = Flt(so, "massacreUnitCapExitFillRatio");
 
         // --- plano (lado NORMAL; a overlay hard sobe multiplier→2 e cap→6)
         preset.plano.maxActiveObjectives = Int(so, "maxActiveObjectives");

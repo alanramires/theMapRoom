@@ -74,8 +74,12 @@ public partial class AIController : MonoBehaviour
     public bool StrongWeakSidePolitic =>
         activePreset != null ? activePreset.capacidades.politicaLadoForteFraco : strongWeakSidePolitic;
 
-    [Tooltip("Doutrina da Conscricao (tatica do enxame): todo produtor do exercito compra o corpo mais barato TODO turno; demandas/elite so gastam por cima da massa garantida (imposto de conscricao no shopping). Desenhada pro Hard (Agressivo), mas pode ser ligada avulsa pra experimentar um Normal mais dificil.")]
-    [SerializeField] private bool conscriptionDoctrine = false;
+    // Doutrina da Conscricao (tatica do enxame): todo produtor do exercito compra o corpo
+    // mais barato TODO turno; demandas/elite so gastam por cima da massa garantida.
+    // ESCONDIDO DA CENA: quem decide e o perfil (AIPresetData.capacidades.conscricaoSempre).
+    // O campo segue serializado so como estado de runtime: o save o restaura, e o caminho
+    // de reserva sem catalogo (AIController.Preset.cs) o copia para o perfil montado.
+    [SerializeField, HideInInspector] private bool conscriptionDoctrine = false;
     public bool ConscriptionDoctrine =>
         activePreset != null ? activePreset.capacidades.conscricaoSempre : conscriptionDoctrine;
 
@@ -91,6 +95,10 @@ public partial class AIController : MonoBehaviour
     [SerializeField, Range(0.5f, 1f)] private float massacreUnitCapFillRatio = 0.85f;
     public float MassacreUnitCapFillRatio => massacreUnitCapFillRatio;
 
+    [Tooltip("Histerese do teto: uma vez cessada pelo teto, a conscricao so volta quando as unidades em campo caem abaixo desta fracao do limite por time (ou em defesa). Sem folga entre as duas, cada baixa alternaria soldado/elite.")]
+    [SerializeField, Range(0.3f, 1f)] private float massacreUnitCapExitFillRatio = 0.45f;
+    public float MassacreUnitCapExitFillRatio => massacreUnitCapExitFillRatio;
+
     // Estado de histerese da Fase de Massacre (persiste no save via SaveGameManager).
     [System.NonSerialized] private bool massacrePhaseActive;
     public bool MassacrePhaseActive
@@ -101,8 +109,10 @@ public partial class AIController : MonoBehaviour
 
     public MatchController Match => matchController;
 
-    [Tooltip("Recrutamento forcado emergencial quando a IA esta perdendo. Independente do pacote Hard.")]
-    [SerializeField] private bool conscriptionWhenLosing = false;
+    // Recrutamento forcado emergencial quando a IA esta perdendo. ESCONDIDO DA CENA pelo
+    // mesmo motivo da doutrina: quem decide e o perfil (capacidades.conscricaoQuandoPerdendo);
+    // ApplyDifficulty e o save escrevem este campo, o autor nao.
+    [SerializeField, HideInInspector] private bool conscriptionWhenLosing = false;
     public bool ConscriptionWhenLosing =>
         activePreset != null ? activePreset.capacidades.conscricaoQuandoPerdendo : conscriptionWhenLosing;
 
