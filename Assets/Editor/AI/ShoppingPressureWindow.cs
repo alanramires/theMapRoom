@@ -919,6 +919,7 @@ public class ShoppingPressureWindow : EditorWindow
                 $"  {axisLabel}: {axisProgress}" +
                 $"prof={axis.Depth:F1} força={axis.AssignedUnits} " +
                 $"trans={axis.AssignedTransports}/{axis.DesiredTransports} " +
+                (axis.LandRoute ? "" : "SEM TERRA (APC nao opera) ") +
                 $"score={axis.Score:F1}",
                 _subtle);
         }

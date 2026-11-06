@@ -19,6 +19,8 @@ public partial class AIShoppingPlanner
         public int DesiredTransports;
         public int AssignedUnits;
         public float Score;
+        // O alvo do eixo esta na NOSSA terra? Sem ligacao por terra o APC nao opera ali.
+        public bool LandRoute = true;
     }
 
     public sealed class OperationalPressureInspection
@@ -28,6 +30,9 @@ public partial class AIShoppingPlanner
         public float Transport;
         public int DesiredTransports;
         public int ActiveTransports;
+        // A falta e medida em APC atribuido ao eixo; a frota (ActiveTransports) inclui Chinook e
+        // transporte sem eixo, e "cobertura=3/1" comparava duas grandezas diferentes.
+        public int AssignedGroundTransports;
         public int TransportGap;
         public float Logistics;
         public float CurrentRepair;
@@ -89,6 +94,10 @@ public partial class AIShoppingPlanner
             campaignRegularAdvance += Mathf.Clamp(regularConquered + regularPartial, 0f, regularTotal);
         }
 
+        // A pergunta "isto e nossa terra?" e a mesma do counter e da invasao (ilha do QG, ou o
+        // alcance terrestre a partir dele). Sem dado responde sim: falha conservadora.
+        OwnLandProbe ownLand = BuildOwnLandProbe(snapshot);
+
         foreach (InvasionAxisMap.Axis axis in map.Axes)
         {
             int total = axis.Corridor.Count + 1;
@@ -111,13 +120,24 @@ public partial class AIShoppingPlanner
             }
             ConstructionSector target = map.GetTransportTargetSector(axis.EixoIndex);
             float depth = 0f;
+            Vector3Int? targetCell = null;
             if (axis.IsInvasionAxis)
+            {
                 // A base inimiga não está em TryGetSectorInfo e não tem dist-de-HQ confiável:
                 // profundidade pela GEOMETRIA do eixo (HQ -> célula da base). Mesma base do builder.
                 depth = SectorManager.HexDistance(axis.HqCell, axis.RallyCell);
+                targetCell = axis.RallyCell;
+            }
             else if (target != ConstructionSector.None
                 && SectorManager.TryGetSectorInfo(target, out SectorManager.SectorInfo info))
+            {
                 depth = info.GetDistanceToHQ(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+                targetCell = info.RepresentativeCell;
+            }
+            // APC so pede eixo cujo alvo esta na nossa terra. Antes, eixo com travessia naval
+            // pedia APC pela profundidade (AI Step: "eixos=4 cobertura=3/1", APC $4200 numa ilha
+            // sem ligacao). A carona aerea desses alvos vem das operacoes (AirliftCapture).
+            bool landRoute = ownLand == null || !targetCell.HasValue || ownLand.Contains(targetCell.Value);
 
             int assigned = CountAxisGroundTransports(snapshot, axis.EixoIndex);
             int desired;
@@ -152,8 +172,15 @@ public partial class AIShoppingPlanner
                     : 0f;
             }
 
+            if (!landRoute)
+            {
+                desired = 0;
+                score = 0f;
+            }
+
             result.Axes.Add(new AxisTransportPressureInspection
             {
+                LandRoute = landRoute,
                 Eixo = axis.EixoIndex,
                 IsInvasionAxis = axis.IsInvasionAxis,
                 Front = axis.FrontSector,
@@ -171,6 +198,7 @@ public partial class AIShoppingPlanner
             });
             result.Transport += score;
             result.DesiredTransports += desired;
+            result.AssignedGroundTransports += assigned;
             result.TransportGap += Mathf.Max(0, desired - assigned);
         }
 
@@ -313,12 +341,19 @@ public partial class AIShoppingPlanner
         if (snapshot == null || demands == null || pressure == null)
             return;
 
+        // Dominio Land: a falta e medida em APC atribuido ao eixo. Um Chinook comprado por ela
+        // nunca fecharia a conta, e a demanda voltaria no turno seguinte.
         if (pressure.TransportGap > 0)
-            EnsureRoleDemand(
-                demands, UnitRole.Transportador, pressure.TransportGap,
+        {
+            AIShoppingDemand transport = NewRoleDemand(UnitRole.Transportador, pressure.TransportGap,
                 pressure.Transport >= 2f ? 17 : 23,
                 "operational-pressure",
-                $"eixos={pressure.Axes.Count} pressão={pressure.Transport:F1} cobertura={pressure.ActiveTransports}/{pressure.DesiredTransports}");
+                $"eixos={pressure.Axes.Count} pressão={pressure.Transport:F1} "
+                + $"APC nos eixos={pressure.AssignedGroundTransports}/{pressure.DesiredTransports} "
+                + $"(frota={pressure.ActiveTransports})", false);
+            transport.Domain = Domain.Land;
+            MergeRoleDemand(demands, transport, false);
+        }
 
         if (pressure.LogisticsGap > 0)
         {
