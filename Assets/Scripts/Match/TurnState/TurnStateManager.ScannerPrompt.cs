@@ -4097,15 +4097,13 @@ public partial class TurnStateManager
 
             int childBefore = Mathf.Max(0, child.CurrentHP);
             // Regra de sobrevida: dano proporcional em embarcados nao mata enquanto
-            // o transportador pai continua vivo.
+            // o transportador pai continua vivo. A conta e do CombatFormula (fonte
+            // unica com a previsao da IA).
             if (childBefore <= 0)
                 continue;
 
-            int propagatedDamage = Mathf.RoundToInt(childBefore * ratio);
-            if (propagatedDamage <= 0)
-                propagatedDamage = 1;
-
-            int childAfter = Mathf.Max(1, childBefore - propagatedDamage);
+            int childAfter = CombatFormula.ResolveEmbarkedHpAfterCascade(
+                childBefore, ratio, parentDies: false);
             child.SetCurrentHP(childAfter);
 
             ApplyRatioDamageToEmbarkedRecursive(child, ratio);

@@ -95,6 +95,31 @@ public struct CombatFormulaResult
 /// </summary>
 public static class CombatFormula
 {
+    /// <summary>
+    /// HP de um EMBARCADO depois que o transportador que o leva sofreu um golpe direto.
+    /// Fonte unica da cascata: a execucao (TurnStateManager.ApplyRatioDamageToEmbarkedRecursive)
+    /// e a previsao da IA (Disruptor: quanto poder de captura um tiro nega) chamam aqui.
+    ///
+    /// Transportador morto: todo embarcado morre (0). Vivo: o embarcado perde a MESMA
+    /// fracao que o transportador perdeu, arredondada, no minimo 1 — e nunca morre por
+    /// propagacao enquanto o pai vive (sobra pelo menos 1).
+    /// </summary>
+    public static int ResolveEmbarkedHpAfterCascade(int childHpBefore, float parentDamageRatio, bool parentDies)
+    {
+        childHpBefore = Mathf.Max(0, childHpBefore);
+        if (childHpBefore <= 0)
+            return 0;
+        if (parentDies)
+            return 0;
+        if (parentDamageRatio <= 0f)
+            return childHpBefore;
+
+        int propagatedDamage = Mathf.RoundToInt(childHpBefore * Mathf.Clamp01(parentDamageRatio));
+        if (propagatedDamage <= 0)
+            propagatedDamage = 1;
+        return Mathf.Max(1, childHpBefore - propagatedDamage);
+    }
+
     public static CombatFormulaResult Resolve(in CombatFormulaInput input)
     {
         CombatFormulaResult r = default;

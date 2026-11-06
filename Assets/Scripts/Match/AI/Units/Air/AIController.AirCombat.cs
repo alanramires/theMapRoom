@@ -153,7 +153,7 @@ public partial class AIController
         if (data.domain != Domain.Air || data.roles == null || data.roles.Count == 0)
             return false;
 
-        return data.roles[0] == UnitRole.AtaqueAereo
+        return UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.AtaqueAereo)
             || data.roles[0] == UnitRole.Interceptador
             || IsArmedSurveillance(unit, data);
     }
@@ -165,7 +165,7 @@ public partial class AIController
 
         return data.roles != null
             && data.roles.Count > 0
-            && (data.roles[0] == UnitRole.AtaqueAereo
+            && (UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.AtaqueAereo)
                 || IsArmedSurveillance(unit, data));
     }
 
@@ -264,7 +264,7 @@ public partial class AIController
             && patrolData != null
             && patrolData.roles != null
             && patrolData.roles.Count > 0
-            && (patrolData.roles[0] == UnitRole.AtaqueAereo
+            && (UnitRoleCompatibility.MatchesLabel(patrolData.roles[0], UnitRole.AtaqueAereo)
                 || patrolData.roles[0] == UnitRole.Interceptador);
         if (usesHalfMovementCaptainPatrol)
         {
@@ -799,6 +799,20 @@ public partial class AIController
             return huntCell;
         }
 
+        // INTERDICAO DE CAPTURA — "Voce nao vai fazer dinheiro nao!" (autor, 2026-11-06).
+        // O espelho do capturador ("antes do tiro vem o dinheiro"): ataque aereo SEM vaga
+        // no plano nao orbita o capitao, vai atras de quem faz dinheiro para o inimigo.
+        // Com vaga, a escolta do capitao segue valendo (missao secundaria do autor).
+        if (!isRebel
+            && IsCaptureInterdictionUnit(unit)
+            && TryResolveCaptureInterdictionAnchor(
+                unit, snapshot, fromCell, visibleEnemies,
+                out Vector3Int interdictionCell, out string interdictionTier))
+        {
+            tier = interdictionTier;
+            return interdictionCell;
+        }
+
         if (hasCaptain)
         {
             tier = $"CapturerMagnet:#{capturer.InstanceId}";
@@ -872,6 +886,255 @@ public partial class AIController
     /// Operacional (proxima rodada, encadeada). Null = ninguem ao alcance: o
     /// capitao volta a mandar.
     /// </summary>
+    // Peso de cada ponto de poder de captura negado no score de tiro do Disruptor.
+    // Escala do resto do score: preferencia Primary = 30000, abate = 26000. Com 10000,
+    // Chinook com 2 soldados (nega 10) > capturador no chao (nega ~7) > Chinook com 1
+    // (nega 5) — a ordem do autor sai da conta, nao de uma lista.
+    private const float DisruptorDeniedCaptureWeight = 10000f;
+
+    // O rotulo, com ou sem vaga: escolher o tiro pelo dinheiro e da natureza dele.
+    private static bool IsCaptureDisruptor(UnitManager unit)
+    {
+        return unit != null
+            && unit.TryGetUnitData(out UnitData data)
+            && data != null
+            && data.roles != null
+            && data.roles.Count > 0
+            && data.roles[0] == UnitRole.DisruptorDeCaptura;
+    }
+
+    // Poder de captura (base = HP, PodeCapturarSensor.GetCapturePower) que o tiro tira
+    // do inimigo: o HP que o proprio alvo perde, se ele captura, mais o que os
+    // embarcados que capturam perdem pela cascata (CombatFormula, fonte unica com a
+    // execucao). Carga de unidade detectada e inspecao livre do jogador: nao e trapaca.
+    private static int PredictDeniedCapturePower(UnitManager target, int targetHpAfter)
+    {
+        if (target == null)
+            return 0;
+        int before = Mathf.Max(0, target.CurrentHP);
+        int after = Mathf.Clamp(targetHpAfter, 0, before);
+        int denied = 0;
+        if (PodeCapturarSensor.HasAnyCaptureKey(target))
+            denied += before - after;
+        if (before > 0)
+        {
+            float ratio = (before - after) / (float)before;
+            denied += PredictDeniedCaptureAboard(target, ratio, after <= 0, new HashSet<UnitManager>());
+        }
+        return denied;
+    }
+
+    private static int PredictDeniedCaptureAboard(
+        UnitManager transporter, float ratio, bool parentDies, HashSet<UnitManager> processed)
+    {
+        IReadOnlyList<UnitTransportSeatRuntime> seats =
+            transporter != null ? transporter.TransportedUnitSlots : null;
+        if (seats == null)
+            return 0;
+        int denied = 0;
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitManager child = seats[i] != null ? seats[i].embarkedUnit : null;
+            if (child == null || !child.IsEmbarked || child.IsDead || !processed.Add(child))
+                continue;
+            int childBefore = Mathf.Max(0, child.CurrentHP);
+            int childAfter = CombatFormula.ResolveEmbarkedHpAfterCascade(childBefore, ratio, parentDies);
+            if (PodeCapturarSensor.HasAnyCaptureKey(child))
+                denied += childBefore - childAfter;
+            denied += PredictDeniedCaptureAboard(child, ratio, parentDies, processed);
+        }
+        return denied;
+    }
+
+    // Disruptor de captura sem vaga no plano. O rotulo diz a MISSAO (cacar quem faz
+    // dinheiro); o que ele consegue cacar sai das armas da ficha, nao do rotulo. O
+    // AtaqueAereo puro (Bombardeiro) fica com o capitao ate ganhar o magnetico proprio.
+    private static bool IsCaptureInterdictionUnit(UnitManager unit)
+    {
+        return unit != null
+            && !unit.AIHasAssignedPlan
+            && unit.TryGetUnitData(out UnitData data)
+            && data != null
+            && data.roles != null
+            && data.roles.Count > 0
+            && data.roles[0] == UnitRole.DisruptorDeCaptura;
+    }
+
+    // O CAPITAO DO DISRUPTOR E O PODER DE CAPTURA COMBINADO (autor, 2026-11-06): "nao
+    // importa se e transportador, a pe, ou se os soldados estao no navio de desembarque".
+    // O magnetico e quem CARREGA mais poder de captura — o proprio HP se tem chave de
+    // captura, mais o de cada embarcado capturador (CombinedCapturePower). A distancia so
+    // desempata. Transporte VAZIO nao atrai: nao carrega dinheiro nenhum.
+    // Ninguem visivel carregando captura: o predio contestado — capturavel nosso ou
+    // neutro mais perto de predio inimigo. Posicao de predio e intel publica, entao vale
+    // com nevoa honesta e o aparelho nao fica rodando pelas beiradas.
+    // So entra alvo que ALGUMA arma desta unidade acerta na camada atual dele
+    // (WeaponData.SupportsOperationOn). A legalidade do tiro continua no PodeMirar.
+    // Era uma ordem fixa de faixas (capturando > transporte > capturador): a moeda unica
+    // e a mesma do tiro no Tatico (PredictDeniedCapturePower).
+    private bool TryResolveCaptureInterdictionAnchor(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        List<UnitManager> visibleEnemies,
+        out Vector3Int anchor,
+        out string tier)
+    {
+        anchor = fromCell;
+        tier = null;
+
+        UnitManager best = null;
+        int bestPower = 0;
+        int bestDistance = int.MaxValue;
+        if (visibleEnemies != null)
+        {
+            for (int i = 0; i < visibleEnemies.Count; i++)
+            {
+                UnitManager enemy = visibleEnemies[i];
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (!CanAnyWeaponHitLayer(unit, enemy.GetDomain(), enemy.GetHeightLevel()))
+                    continue;
+
+                int power = CombinedCapturePower(enemy);
+                if (power <= 0)
+                    continue;
+
+                Vector3Int cell = enemy.CurrentCellPosition;
+                cell.z = 0;
+                int distance = AIActionReachCoordinator.CubicDistance(fromCell, cell);
+                if (power > bestPower
+                    || (power == bestPower && distance < bestDistance)
+                    || (power == bestPower && distance == bestDistance
+                        && best != null && enemy.InstanceId < best.InstanceId))
+                {
+                    best = enemy;
+                    bestPower = power;
+                    bestDistance = distance;
+                }
+            }
+        }
+
+        if (best != null)
+        {
+            anchor = best.CurrentCellPosition;
+            anchor.z = 0;
+            Vector3Int bestCell = anchor;
+            string state = IsCapturingForeignBuilding(best, bestCell) ? " capturando"
+                : best.GetEmbarkedPassengerCount() > 0 ? $" levando {best.GetEmbarkedPassengerCount()}"
+                : "";
+            tier = $"Interdicao:PoderDeCaptura={bestPower}#{best.InstanceId}{state}";
+            return true;
+        }
+
+        if (TryResolveContestedBuilding(unit, snapshot, fromCell, out ConstructionManager contested))
+        {
+            anchor = contested.CurrentCellPosition;
+            anchor.z = 0;
+            tier = $"Interdicao:PredioContestado@({anchor.x},{anchor.y})";
+            return true;
+        }
+        return false;
+    }
+
+    // Poder de captura que esta unidade CARREGA: o HP dela se tem chave de captura
+    // (PodeCapturarSensor.GetCapturePower: base = HP) mais o de cada embarcado que
+    // captura, recursivo. A pe, no Chinook ou no navio de desembarque, a mesma conta.
+    private static int CombinedCapturePower(UnitManager unit)
+    {
+        return CombinedCapturePower(unit, new HashSet<UnitManager>());
+    }
+
+    private static int CombinedCapturePower(UnitManager unit, HashSet<UnitManager> processed)
+    {
+        if (unit == null || unit.IsDead || !processed.Add(unit))
+            return 0;
+        int power = PodeCapturarSensor.HasAnyCaptureKey(unit)
+            ? PodeCapturarSensor.GetCapturePower(unit)
+            : 0;
+        IReadOnlyList<UnitTransportSeatRuntime> seats = unit.TransportedUnitSlots;
+        if (seats != null)
+            for (int i = 0; i < seats.Count; i++)
+            {
+                UnitManager child = seats[i] != null ? seats[i].embarkedUnit : null;
+                if (child != null && child.IsEmbarked)
+                    power += CombinedCapturePower(child, processed);
+            }
+        return power;
+    }
+
+    private bool IsCapturingForeignBuilding(UnitManager enemy, Vector3Int cell)
+    {
+        ConstructionManager building =
+            ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        return building != null
+            && building.IsCapturable
+            && !PlayerSlotRelations.AreAllies(enemy, building);
+    }
+
+    // Capturavel que NAO e do inimigo (nosso ou neutro), o mais perto de algum predio
+    // inimigo; empate, o mais perto desta unidade.
+    private static bool TryResolveContestedBuilding(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out ConstructionManager contested)
+    {
+        contested = null;
+        if (snapshot == null || snapshot.EnemyBuildings == null || snapshot.EnemyBuildings.Count == 0)
+            return false;
+
+        int bestFront = int.MaxValue;
+        int bestOwn = int.MaxValue;
+        foreach (ConstructionManager building in ConstructionManager.AllActive)
+        {
+            if (building == null || !building.IsCapturable
+                || PlayerSlotRelations.AreEnemies(unit, building))
+                continue;
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+
+            int front = int.MaxValue;
+            foreach (ConstructionManager enemyBuilding in snapshot.EnemyBuildings)
+            {
+                if (enemyBuilding == null)
+                    continue;
+                Vector3Int enemyCell = enemyBuilding.CurrentCellPosition;
+                enemyCell.z = 0;
+                int d = AIActionReachCoordinator.CubicDistance(cell, enemyCell);
+                if (d < front)
+                    front = d;
+            }
+            if (front == int.MaxValue)
+                continue;
+
+            int own = AIActionReachCoordinator.CubicDistance(fromCell, cell);
+            if (front < bestFront || (front == bestFront && own < bestOwn))
+            {
+                contested = building;
+                bestFront = front;
+                bestOwn = own;
+            }
+        }
+        return contested != null;
+    }
+
+    private static bool CanAnyWeaponHitLayer(UnitManager unit, Domain domain, HeightLevel height)
+    {
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit != null ? unit.GetEmbarkedWeapons() : null;
+        if (weapons == null)
+            return false;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon entry = weapons[i];
+            if (entry?.weapon != null
+                && entry.squadAmmunition > 0
+                && entry.weapon.SupportsOperationOn(domain, height))
+                return true;
+        }
+        return false;
+    }
+
     private bool TryResolveOperationalHuntTarget(
         UnitManager unit,
         Vector3Int fromCell,
@@ -993,6 +1256,7 @@ public partial class AIController
             candidates,
             out bool hasAttackableAircraft,
             out bool hasPreferredAttackableAircraft);
+        bool isDisruptor = IsCaptureDisruptor(unit);
 
         for (int i = 0; i < candidates.Count; i++)
         {
@@ -1024,12 +1288,16 @@ public partial class AIController
 
             float combatScore = 0f;
             string combatScoreReason = "";
+            int deniedCapture = 0;
             if (TrySimulateAttackForAI(
                     unit,
                     enemy,
                     cell,
                     out CombatEvaluationResult simSummary))
             {
+                if (isDisruptor)
+                    deniedCapture = PredictDeniedCapturePower(
+                        enemy, simSummary.Simulation.defenderHpAfter);
                 combatScore =
                     (simSummary.Simulation.killGuaranteed ? 26000f : 0f)
                     + simSummary.TargetDamagePercent * 420f
@@ -1047,6 +1315,11 @@ public partial class AIController
             bool attacksFromCurrentCell = cell == fromCell;
             float targetValueScore =
                 ScoreAirCombatTargetValue(enemy, attackOption, unit);
+            // Disruptor: o valor do alvo e o DINHEIRO que o tiro nega, nao o bonus
+            // generico de alvo aereo (que punha um Chinook com 1 soldado acima de um
+            // capturador no chao). Sem captura em jogo, cai no valor generico.
+            if (isDisruptor && deniedCapture > 0)
+                targetValueScore = deniedCapture * DisruptorDeniedCaptureWeight;
             float postureScore = ScoreAirCombatAttackPosture(
                 unit,
                 snapshot,
@@ -1078,6 +1351,7 @@ public partial class AIController
                     $"value={targetValueScore:F0} posture={postureScore:F0} " +
                     $"weapon={weaponName} hp={enemy.CurrentHP} " +
                     $"noMove={attacksFromCurrentCell}{combatScoreReason} " +
+                    (isDisruptor ? $"capturaNegada={deniedCapture} " : "") +
                     $"{attackDecisionReason}";
             }
         }
@@ -1391,7 +1665,7 @@ public partial class AIController
 
         bool isAirAttack = targetData.roles != null
             && targetData.roles.Count > 0
-            && targetData.roles[0] == UnitRole.AtaqueAereo;
+            && UnitRoleCompatibility.MatchesLabel(targetData.roles[0], UnitRole.AtaqueAereo);
         bool isInterceptor = targetData.roles != null
             && targetData.roles.Count > 0
             && targetData.roles[0] == UnitRole.Interceptador;
