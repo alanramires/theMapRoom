@@ -52,6 +52,43 @@ O relatório explica **o porquê**, não o quê. O `git log` já diz o quê.
 
 Adicione a linha correspondente na tabela de versões do `CHANGELOG.md`.
 
+### 2b. Docs de doutrina: apontar, não reescrever
+
+O fechamento costuma ser feito com o autor esgotado, e a doutrina do dia ainda
+está se mexendo. **Não reescreva documento de doutrina aqui.** Só aponte, no
+relatório, numa seção própria:
+
+```text
+## Docs de doutrina
+
+Desatualizados
+  docs/AI Behavior/Capturador.md — blitz: rota terrestre (vX.Y.Z), só compilou
+
+Prontos para consolidar
+  Força aérea: Disruptor/CCP — sem mudança há 2 fechamentos, visto em Play, sem marca aberta
+```
+
+**Desatualizado:** para cada frente do dia, procure nos docs de doutrina
+(`docs/AI Behavior/`, `docs/manual/`) quem descreve a regra que mudou. Procure o
+conceito por sinônimo, não só pelo nome do método — busca vazia não prova que o
+doc não existe. Liste arquivo + o que mudou + "visto em Play" ou "só compilou".
+Carregue a lista do relatório anterior: item que não foi consolidado continua
+na lista.
+
+**Pronto para consolidar** — os três sinais, todos objetivos, nenhum depende de
+o autor julgar:
+
+1. **estável:** nenhum commit mexeu naquela regra nos últimos 2 fechamentos
+   (`git log` nos arquivos da frente e nas mensagens que a citam);
+2. **vista rodando:** algum relatório registra a regra como "visto em Play";
+   "só compilou" não consolida;
+3. **sem marca aberta:** nenhuma marca do AI Step sobre ela depois da última
+   mudança (`ai_step_marcas.jsonl`).
+
+Quem consolida é a skill `consolidar-doutrina`, chamada pelo autor quando
+quiser, para um item desta lista. Se ninguém chamar, a lista cresce — e o
+relatório mostra isso.
+
 ## 3. Commits separados por frente de trabalho
 
 **Um commit por frente, não um commit do lote inteiro.** Stage arquivo por
@@ -119,6 +156,7 @@ Corte o que virou obsoleto. O resumo cresce se ninguém podar.
 
 - [ ] `git status` limpo
 - [ ] relatório existe e tem seção do que não terminou
+- [ ] relatório tem a seção "Docs de doutrina" (desatualizados + prontos para consolidar)
 - [ ] `CHANGELOG.md` tem a linha da versão
 - [ ] um commit por frente, mais um de churn
 - [ ] tag criada **depois** do último commit, e pushada
