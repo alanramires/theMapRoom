@@ -745,10 +745,9 @@ public static class MelhorEmbarqueService
                 && PodeEmbarcarSensor.IsTransporterCellValidForEmbark(
                     request.map, request.terrainDatabase,
                     transporterData, cell)
-                && (request.transporter.GetDomain() != Domain.Air
-                    || PodePousarSensor.CanLandAtCell(
-                        request.transporter, request.map,
-                        request.terrainDatabase, cell, out _));
+                && (transporterData == null
+                    || !transporterData.IsAircraft()
+                    || CanAircraftLandForPickup(request, cell));
             // LZ NUNCA EM CIMA DE PRODUTORA PROPRIA. Transportador estacionado na
             // fabrica tranca a compra daquele hex no fim do turno. AI Step
             // 2026-11-04: o APC #21 "aguardava" o #9 parado na propria
@@ -1092,6 +1091,44 @@ public static class MelhorEmbarqueService
                 explicitManifest: false);
         }
         return result;
+    }
+
+    /// <summary>
+    /// A aeronave POUSA nesta LZ para embarcar?
+    ///
+    /// O gate decidia por `GetDomain() != Air`, e aeronave POUSADA e Land: o Chinook
+    /// que comecava o turno no aeroporto era tratado como transporte terrestre e pulava
+    /// o teste de pouso inteiro. AI Step T3 amarelo: o #18 escolheu (16,2) com o proprio
+    /// passageiro #10 no predio — chegava, nao pousava, e ninguem embarcava. O teste
+    /// agora e pela FICHA (IsAircraft), e a ocupacao repete a mesma sequencia do pouso
+    /// em AircraftOperationRules.Evaluate (camada de pouso do hex, suporte a ela,
+    /// CanEndLayerTransitionAtCell) — que vale no chao e no ar. Pousar na superficie
+    /// com QUALQUER unidade no hex e proibido, inclusive o passageiro do manifesto: o
+    /// veiculo pousa antes de ele embarcar.
+    ///
+    /// Terreno/estrutura continua com o PodePousar, que so responde com a aeronave no
+    /// ar (gate de estado "no ar x pousada", pela unidade real). Pousada, fica como
+    /// antes: sem esse teste.
+    /// </summary>
+    private static bool CanAircraftLandForPickup(
+        MelhorEmbarqueRequest request,
+        Vector3Int cell)
+    {
+        UnitManager aircraft = request.transporter;
+        AircraftOperationRules.ResolveGroundedLayerForCell(
+            aircraft, request.map, request.terrainDatabase, cell,
+            out Domain landDomain, out HeightLevel landHeight);
+        if (landDomain == Domain.Air
+            || !aircraft.SupportsLayerMode(landDomain, landHeight))
+            return false;
+        if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(
+                request.map, cell, aircraft, landDomain, landHeight, out _))
+            return false;
+
+        if (aircraft.GetDomain() == Domain.Air && !aircraft.IsAircraftGrounded)
+            return PodePousarSensor.CanLandAtCell(
+                aircraft, request.map, request.terrainDatabase, cell, out _);
+        return true;
     }
 
     private static IReadOnlyList<Vector3Int> ResolveCandidateCells(
