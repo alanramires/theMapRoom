@@ -1042,7 +1042,7 @@ MonoBehaviour:
   - teamId: 2
     flipX: 0
     flipXOverride: 0
-    isAI: 0
+    isAI: 1
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -1054,7 +1054,7 @@ MonoBehaviour:
   - teamId: 3
     flipX: 1
     flipXOverride: 0
-    isAI: 0
+    isAI: 1
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -9128,7 +9128,7 @@ MonoBehaviour:
   showAIUnitHUD: 1
   startOnPause: 1
   iaRapida: 0
-  hardMode: 0
+  hardMode: 1
   easyMode: 0
   strongWeakSidePolitic: 0
   conscriptionDoctrine: 0
@@ -10527,7 +10527,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 376536317023229975, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4294944936
       objectReference: {fileID: 0}
     - target: {fileID: 3803312006916396853, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Pivot.x
@@ -10615,7 +10615,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4294944936
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
