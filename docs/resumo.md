@@ -1,15 +1,33 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-06, **depois** da tag `v10.2.0`.
+Ponto de retomada. Atualizado em 2026-11-07, **depois** da tag `v10.3.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v10.2.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.2.0.md`](relatorio_v10.2.0.md),
-[`relatorio_v10.1.0.md`](relatorio_v10.1.0.md), [`relatorio_v10.0.1.md`](relatorio_v10.0.1.md).
+`v10.3.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.3.0.md`](relatorio_v10.3.0.md),
+[`relatorio_v10.2.0.md`](relatorio_v10.2.0.md), [`relatorio_v10.1.0.md`](relatorio_v10.1.0.md).
+
+**A descoberta da v10.3.0: a IA comprava por igualdade.** O counter só sossegava quando a
+cobertura *empatava* a força inimiga (efeito Pernalonga × Gaguinho, inclusive contra infantaria
+do outro lado do mar); o Médio planejava igual ao Fácil (o multiplicador do preset não tinha
+leitor); o "Interceptador" era um nome só para dois trabalhos. Cada igualdade virou régua:
+
+- **counter:** urgente só no **anel** (Operacional do inimigo, para terra), fora dele tolera
+  60% de cobertura, e alvo em outra ilha não aceita resposta terrestre quando há ar à venda;
+- **capturadores por prédio** no perfil (Fácil 1,1,2,2 · Médio 1,2,3,4 · Difícil 2,4,5,6),
+  reforço do Difícil desliga em `Defensive`; a invasão da base segue com regra própria;
+- **dois ramos aéreos** (autor): poder de captura < Apache < Caça B < Caça A; bombardeiro <
+  Caça B < Caça A. Novo sub-rótulo `InterceptadorDeDisruptor` (Caça B), no molde do Disruptor;
+  a escolta o pede pelo papel principal;
+- **antiaéreo pela presa:** bombardeiro no anel pede SAM (Plane PRI), Apache pede AAA (Heli PRI);
+  sem primário à venda, o secundário. **Um PRI por classe** — empate pelo preço nunca compra SAM.
+
+Vistos em Play: teto de conscrição contando embarcados, escolta pré-comprada (Caça B saiu),
+counter sem resposta terrestre para outra ilha. O resto só compilou.
 
 **A descoberta da v10.2.0: a compra gastava o dinheiro do elite em qualquer urgência.** Três AAA,
 um Apache, uma Metranca — e os caças nunca nasciam. Romper a poupança passou a ser **no tamanho
@@ -326,23 +344,35 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
+### O que a v10.3.0 deixou — régua no lugar de igualdade
+
+1. **Ver rodando o que só compilou:** anel e tolerância do counter
+   (`AIShoppingPlanner.CounterPressure.cs`, log `counter … sem compra — cobertura … >= 60%`),
+   a escala de capturadores por prédio (Médio no Peixe Pequeno: o caixa trava em infantaria?),
+   o anel antiaéreo por presa (`presa em primario/secundario` no motivo da demanda), a escolta
+   pedindo `InterceptadorDeDisruptor`.
+2. **Custo do anel Operacional do counter** — não medido. Lentidão da IA no Feijão Torto:
+   começar por aqui (há cache por inimigo/célula/turno).
+3. **Demanda "bombardeiro inimigo → Caça A"** — o ramo 2 só tem a resposta do chão.
+4. **`aiAttackOnlyListedTargets` (Caça F, BF) sem leitor, de propósito** — quando um furtivo
+   "revelar por quê?", é ele. Hoje classe fora da lista vale Terciária e o "ar primeiro" atira.
+5. **SAM à venda mas bloqueado pela cadeia de elite** — a demanda urgente nasceria e não fecharia.
+6. **Freio da conscrição pela fila de carona** — continua decisão do autor.
+7. **Batalha agora com `isAI` 1 nos dois slots e `hardMode` 1** (`a036cfc`, autoria) — rever
+   antes de publicar.
+8. **Docs de doutrina:** lista no relatório v10.3.0 (Shopping.md §6, Papeis/ficha_do_papel/
+   Assalto/Vigilancia — Interceptador em dois; a fórmula de slots por setor não tem doc).
+
 ### O que a v10.2.0 deixou — compra aérea e o primeiro build para fora
 
 1. **Ver rodando o que só compilou:** swap pelo Tático da vizinhança
    (`AIController.Capturer.Swap.cs`), o piso de Chinook da fila de carona (origem `fila-carona`
    no log do carrinho), a estrada do fundo em "Selecione o Mapa" (precisa do "Assar TODOS
    (quadrantes + fundos)") e a guarda do Panel_helper.
-2. **Por qual caminho o Caça B saiu:** "escolta segura o caixa" num turno e o caça no seguinte,
-   ou caça direto pela folga da conscrição. A próxima marca de compra de caça responde.
-3. **Freio da conscrição pela fila de carona** (parar o imposto quando ilhados > bancos aéreos
-   livres): proposto, decisão do autor.
-4. **Metranca contra inimigo fora da ilha:** a pressão de counter só desconta o `foraDaTerra`
-   ao escolher quem responde; com o Aeroporto ocupado a demanda urgente cai na Fábrica Leve.
-5. **No build Web:** volume persiste ao reabrir? Retrato e logo em 1024 ficaram nítidos?
-6. **Batalha com `isAI` 0 nos dois slots, `aiStep`/`hardMode` desligados, massacre 0.5:** é
-   autoria do autor (commit `6e827eb`); não conferi se a Nova Partida sobrescreve o `isAI`.
-7. **Docs de doutrina:** lista no relatório v10.2.0 (Capturador.md — o swap ainda diz "mesmo
-   objetivo" e "HP cru" —, Shopping.md §6, Transporte.md, FireSupport.md).
+2. **No build Web:** volume persiste ao reabrir? Retrato e logo em 1024 ficaram nítidos?
+
+O caminho do Caça B (respondido: pré-compra da escolta) e a Metranca contra inimigo fora da
+ilha (resolvido pela regra "outra ilha" do counter) saíram desta lista na v10.3.0.
 
 ### O que a v10.1.0 deixou — a força aérea no Peixe Pequeno
 
@@ -763,6 +793,12 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **`snapshot.MyUnits` não tem embarcados** | o limite do jogo (`MatchController.GetSlotUnitCounts`) e o HUD contam todos. Qualquer régua comparada ao teto tem de contar como o teto, senão a festa da carona esconde metade do exército |
+| **sub-rótulo novo some das comparações estritas** | `roles[0] == X` não vê o sub-rótulo. Antes de criar um (Disruptor, `InterceptadorDeDisruptor`), trocar as leituras por `MatchesLabel`/`CanSatisfy` — e conferir que a CONTAGEM e a DEMANDA usam a mesma régua, senão a demanda aceita, a contagem não vê, e a compra entra em loop |
+| **empate de prioridade decide pelo preço** | duas peças com a mesma presa em primário: a barata ganha sempre (a AAA nunca deixaria o SAM nascer). Um PRI por classe; a peça barata entra pelo secundário |
+| **o carrinho prefere largura** | o beam soma atendimentos: 6 peças baratas vencem 1 cara que cabe. Peça que precisa sair (1º MBT, escolta) vai por `TryPreCommitDemand`, antes do carrinho |
+| **inspeção que loga vira loop** | a Shopping Pressure recalculava a demanda por segundo; linha sem `if (log …)` aparece no Console a cada refresh |
+| **Bash é lento neste disco por arquivo** | `grep`/`basename` por arquivo em laço passa de 2 min. Auditar fichas com PowerShell num processo só (o script de auditoria fica no scratchpad da sessão) |
 | **"Voltar ao debug" só restaura o que o "Preparar" mudou** | flag desligada à mão antes do Preparar não entra no backup (`UserSettings/PublicacaoChecklist.json`). No fechamento da v10.2.0, cinco flags da Batalha (Start On Pause, atalhos, HUD e logs da IA) só voltaram pelo valor do HEAD |
 | **a raiz do prefab é override em cada cena** | aumentar o `Panel_Config` no prefab não chegava nas cenas: tamanho e posição da raiz ficam gravados na instância. Mexer no prefab E nas três instâncias |
 | **liberar a poupança sem fechar a peça** | soltar a reserva do elite para uma demanda que não cabe só entrega o dinheiro a outra demanda. Rompe se compra; senão, segura o caixa |
