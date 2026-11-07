@@ -29,6 +29,7 @@ da cena. Um mapa novo tem de pedir autoria, não código.
 | v10.1.0 | Você não vai fazer dinheiro não (Disruptor de captura e o capitão = poder de captura combinado; Bombardeiro nega a escolta; demanda de Disruptor; carona que trabalha enquanto espera) | [relatório](docs/relatorio_v10.1.0.md) |
 | v10.2.0 | O dinheiro do elite para de vazar, e o jogo vai para outra pessoa (escolta segura o caixa, folga da conscrição, swap pelo Tático, fila de carona; checklist de publicação, texturas Web, volume, estrada inteira na Campanha) | [relatório](docs/relatorio_v10.2.0.md) |
 | v10.3.0 | Não precisa empatar, precisa não perder (capturadores por prédio, teto com embarcados, escolta pré-comprada, counter por anel e tolerância, Interceptador em dois ramos, antiaéreo pela presa) | [relatório](docs/relatorio_v10.3.0.md) |
+| v10.4.0 | Ler o que o jogo já sabe (Fase 2 volta a ver o inimigo; escada aérea — vanguarda pede caça, cadeia na demanda; Avião Tanque pelo vaivém; AI Step e Shopping Pressure param de refazer o jogo; GetConstructionAtCell sem busca na cena; entrega pela banda Operacional) | [relatório](docs/relatorio_v10.4.0.md) |
 
 ---
 
