@@ -24,21 +24,20 @@ public class ShoppingPressureWindow : EditorWindow
     private Vector2 _leftScroll;
     private Vector2 _rightScroll;
 
-    // A reconstrução do snapshot dispara GetDeficits, que loga no console. Por isso a
-    // coluna de pressão é recomputada quando o tabuleiro muda (turno, caixa, unidades,
-    // time) ou no botão Atualizar — nunca por relógio. A coluna de objetivos lê o plano
-    // vivo a cada repaint (silencioso).
-    private string _lastFingerprint = string.Empty;
+    // FATO NA ORIGEM: a janela LE a ultima compra que a IA fez (AIShoppingPlanner guarda o
+    // que o carrinho viu: snapshot, demanda, roster, counter, operacional). Nao calcula nada
+    // sozinha — antes era um segundo shopping rodando ao lado do primeiro, recalculando a cada
+    // mudanca de tabuleiro, por relogio e ate no desenho, e derrubando o FPS do Play.
+    // O unico calculo e o botao Atualizar: "e se comprasse agora?", sob pedido.
+    // A coluna de objetivos le o plano vivo a cada repaint (silencioso).
     private List<AIShoppingDemand> _demands = new List<AIShoppingDemand>();
     private AIWorldSnapshot _snapshot;
     private AIShoppingPlanner.AIRosterKnowledge _roster;
-    // Pressao operacional (eixos, fila de carona, ilha, vaivem aereo) entra no MESMO recalculo
-    // da demanda. Era chamada no desenho — 2 lugares x Layout+Repaint x 10 Hz, ~40 vezes por
-    // segundo de mapa de eixos + fila de carona + inundacao da ilha — e derrubava o FPS do Play.
     private AIShoppingPlanner.OperationalPressureInspection _operationalPressure;
-    // Idem a pressao de counter: refaz o roster e o anel Operacional por inimigo.
     private AIShoppingPlanner.CounterPressureInspection _counterPressure;
     private TeamId _snapshotTeam = TeamId.Neutral;
+    private AIShoppingPlanner.ShoppingDecisionInspection _shownDecision;
+    private string _sourceLabel;
 
     private GUIStyle _header;
     private GUIStyle _objTitle;
@@ -122,6 +121,12 @@ public class ShoppingPressureWindow : EditorWindow
 
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(ResolveSelectedSlot());   // leitura viva, silenciosa
         RebuildPressureIfStale(force: false);
+        if (_snapshot == null)
+            EditorGUILayout.HelpBox(
+                $"[{team}] ainda não comprou neste mapa. A janela mostra a ÚLTIMA COMPRA da IA "
+                + "(fase de compra); Atualizar simula o que ela compraria agora.", MessageType.Info);
+        else if (!string.IsNullOrEmpty(_sourceLabel))
+            EditorGUILayout.LabelField(_sourceLabel, EditorStyles.miniBoldLabel);
 
         EditorGUILayout.BeginHorizontal();
 
@@ -149,29 +154,48 @@ public class ShoppingPressureWindow : EditorWindow
 
     private void RebuildPressureIfStale(bool force)
     {
-        bool teamChanged = _snapshotTeam != team;
-        // Recalcula quando o TABULEIRO muda (turno, caixa, numero de unidades), nao por relogio:
-        // a demanda inteira por segundo, com a janela aberta, pesava no Play e repetia log.
-        // O relogio longo fica como rede de seguranca para mudanca que a impressao nao ve.
         PlayerSlotId slot = ResolveSelectedSlot();
-        string fingerprint = _matchController != null
-            ? $"{_matchController.CurrentTurn}|{_matchController.GetActualMoney(slot)}|{UnitManager.AllActive.Count}"
-            : string.Empty;
-        bool boardChanged = fingerprint != _lastFingerprint;
-        // Sem relogio: o recalculo inteiro (demanda + counter + operacional) custava ate segundos
-        // e, de 10 em 10 s, travava um frame com a IA PARADA esperando o AI Step — FrameSpike de
-        // 1-4 s em Neutral/AwaitingAction, nada se mexendo. Parado, nao ha o que refazer; o que
-        // a impressao nao ve, o botao Atualizar refaz.
-        if (!force && !teamChanged && !boardChanged)
-            return;
-        _lastFingerprint = fingerprint;
+        bool teamChanged = _snapshotTeam != team;
 
-        _snapshot = AIWorldSnapshot.Build(ResolveSelectedSlot(), _matchController);
-        _demands = AIShoppingPlanner.InspectRoleDemands(_snapshot);
-        _roster = AIShoppingPlanner.InspectRosterKnowledge(_snapshot);
-        _operationalPressure = AIShoppingPlanner.InspectOperationalPressure(_snapshot);
-        _counterPressure = AIShoppingPlanner.InspectCounterPressure(_snapshot);
-        _snapshotTeam = team;
+        if (force)
+        {
+            // Simulacao sob pedido: a unica conta que a janela faz.
+            _snapshot = AIWorldSnapshot.Build(slot, _matchController);
+            _demands = AIShoppingPlanner.InspectRoleDemands(_snapshot);
+            _roster = AIShoppingPlanner.InspectRosterKnowledge(_snapshot);
+            _operationalPressure = AIShoppingPlanner.InspectOperationalPressure(_snapshot);
+            _counterPressure = AIShoppingPlanner.InspectCounterPressure(_snapshot);
+            _snapshotTeam = team;
+            _sourceLabel = $"SIMULAÇÃO (Atualizar) no T{_snapshot?.TurnNumber} — o que a IA compraria agora, não o que comprou";
+            // Mantem a referencia da compra exibida: so uma compra NOVA substitui a simulacao.
+            AIShoppingPlanner.TryGetLastShoppingDecision(slot.Value, out _shownDecision);
+            return;
+        }
+
+        bool found = AIShoppingPlanner.TryGetLastShoppingDecision(
+            slot.Value, out AIShoppingPlanner.ShoppingDecisionInspection decision);
+        if (found && (teamChanged || !ReferenceEquals(decision, _shownDecision)))
+        {
+            _shownDecision = decision;
+            _snapshot = decision.Snapshot;
+            _demands = decision.Demands ?? new List<AIShoppingDemand>();
+            _roster = decision.Roster;
+            _operationalPressure = decision.Operational;
+            _counterPressure = decision.Counter;
+            _snapshotTeam = team;
+            _sourceLabel = $"Compra da IA no T{decision.Turn} (o que o carrinho viu). Atualizar simula o agora.";
+        }
+        else if (!found && teamChanged)
+        {
+            _shownDecision = null;
+            _snapshot = null;
+            _demands = new List<AIShoppingDemand>();
+            _roster = null;
+            _operationalPressure = null;
+            _counterPressure = null;
+            _snapshotTeam = team;
+            _sourceLabel = null;
+        }
     }
 
     private void DrawToolbar()

@@ -1336,11 +1336,31 @@ public partial class AIShoppingPlanner
         if (snapshot == null)
             return orders;
 
+        s_lastBuiltRoster = null;
+        s_lastBuiltCounter = null;
+        s_lastBuiltOperational = null;
         List<AIShoppingDemand> demands = BuildRoleShoppingDemands(snapshot);
         AIElitePurchaseCommitment eliteCommitment =
             ResolveElitePurchaseCommitment(snapshot, demands);
-        AIRosterKnowledge shoppingRoster = BuildRosterKnowledge(snapshot, log: false);
-        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, shoppingRoster);
+        // Reusa o que a demanda acabou de montar (mesmo snapshot): antes refazia roster e counter
+        // uma segunda vez aqui. O rebelde volta cedo e nao monta: cai no calculo.
+        AIRosterKnowledge shoppingRoster = s_lastBuiltRoster ?? BuildRosterKnowledge(snapshot, log: false);
+        CounterPressureInspection counterPressure = s_lastBuiltCounter ?? BuildCounterPressure(snapshot, shoppingRoster);
+#if UNITY_EDITOR
+        // FATO NA ORIGEM: a Shopping Pressure le ESTA compra, nao refaz outra ao lado. Mesmas
+        // referencias que o carrinho usa; o que o resto da funcao muda na lista aparece la.
+        s_lastDecisionBySlot[snapshot.AISlotIndex] = new ShoppingDecisionInspection
+        {
+            Turn = snapshot.TurnNumber,
+            Slot = snapshot.AISlotIndex,
+            SceneHandle = UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle.GetRawData(),
+            Snapshot = snapshot,
+            Demands = demands,
+            Roster = shoppingRoster,
+            Counter = counterPressure,
+            Operational = s_lastBuiltOperational ?? BuildOperationalPressure(snapshot),
+        };
+#endif
         var occupied = BuildProductionOccupiedCells();
         var usedBuildings = new HashSet<ConstructionManager>();
         int remaining = snapshot.Budget;
@@ -2909,7 +2929,40 @@ public partial class AIShoppingPlanner
         return cheapest == int.MaxValue ? 0 : cheapest;
     }
 
+    // O que a ultima montagem de demanda REAL (log=true, a do Decide) calculou no caminho.
+    // Zerados no inicio do DecideRoleBased; nunca lidos fora dele e da inspecao.
+    private static AIRosterKnowledge s_lastBuiltRoster;
+    private static CounterPressureInspection s_lastBuiltCounter;
+    private static OperationalPressureInspection s_lastBuiltOperational;
+
 #if UNITY_EDITOR
+    // A ultima compra de cada slot, exatamente como o carrinho a viu.
+    public sealed class ShoppingDecisionInspection
+    {
+        public int Turn;
+        public int Slot;
+        public ulong SceneHandle;
+        public AIWorldSnapshot Snapshot;
+        public List<AIShoppingDemand> Demands;
+        public AIRosterKnowledge Roster;
+        public CounterPressureInspection Counter;
+        public OperationalPressureInspection Operational;
+    }
+
+    // O planner e DontDestroyOnLoad: o registro carrega a cena em que nasceu e e recusado em
+    // outra, para a compra do mapa anterior nunca aparecer como se fosse deste.
+    private static readonly Dictionary<int, ShoppingDecisionInspection> s_lastDecisionBySlot =
+        new Dictionary<int, ShoppingDecisionInspection>();
+
+    public static bool TryGetLastShoppingDecision(int slot, out ShoppingDecisionInspection decision)
+    {
+        if (s_lastDecisionBySlot.TryGetValue(slot, out decision) && decision != null
+            && decision.SceneHandle == UnityEngine.SceneManagement.SceneManager.GetActiveScene().handle.GetRawData())
+            return true;
+        decision = null;
+        return false;
+    }
+
     // Acesso somente-editor para a janela Tools > Utils > Shopping Pressure.
     // Reconstrói a fila de demandas exatamente como o shopping a veria agora.
     public static List<AIShoppingDemand> InspectRoleDemands(AIWorldSnapshot snapshot)
@@ -3006,6 +3059,11 @@ public partial class AIShoppingPlanner
         var demands = new List<AIShoppingDemand>();
         AIRosterKnowledge roster = BuildRosterKnowledge(snapshot, log);
         CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, roster);
+        if (log)
+        {
+            s_lastBuiltRoster = roster;
+            s_lastBuiltCounter = counterPressure;
+        }
         List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(
             PlayerSlotId.FromIndex(snapshot.AISlotIndex),
             log);
@@ -3432,7 +3490,10 @@ public partial class AIShoppingPlanner
             groundCounterPressureCovered, rallyAssemblyActive);
         AddEliteQualityDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 27,
             groundCounterPressureCovered, rallyAssemblyActive);
-        AddOperationalPressureDemands(snapshot, demands, BuildOperationalPressure(snapshot));
+        OperationalPressureInspection operational = BuildOperationalPressure(snapshot);
+        if (log)
+            s_lastBuiltOperational = operational;
+        AddOperationalPressureDemands(snapshot, demands, operational);
 
         ApplyHardModeArmorFirst(snapshot, demands);
 
