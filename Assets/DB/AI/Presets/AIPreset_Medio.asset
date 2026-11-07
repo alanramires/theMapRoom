@@ -74,8 +74,11 @@ MonoBehaviour:
     massacreEnterForceRatio: 0.66
     massacreExitForceRatio: 0.58
     massacreUnitCapFillRatio: 0.85
+    massacreUnitCapExitFillRatio: 0.45
   plano:
     maxActiveObjectives: 4
+    capturadoresPorPredio: 1
+    reforcoPrimeirosPredios: 0
     capturerSlotsPerSectorMultiplier: 1
     capturerSlotCap: 4
     minDistanceForTransportSlot: 7

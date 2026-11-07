@@ -136,6 +136,18 @@ public partial class AIController
             ? Mathf.Clamp01(activePreset.economia.fracaoRendaForaDeCidades)
             : (EasyMode ? 1f / 3f : 1f);
 
+    /// <summary>Capturadores pedidos por prédio do setor. Sem preset: 1 no hard, 0.5 no resto.</summary>
+    public float CapturadoresPorPredio =>
+        activePreset != null ? Mathf.Max(0.25f, activePreset.plano.capturadoresPorPredio) : (hardMode ? 1f : 0.5f);
+
+    /// <summary>+1 capturador para cada um dos primeiros N prédios do setor. Sem preset: 2 no hard, 0 no resto.</summary>
+    public int ReforcoPrimeirosPredios =>
+        activePreset != null ? Mathf.Max(0, activePreset.plano.reforcoPrimeirosPredios) : (hardMode ? 2 : 0);
+
+    /// <summary>Teto de capturadores por setor (a invasão da base não usa). Sem preset: 6 no hard, 4 no resto.</summary>
+    public int TetoCapturadoresPorSetor =>
+        activePreset != null ? Mathf.Max(1, activePreset.plano.capturerSlotCap) : (hardMode ? 6 : 4);
+
     /// <summary>Preset já com a overlay da dificuldade aplicada. Cópia de runtime; nunca é o asset. Null se basePreset não estiver ligado na cena.</summary>
     public AIPresetData ActivePreset => activePreset;
 

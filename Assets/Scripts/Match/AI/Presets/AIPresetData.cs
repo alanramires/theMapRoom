@@ -355,10 +355,16 @@ public class AIPlannerPreset
     [Tooltip("Máximo de objetivos ofensivos simultâneos (Pending/Pursuing/Capturing). Origem: maxActiveObjectives.")]
     [Range(1, 12)] public int maxActiveObjectives = 4;
 
+    [Tooltip("Capturadores que o plano pede por prédio do setor. 0.5 = um a cada dois prédios (Fácil), 1 = um por prédio (Médio e Difícil). Não vale para a invasão da base (eixo 4), que tem regra própria sem teto.")]
+    [Range(0.25f, 3f)] public float capturadoresPorPredio = 0.5f;
+
+    [Tooltip("Reforço: +1 capturador para cada um dos primeiros N prédios do setor. 0 = sem reforço (Fácil, Médio). 2 = Difícil: 1 prédio → 2, 2 prédios → 4, depois +1 por prédio (3 → 5, 4 → 6).")]
+    [Range(0, 4)] public int reforcoPrimeirosPredios = 0;
+
     [Tooltip("Multiplicador dos slots de capturador por setor. 1 = normal, 2 = a antiga regra do Hard Mode. Origem: PlanEvaluator (slots * 2).")]
     [Range(1, 3)] public int capturerSlotsPerSectorMultiplier = 1;
 
-    [Tooltip("Teto absoluto de slots de capturador por setor, depois do multiplicador. Hoje é const no código: 4 normal, HardModeCapturerSlotCap = 6.")]
+    [Tooltip("Teto de slots de capturador por setor (fora a invasão da base). 4 Fácil/Médio, 6 Difícil.")]
     [Range(1, 12)] public int capturerSlotCap = 4;
 
     [Tooltip("Distância mínima em hexes do QG para um setor gerar slot de transportador no plano e no shopping. Origem: minDistanceForTransportSlot.")]
@@ -528,6 +534,11 @@ public class AIPresetData : ScriptableObject
 
         // --- economia ---
         target.economia.fracaoRendaForaDeCidades = easy ? 1f / 3f : 1f;
+
+        // --- plano: capturadores por prédio do setor.
+        //   Fácil   1, 1, +n/2      Médio  1, 2, +n      Difícil  2, 4, +n
+        target.plano.capturadoresPorPredio = easy ? 0.5f : 1f;
+        target.plano.reforcoPrimeirosPredios = hard ? 2 : 0;
 
         // --- valores que o antigo par normal/hard trocava (só sobem no hard) ---
         // O baseline guarda os valores NORMAL; a overlay hard os substitui. Se você quiser

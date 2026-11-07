@@ -47,11 +47,6 @@ public partial class AIController
     // trocar nao ganha nada. Peso de custo, nao alcance em hex: a banda e da unidade.
     private const float TacticalCaptureAssignmentBonus = 20f;
 
-    // Hard Mode dobra a demanda de capturadores por setor, mas com teto proprio para
-    // aumentar pressao territorial sem explodir setores grandes em demanda absurda de
-    // infantaria (cap normal 4 -> teto hard 6).
-    private const int HardModeCapturerSlotCap = 6;
-
     // Plano de invasão da base inimiga (">>") — captura FINAL: precisa das PEÇAS FORTES (assalto +
     // fogo indireto, atendidos pelo reserve de elite do shopping) E de MASSA barata com suporte. O
     // modelo de gasto é: as elites são atendidas primeiro; o que sobra do orçamento inunda
@@ -449,10 +444,20 @@ public partial class AIController
                     continue;
                 }
             }
-            int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
+            // Demanda proporcional ao setor, escala do autor:
+            //   Fácil 1, 1, +n/2     Médio 1, 2, +n     Difícil 2, 4, +n
+            // = ceil(prédios × por-prédio) + reforço nos primeiros N prédios, com teto por setor
+            // (4, Difícil 6). Antes o Difícil arredondava e SÓ DEPOIS dobrava: 2 prédios davam 2.
+            // Em Defensive (ameaça real ao QG) o reforço desliga: o Difícil pede como o Médio.
+            // A massa do recrutamento forçado fica para defender, não sai capturando retaguarda.
+            int predios = info.ConstructionCount;
+            int teto = TetoCapturadoresPorSetor;
+            int reforco = snapshot.Stance == AIStance.Defensive ? 0 : ReforcoPrimeirosPredios;
+            int slots = Mathf.CeilToInt(predios * CapturadoresPorPredio - 0.001f)
+                + Mathf.Min(predios, reforco);
+            slots = Mathf.Clamp(slots, 1, teto);
             bool highRisk = info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.High;
-            if (highRisk) slots = Mathf.Max(slots, 2);
-            if (DobraSlotsDeCapturador) slots = Mathf.Min(slots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores por setor (com teto)
+            if (highRisk) slots = Mathf.Min(Mathf.Max(slots, 2), Mathf.Max(2, teto));
             if (!isRallyAssemblySector)
             {
                 for (int s = 0; s < slots; s++)
