@@ -3889,7 +3889,13 @@ public partial class AIShoppingPlanner
         // so volta abaixo do piso de saida.
         int unitCap = ai.Match != null ? ai.Match.MaxUnitsPerTeam : 0;
         float capRatio = wasActive ? ai.MassacreUnitCapExitFillRatio : ai.MassacreUnitCapFillRatio;
-        bool byCap = unitCap > 0 && snapshot.MyUnits.Count
+        // Conta COMO O TETO CONTA: o limite do jogo inclui embarcados, o snapshot.MyUnits nao.
+        // Com a festa da carona (4 transportes lotados) a valvula via 2x-3x menos gente que o
+        // HUD e a conscricao seguia acima do teto do autor (Peixe Pequeno T7: HUD 32, teto 30).
+        int unitsInField = snapshot.MyUnits.Count;
+        if (ai.Match != null)
+            ai.Match.GetSlotUnitCounts(snapshot.AISlotIndex, out unitsInField, out _);
+        bool byCap = unitCap > 0 && unitsInField
             >= Mathf.CeilToInt(unitCap * capRatio);
         // DEFESA reativa a conscricao: base ameacada pede corpo agora, nao elite daqui a dois
         // turnos. Mesmos sinais de defesa do resto do shopping (postura Defensiva, Perdendo).
@@ -3899,13 +3905,15 @@ public partial class AIShoppingPlanner
         if (active != wasActive)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                 + (active
-                    ? $"FASE DE MASSACRE: conscrição cessa (fr={macro.ForceRatio:P0} "
-                        + $"unidades={snapshot.MyUnits.Count}/{unitCap}"
-                        + (byCap && !byRatio ? $", teto {ai.MassacreUnitCapFillRatio:P0}" : "")
-                        + ") — caixa vira elite"
-                    : $"fim do massacre (fr={macro.ForceRatio:P0} unidades={snapshot.MyUnits.Count}/{unitCap}"
+                    // Dois gatilhos, uma consequencia (conscricao desliga), nomes diferentes:
+                    // massacre e a vantagem de 2:1; o teto e so o exercito cheio.
+                    ? (byRatio
+                        ? $"FASE DE MASSACRE (vantagem {macro.ForceRatio:P0} >= {ai.MassacreEnterForceRatio:P0}): conscrição cessa "
+                        : $"TETO DE CONSCRIÇÃO ({unitsInField}/{unitCap} >= {ai.MassacreUnitCapFillRatio:P0}): conscrição cessa ")
+                        + $"(fr={macro.ForceRatio:P0} unidades={unitsInField}/{unitCap}) — caixa vira elite"
+                    : $"conscrição reativada (fr={macro.ForceRatio:P0} unidades={unitsInField}/{unitCap}"
                         + (defense ? ", defesa" : "")
-                        + ") — conscrição reativada"));
+                        + ")"));
         return active;
     }
 
