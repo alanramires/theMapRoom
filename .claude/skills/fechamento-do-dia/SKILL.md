@@ -169,6 +169,20 @@ lê antes de codar (o autor abre a sessão com *"leia o resumo.md, em especial a
 trabalho"*). Item dela só sai se o autor mandar, ou se a função que ele cita deixar de existir
 — e aí troca-se o nome, não se apaga a regra.
 
+## 8. Backup do dia
+
+Depois do push e do resumo, tire a foto do dia com a skill global `faca-um-backup`
+(`~/.claude/skills/faca-um-backup`), só deste projeto:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.claude\skills\faca-um-backup\backup.ps1" -Projetos "The Map Room"
+```
+
+Antes, confira que o Unity não está em Play nem com cena por salvar. Rode em segundo plano
+(o `.git` pesa) e relate a linha `OK` / `INCOMPLETO` / `PULEI` / `FALHOU` com o tamanho —
+`INCOMPLETO` não conta como backup. O GitHub guarda o commitado; a foto pega o resto
+(marcas do AI Step, saves, `UserSettings`, o que não foi commitado).
+
 ## Critério de pronto
 
 - [ ] `git status` limpo
@@ -179,5 +193,6 @@ trabalho"*). Item dela só sai se o autor mandar, ou se a função que ele cita 
 - [ ] tag criada **depois** do último commit, e pushada
 - [ ] `docs/resumo.md` descreve o estado de agora
 - [ ] "Regras de trabalho" do resumo intacta, e com a lição do dia se houve uma
+- [ ] backup do dia `OK`
 
 Relate ao autor o que ficou pendente e o que você não conseguiu verificar.
