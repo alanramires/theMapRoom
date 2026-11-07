@@ -33,7 +33,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 4
   combatClassification: 0
-  roles: 08000000
+  roles: 0800000010000000
   aiInitiative: 1
   aiPurchaseMode: 0
   bannedOnHardMode: 0
@@ -49,7 +49,6 @@ MonoBehaviour:
   preferMaxDisplacement: 1
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
-  preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
   attackAcceptHpLossPercent: 50
   attackEliminationMinPercent: 10
@@ -72,6 +71,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 0
   eliteFrom: {fileID: 0}
   combatModifiers: []
@@ -119,12 +119,14 @@ MonoBehaviour:
   - domain: 0
     heightLevel: 3
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierServiceProfile: 0
   supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
