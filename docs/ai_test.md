@@ -211,3 +211,17 @@ Considera somente a parada planejada ou outra celula Tactical adjacente a mesma 
 
 Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Play, usando sensores e simulacao reais: 10 vs3 em planicie, melhor DPQ entre posicoes equivalentes (floresta vs planicie), LZ preservada, embarque imediato, recuperacao e recusa de luta sem abate. Nenhuma acao executada; falta repetir a marca no mapa real.
 
+
+### 2026-11-07 — revezamento da ponta com herdeiro disponível
+- Marca T8/slot 0, Soldado #13: memória de captura iniciada permitia abandonar prédio parcial sem herdeiro confirmado no plano.
+- A execução agora revalida o herdeiro explícito: vivo, desembarcado, sem reparo, ainda sem agir e com alcance tático para assumir. Sem ele, volta ao fluxo normal de captura.
+- O planejador rejeita embarcados também nos candidatos de troca e na consulta de alcance do revezamento.
+- Regressão: `tools/ai_test/verificar_handoff_embarcado.cs` — PASS no Editor fora do Play: herdeiro válido aceita; embarcado, já agiu, distante, sem herdeiro e memória sem plano rejeitam. Embarcado não recebe alcance tático.
+- `dotnet build Assembly-CSharp-Editor.csproj`: 0 erros; 477 avisos existentes.
+
+### 2026-11-07 — espera por carona fora de produtores
+- Marca T8/slot 0, Soldado #57: encontro com Chinook #24 terminava sobre a Fábrica Leve (1,14).
+- O consumidor de MelhorEmbarque agora veta produtores próprios nas paradas do passageiro antes do ranking: Tactical, Operational e longo alcance. Caminhos continuam podendo atravessar essas células.
+- Aproximação ao encontro e ataque oportunista durante a espera também vetam terminar em produtor próprio.
+- Regressão `tools/ai_test/verificar_encontro_fora_produtora.cs`: PASS no Editor fora do Play; produtora mais barata descartada, vizinho alternativo para a mesma LZ, ausência de alternativa devolve vazio e mapa de passagem preservado.
+- Compilação: 0 erros, 477 avisos existentes.

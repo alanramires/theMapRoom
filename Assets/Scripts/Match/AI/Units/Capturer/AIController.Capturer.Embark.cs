@@ -263,6 +263,8 @@ public partial class AIController
                 new MelhorEmbarquePassengerRequest
                 {
                     passenger = passenger,
+                    allowPassengerMeetingCell = cell =>
+                        !IsOwnProductionCell(cell, snapshot.AITeam),
                     // Vazio de proposito: o passageiro nao escolhe um dono.
                     // O farol persistido entra apenas na preferencia abaixo.
                     transporter = null,
@@ -445,7 +447,8 @@ public partial class AIController
                     ToolProgressionIntent.TransportRendezvous,
                     out Vector3Int progressionCell,
                     out _,
-                    out string progressionReason)
+                    out string progressionReason,
+                    allowCell: cell => !IsOwnProductionCell(cell, snapshot.AITeam))
                 && progressionCell != fromCell)
             {
                 action = BuildMoveBatch(
@@ -516,7 +519,7 @@ public partial class AIController
             if (cell != waitingAction.MoveTo && SectorManager.HexDistance(cell, meeting.lzCell) != 1f) continue;
             if (cell != from && (occupied.Contains(cell)
                 || (plannedDestinations != null && plannedDestinations.Contains(cell)))) continue;
-            if (cell != waitingAction.MoveTo && IsOwnProductionCell(cell, snapshot.AITeam)) continue;
+            if (IsOwnProductionCell(cell, snapshot.AITeam)) continue;
             foreach (var enemy in enemies)
             {
                 if (enemy == null || enemy.IsDead || enemy.IsEmbarked

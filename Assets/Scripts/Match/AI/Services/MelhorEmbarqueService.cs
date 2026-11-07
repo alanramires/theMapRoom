@@ -113,6 +113,8 @@ public sealed class MelhorEmbarqueReject
 public sealed class MelhorEmbarqueRequest
 {
     public UnitManager transporter;
+    // Filters waiting endpoints only; routes may cross these cells.
+    public Func<Vector3Int, bool> allowPassengerMeetingCell;
     public Tilemap map;
     public TerrainDatabase terrainDatabase;
     public int tacticalBudget;
@@ -152,6 +154,8 @@ public sealed class MelhorEmbarquePassengerRequest
 {
     public UnitManager passenger;
     public UnitManager transporter;
+    // Filters waiting endpoints only; routes may cross these cells.
+    public Func<Vector3Int, bool> allowPassengerMeetingCell;
     public Tilemap map;
     public TerrainDatabase terrainDatabase;
     public int operationalTurns = 2;
@@ -289,6 +293,7 @@ public static class MelhorEmbarqueService
                         1, request.operationalTurns),
                     includeStrategic = request.includeStrategic,
                     resolveLongRangePassengerMeeting = true,
+                    allowPassengerMeetingCell = request.allowPassengerMeetingCell,
                     allowPassenger = candidate =>
                         candidate == request.passenger,
                     evaluateRideNeed = request.evaluateRideNeed,
@@ -1286,7 +1291,7 @@ public static class MelhorEmbarqueService
                 request.terrainDatabase);
         Dictionary<Vector3Int, PassengerMeeting> nowMeeting =
             BuildMeetingCostMap(
-                request.map, topology, nowStops);
+                request.map, topology, nowStops, request.allowPassengerMeetingCell);
         return new PassengerReachProfile
         {
             // A consulta seguinte pergunta pela LZ, nao pela celula final
@@ -1297,7 +1302,7 @@ public static class MelhorEmbarqueService
             later = request.tacticalOnly
                 ? nowMeeting
                 : BuildMeetingCostMap(
-                    request.map, topology, laterStops),
+                    request.map, topology, laterStops, request.allowPassengerMeetingCell),
             laterStops = laterStops,
             topology = topology,
             nowBudget = nowBudget,
@@ -1311,7 +1316,8 @@ public static class MelhorEmbarqueService
         BuildMeetingCostMap(
         Tilemap map,
         BoardTopologyIndex topology,
-        Dictionary<Vector3Int, int> stopCosts)
+        Dictionary<Vector3Int, int> stopCosts,
+        Func<Vector3Int, bool> allowStop = null)
     {
         var meetingCosts =
             new Dictionary<Vector3Int, PassengerMeeting>();
@@ -1323,6 +1329,8 @@ public static class MelhorEmbarqueService
         {
             Vector3Int stop = pair.Key;
             stop.z = 0;
+            if (allowStop != null && !allowStop(stop))
+                continue;
             SetMinimumMeetingCost(
                 meetingCosts, stop, stop, pair.Value);
 
@@ -1527,7 +1535,8 @@ public static class MelhorEmbarqueService
         profile.longRange = BuildMeetingCostMap(
             request.map,
             profile.topology,
-            longRangeStops);
+            longRangeStops,
+            request.allowPassengerMeetingCell);
     }
 
     // Distribuicao dos pares por estado de rota do passageiro. Diz de que tipo

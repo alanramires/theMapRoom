@@ -82,6 +82,17 @@ public partial class AIController
             advanceSector = ResolveBlitzkriegAdvanceSector(origin.Sector, assigned, snapshot.AITeam);
         }
 
+        // Opening a capture is not a handoff. Revalidate the committed heir
+        // against the current board, also for remembered captures and loaded saves.
+        SectorObjective originObjective = handoffObjective
+            ?? (origin != null && plan != null ? plan.GetObjectiveForSector(origin.Sector) : null);
+        if (!HasReadyBlitzkriegHeir(unit, origin, originObjective, snapshot.AITeam))
+        {
+            hardBlitzkriegHandoffs.Remove(unit.InstanceId);
+            Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} cancela revezamento: sem herdeiro confirmado no chão e no tático — captura normal");
+            return false;
+        }
+
         ConstructionSector originSector = origin != null ? origin.Sector : handoffObjective.Sector;
         if (advanceSector == ConstructionSector.None || advanceSector == originSector)
             return false;
@@ -357,6 +368,25 @@ public partial class AIController
         action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, bestCell,
             bestTarget.InstanceId.ToString(), targetCell, paths);
         return true;
+    }
+
+    private bool HasReadyBlitzkriegHeir(
+        UnitManager leader,
+        ConstructionManager origin,
+        SectorObjective objective,
+        TeamId team)
+    {
+        if (origin == null || objective == null || objective.HandoffHeirUnitId < 0
+            || objective.HandoffHeirUnitId == leader.InstanceId)
+            return false;
+        UnitManager heir = FindActiveUnit(objective.HandoffHeirUnitId, team);
+        if (heir == null || heir.IsDead || heir.IsEmbarked
+            || heir.IsUnderRepair || heir.HasActed)
+            return false;
+        Vector3Int target = origin.CurrentCellPosition;
+        target.z = 0;
+        return SimulateCaptureSensor(heir, target, out _)
+            && ResolveHandoffReach(heir, target, allowNeighbor: true).Tactical;
     }
 
     private static bool TryGetPlannedHardHandoff(

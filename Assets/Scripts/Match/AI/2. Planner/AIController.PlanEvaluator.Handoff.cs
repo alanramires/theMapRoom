@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -149,6 +149,8 @@ public partial class AIController
             {
                 // Herdeiro ja prometido a outro predio nesta passada nao e roubado: o #16 herdou
                 // Golf (fechava) e a fila do eixo o levou para Foxtrot logo em seguida.
+                if (candidate == null || candidate.IsDead || candidate.IsEmbarked
+                    || candidate.HasActed || candidate.IsUnderRepair) continue;
                 if (handoffHeirs.Contains(candidate.InstanceId)) continue;
                 if (!SimulateCaptureSensor(candidate, targetCell, out _)) continue;
 
@@ -270,7 +272,7 @@ public partial class AIController
                         {
                             if (!otherSlot.Filled || otherSlot.Role != UnitRole.Capturador) continue;
                             UnitManager cand = FindActiveUnit(otherSlot.AssignedUnitId, aiTeam);
-                            if (cand == null || cand.IsUnderRepair) continue;
+                            if (cand == null || cand.IsEmbarked || cand.HasActed || cand.IsUnderRepair) continue;
                             if (!SimulateCaptureSensor(cand, targetCell, out _)) continue;
 
                             var swapPaths = UnitMovementPathRules.CalcularCaminhosValidos(
@@ -504,7 +506,8 @@ public partial class AIController
     private HandoffReach ResolveHandoffReach(UnitManager unit, Vector3Int targetCell, bool allowNeighbor)
     {
         var result = new HandoffReach { Cost = int.MaxValue };
-        if (unit == null)
+        if (unit == null || unit.IsDead || unit.IsEmbarked
+            || unit.HasActed || unit.IsUnderRepair)
             return result;
 
         Vector3Int here = unit.CurrentCellPosition; here.z = 0;
@@ -584,7 +587,7 @@ public partial class AIController
                     || plan.HandoffVacaterIds.Contains(slot.AssignedUnitId))
                     continue;
                 UnitManager member = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                if (member == null || member.IsUnderRepair || candidates.Contains(member)
+                if (member == null || member.IsEmbarked || member.HasActed || member.IsUnderRepair || candidates.Contains(member)
                     || IsBusyOnPartialCapture(member))
                     continue;
                 if (!otherSameAxis && !IsStandingInOwnBase(member))
