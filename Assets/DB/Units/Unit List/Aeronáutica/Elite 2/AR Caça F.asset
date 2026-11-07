@@ -33,7 +33,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 4
   combatClassification: 2
-  roles: 0800000010000000
+  roles: 08000000
   aiInitiative: 1
   aiPurchaseMode: 2
   bannedOnHardMode: 0
@@ -47,6 +47,7 @@ MonoBehaviour:
   playConservative: 0
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 1
+  aiAttackOnlyListedTargets: 1
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
   useAttackDecision: 1

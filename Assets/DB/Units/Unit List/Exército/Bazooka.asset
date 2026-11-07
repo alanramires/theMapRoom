@@ -50,9 +50,9 @@ MonoBehaviour:
   playConservative: 0
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
+  aiAttackOnlyListedTargets: 0
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 1
-  preferArtilleryModeBeforeCombatant: 1
   useAttackDecision: 1
   attackAcceptHpLossPercent: 80
   attackEliminationMinPercent: 10

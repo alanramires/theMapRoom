@@ -192,6 +192,8 @@ public class UnitData : ScriptableObject
     public bool preferMoveOnBestDPQ = false;
     [Tooltip("Ao se mover rumo a um destino, prioriza atingir o hex mais distante possivel dentro do alcance de movimento. Favorece rotas de estrada naturalmente pois permitem chegar mais longe por turno. Usado por transportadores para cobrir distancias maximas por turno.")]
     public bool preferMaxDisplacement = false;
+    [Tooltip("SEM LEITOR AINDA (autor, 2026-11-07): ordem de engajamento. Ligado, a IA so ataca classes que estao na Preferencia de alvo por classe (AI); classe fora da lista nao e alvo — melhor passar a vez do que se revelar por um alvo pequeno. Pensado para furtivos (Caca F, Bombardeiro F). Hoje classe fora da lista vale Terciaria e o combate aereo atira nela quando nao ha aeronave ao alcance. Se um furtivo 'revelou por que?', o motivo e este campo ainda nao ser lido.")]
+    public bool aiAttackOnlyListedTargets = false;
 
     [Header("Long Range Decision")]
     [Tooltip("Se ativo, a IA nao reposiciona esta unidade apos compra/spawn. Outros casos especiais podem mover a unidade em regras futuras.")]
