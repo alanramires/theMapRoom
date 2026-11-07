@@ -469,8 +469,14 @@ public partial class AIController
                 : null;
         if (evaluation?.best == null)
         {
-            if ((usesFreeCargoFlow || requiredJointDeliveries >= 2)
-                && TryBuildJointDisembarkProgressionAction(
+            // Sem LZ no Tatico, o passe Operacional vale para QUALQUER carga, nao so para grupo
+            // ou carga livre: "mantem a missao, pousa em outro lugar e faz o resto a pe, em
+            // combate frontal" (autor, 2026-11-07). Ele aceita LZ de onde o passageiro chega ao
+            // alvo em dois turnos a pe (BuildPassengerRouteLimits(…, 2)) e desembarca nesta
+            // rodada quando a LZ esta ao alcance. Antes, um passageiro com missao e alvo cercado
+            // (inimigo no predio, AAA ao lado, terreno sem pouso) pulava este passe, e o courier
+            // caia no "anda o maximo rumo ao alvo" — e parava em cima dele.
+            if (TryBuildJointDisembarkProgressionAction(
                     transporter,
                     passengers,
                     snapshot,
