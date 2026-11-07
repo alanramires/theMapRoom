@@ -33,8 +33,8 @@ public partial class AIShoppingPlanner
             bool elite = u.eliteLevel >= 1;
             int score;
             if      (primary == UnitRole.Transportador && wantsTransport)        score = 10000 + u.cost;
-            else if (primary == UnitRole.Interceptador && !elite && wantsCacaB)  score = (urgentCacaB ? 25000 : 18000) + u.cost;
-            else if (primary == UnitRole.Interceptador &&  elite && wantsCacaA)  score = 30000 + u.cost;
+            else if (UnitRoleCompatibility.MatchesLabel(primary, UnitRole.Interceptador) && !elite && wantsCacaB)  score = (urgentCacaB ? 25000 : 18000) + u.cost;
+            else if (UnitRoleCompatibility.MatchesLabel(primary, UnitRole.Interceptador) &&  elite && wantsCacaA)  score = 30000 + u.cost;
             else if (UnitRoleCompatibility.MatchesLabel(primary, UnitRole.AtaqueAereo)   && !elite && wantsApache) score = 20000 + u.cost;
             else if (UnitRoleCompatibility.MatchesLabel(primary, UnitRole.AtaqueAereo)   &&  elite && wantsBomba)  score = 36000 + u.cost;
             else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
@@ -561,7 +561,7 @@ public partial class AIShoppingPlanner
             && !unit.roles.Contains(UnitRole.Capturador)
             && !unit.roles.Contains(UnitRole.FogoIndireto)
             && !unit.roles.Contains(UnitRole.Transportador)
-            && !unit.roles.Contains(UnitRole.Interceptador)
+            && !UnitRoleCompatibility.CanSatisfy(unit.roles, UnitRole.Interceptador)
             && !UnitRoleCompatibility.CanSatisfy(unit.roles, UnitRole.AtaqueAereo)
             && !unit.roles.Contains(UnitRole.Logistica);
     }

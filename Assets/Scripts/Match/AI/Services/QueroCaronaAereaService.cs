@@ -85,7 +85,7 @@ public static class QueroCaronaAereaService
         bool nativeAir = data.domain == Domain.Air;
         result.isAirCombatRole = nativeAir
             && data.roles != null
-            && (data.roles.Contains(UnitRole.Interceptador)
+            && (UnitRoleCompatibility.CanSatisfy(data.roles, UnitRole.Interceptador)
                 || UnitRoleCompatibility.CanSatisfy(data.roles, UnitRole.AtaqueAereo));
         result.isAirSurveillanceRole = nativeAir
             && data.roles != null

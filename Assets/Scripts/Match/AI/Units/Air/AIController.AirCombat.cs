@@ -154,7 +154,7 @@ public partial class AIController
             return false;
 
         return UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.AtaqueAereo)
-            || data.roles[0] == UnitRole.Interceptador
+            || UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.Interceptador)
             || IsArmedSurveillance(unit, data);
     }
 
@@ -265,7 +265,7 @@ public partial class AIController
             && patrolData.roles != null
             && patrolData.roles.Count > 0
             && (UnitRoleCompatibility.MatchesLabel(patrolData.roles[0], UnitRole.AtaqueAereo)
-                || patrolData.roles[0] == UnitRole.Interceptador);
+                || UnitRoleCompatibility.MatchesLabel(patrolData.roles[0], UnitRole.Interceptador));
         if (usesHalfMovementCaptainPatrol)
         {
             int patrolRadius =
@@ -750,7 +750,7 @@ public partial class AIController
             && airData != null
             && airData.roles != null
             && airData.roles.Count > 0
-            && airData.roles[0] == UnitRole.Interceptador;
+            && UnitRoleCompatibility.MatchesLabel(airData.roles[0], UnitRole.Interceptador);
 
         bool hasCaptain = TryResolveCapturerMagnet(
                 unit,
@@ -1760,7 +1760,7 @@ public partial class AIController
             && UnitRoleCompatibility.MatchesLabel(targetData.roles[0], UnitRole.AtaqueAereo);
         bool isInterceptor = targetData.roles != null
             && targetData.roles.Count > 0
-            && targetData.roles[0] == UnitRole.Interceptador;
+            && UnitRoleCompatibility.MatchesLabel(targetData.roles[0], UnitRole.Interceptador);
         bool isTransport =
             UnitRoleCompatibility.ResolveCompositionRole(targetData) == UnitRole.Transportador;
 

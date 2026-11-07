@@ -29,7 +29,7 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.domain == Domain.Air && d.roles[0] == UnitRole.Interceptador && d.eliteLevel >= 1) activeCacaA++;
+                if (d.domain == Domain.Air && UnitRoleCompatibility.MatchesLabel(d.roles[0], UnitRole.Interceptador) && d.eliteLevel >= 1) activeCacaA++;
             }
         int uncoveredBombers = Mathf.Max(0, enemyBombers - activeCacaA);
 
@@ -50,7 +50,7 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.domain == Domain.Air && d.roles[0] == UnitRole.Interceptador && d.eliteLevel == 0) active++;
+                if (d.domain == Domain.Air && UnitRoleCompatibility.MatchesLabel(d.roles[0], UnitRole.Interceptador) && d.eliteLevel == 0) active++;
             }
 
         int demand = Mathf.Max(0, desired - active);
@@ -70,7 +70,7 @@ public partial class AIShoppingPlanner
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
                 if (d.domain != Domain.Air) continue;
                 UnitRole r = d.roles[0];
-                if (r == UnitRole.Interceptador || (UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo) && d.eliteLevel >= 1))
+                if (UnitRoleCompatibility.MatchesLabel(r, UnitRole.Interceptador) || (UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo) && d.eliteLevel >= 1))
                     enemyFighters++;
             }
 
@@ -88,7 +88,7 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.roles[0] == UnitRole.Interceptador && d.eliteLevel >= 1) active++;
+                if (UnitRoleCompatibility.MatchesLabel(d.roles[0], UnitRole.Interceptador) && d.eliteLevel >= 1) active++;
             }
 
         int demand = Mathf.Max(0, desired - active);
@@ -3173,6 +3173,11 @@ public partial class AIShoppingPlanner
                     $"poder de captura inimigo em transito={capturePowerInTransit} em {loadedCarriers} "
                     + $"transporte(s); Disruptores={activeDisruptors}/{desiredDisruptors} (em pares)", false);
                 disruptor.MaxEliteLevel = 0;
+                // Disruptor DE LINHA: papel principal. Quem e disruptor so de secundario (Caca B,
+                // Caca A) faz o servico quando sobra, mas nao ocupa a vaga — e a contagem
+                // (CountActiveDisruptors) so ve o principal: sem isto a demanda aceitava o caca,
+                // nao o contava, e nunca fechava.
+                disruptor.ExactRole = UnitRole.DisruptorDeCaptura;
                 MergeRoleDemand(demands, disruptor, false);
             }
         }
@@ -3186,18 +3191,30 @@ public partial class AIShoppingPlanner
         // de Interceptador, gate inaplicavel.
         int enemyDisruptorsInAir = CountEnemyAirDisruptors(snapshot);
         int ownAirTransports = CountOwnAirTransports(snapshot, out int damagedAirTransports);
+        // A escolta pede o INTERCEPTADOR DE DISRUPTORES (Caca B), nao qualquer interceptador:
+        // um Caca A de $26000 cacando Apache e o trabalho errado pelo preco errado. Mapa que
+        // nao vende o de disruptores cai no interceptador generico (gate inaplicavel).
+        bool offersAntiDisruptor = OffersPrimaryRole(snapshot, UnitRole.InterceptadorDeDisruptor);
+        UnitRole escortRole = offersAntiDisruptor ? UnitRole.InterceptadorDeDisruptor : UnitRole.Interceptador;
         if (enemyDisruptorsInAir > 0 && ownAirTransports > 0
             && CanAnyOwnProducerOffer(snapshot, UnitRole.Interceptador))
         {
             int desiredEscorts = Mathf.Min(EscortDemandCap,
                 Mathf.CeilToInt((enemyDisruptorsInAir + damagedAirTransports) / 2f));
-            int activeEscorts = CountAtomicRole(snapshot, UnitRole.Interceptador);
+            int activeEscorts = offersAntiDisruptor
+                ? CountAtomicRole(snapshot, UnitRole.InterceptadorDeDisruptor)
+                : CountPrimaryLabel(snapshot, UnitRole.Interceptador);
             if (activeEscorts < desiredEscorts)
-                MergeRoleDemand(demands, NewRoleDemand(UnitRole.Interceptador,
+            {
+                AIShoppingDemand escort = NewRoleDemand(UnitRole.Interceptador,
                     desiredEscorts - activeEscorts, 12, "escolta",
                     $"disruptores inimigos no ar={enemyDisruptorsInAir}; transportes aereos nossos="
                     + $"{ownAirTransports} (avariados={damagedAirTransports}); escoltas="
-                    + $"{activeEscorts}/{desiredEscorts}", false), false);
+                    + $"{activeEscorts}/{desiredEscorts} ({escortRole})", false);
+                if (offersAntiDisruptor)
+                    escort.ExactRole = UnitRole.InterceptadorDeDisruptor;
+                MergeRoleDemand(demands, escort, false);
+            }
         }
 
         int enemyArtillery = CountEnemyCombatRole(snapshot, UnitRole.FogoIndireto);
@@ -4430,6 +4447,36 @@ public partial class AIShoppingPlanner
             }
         }
         return count;
+    }
+
+    // Como CountAtomicRole, mas aceita sub-rotulo (MatchesLabel): Interceptador conta tambem
+    // o InterceptadorDeDisruptor.
+    private static int CountPrimaryLabel(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
+                && data.roles != null && data.roles.Count > 0
+                && UnitRoleCompatibility.MatchesLabel(data.roles[0], role))
+                count++;
+        return count;
+    }
+
+    // Algum produtor nosso vende uma ficha cujo papel PRINCIPAL e este (nao so secundario)?
+    private static bool OffersPrimaryRole(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        if (snapshot?.MyBuildings == null)
+            return false;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role)
+                    return true;
+        }
+        return false;
     }
 
     private static int CountAtomicRole(AIWorldSnapshot snapshot, UnitRole role)

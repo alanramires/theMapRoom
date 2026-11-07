@@ -607,7 +607,7 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.domain != Domain.Air) continue;
                 UnitRole r = u.roles != null && u.roles.Count > 0 ? u.roles[0] : UnitRole.None;
-                if (r != UnitRole.Interceptador && !UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo)) continue;
+                if (!UnitRoleCompatibility.MatchesLabel(r, UnitRole.Interceptador) && !UnitRoleCompatibility.MatchesLabel(r, UnitRole.AtaqueAereo)) continue;
                 if (cheapest == 0 || u.cost < cheapest) cheapest = u.cost;
             }
         }

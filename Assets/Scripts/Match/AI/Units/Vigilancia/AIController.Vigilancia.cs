@@ -1748,7 +1748,7 @@ public partial class AIController
             bool highValue = data.roles != null
                 && (UnitRoleCompatibility.CanSatisfy(data.roles, UnitRole.AtaqueAereo)
                     || data.roles.Contains(UnitRole.Transportador)
-                    || data.roles.Contains(UnitRole.Interceptador));
+                    || UnitRoleCompatibility.CanSatisfy(data.roles, UnitRole.Interceptador));
             if (!highValue)
                 continue;
 

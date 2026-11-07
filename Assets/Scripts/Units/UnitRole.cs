@@ -46,7 +46,14 @@ public enum UnitRole
     // capturador — em vez de orbitar o capitao. Sub-rotulo de AtaqueAereo (o shopping o
     // conta como ataque aereo; ver MatchesLabel), familia Assalto. O que ele caca sai das
     // ARMAS da ficha, nao do rotulo: nada aqui sabe que e um helicoptero.
-    DisruptorDeCaptura = 16
+    DisruptorDeCaptura = 16,
+    // Interceptador de Disruptores (autor, 2026-11-07): o "Interceptador" eram dois trabalhos
+    // com um nome so. Este caca o DISRUPTOR (Apache) que morde o nosso comboio aereo — e quem
+    // a ESCOLTA pede. O Interceptador (8) segue sendo o de aeronaves (Caca A/F: abate o que
+    // voa, bombardeiro primeiro). Sub-rotulo de Interceptador, no mesmo molde do Disruptor
+    // sob AtaqueAereo: MatchesLabel/CanSatisfy fazem o codigo antigo continuar vendo-o
+    // como interceptador. A presa preferida sai da prioridade de alvo da ficha.
+    InterceptadorDeDisruptor = 17
 }
 
 /// <summary>
@@ -99,6 +106,7 @@ public static class UnitRoleCompatibility
             case UnitRole.AtaqueAereo:
             case UnitRole.DisruptorDeCaptura:
             case UnitRole.Interceptador:
+            case UnitRole.InterceptadorDeDisruptor:
             case UnitRole.ArtilheiroCombatente:
                 return UnitRoleFamily.Assalto;
 
@@ -142,6 +150,7 @@ public static class UnitRoleCompatibility
             case UnitRole.Capturador:
             case UnitRole.Assalto:
             case UnitRole.Interceptador:
+            case UnitRole.InterceptadorDeDisruptor:
             case UnitRole.AtaqueAereo:
             case UnitRole.DisruptorDeCaptura:
             case UnitRole.Antiaereo:
@@ -199,6 +208,8 @@ public static class UnitRoleCompatibility
                 return requestedRole == UnitRole.Transportador;
             case UnitRole.DisruptorDeCaptura:
                 return requestedRole == UnitRole.AtaqueAereo;
+            case UnitRole.InterceptadorDeDisruptor:
+                return requestedRole == UnitRole.Interceptador;
             default:
                 return false;
         }
@@ -206,7 +217,8 @@ public static class UnitRoleCompatibility
 
     /// <summary>
     /// O rotulo (roles[0], a essencia) E o pedido, ou um SUB-rotulo dele que o codigo
-    /// deve tratar como o mesmo. Hoje so: DisruptorDeCaptura conta como AtaqueAereo.
+    /// deve tratar como o mesmo. Hoje: DisruptorDeCaptura conta como AtaqueAereo, e
+    /// InterceptadorDeDisruptor conta como Interceptador.
     ///
     /// Existe porque dezenas de pontos testam `roles[0] == AtaqueAereo` estrito (shopping,
     /// combate aereo, rally, carona aerea). Sem um ponto unico, criar o sub-rotulo tirava
@@ -217,8 +229,10 @@ public static class UnitRoleCompatibility
     {
         if (actualRole == requestedRole)
             return true;
-        return requestedRole == UnitRole.AtaqueAereo
-            && actualRole == UnitRole.DisruptorDeCaptura;
+        return (requestedRole == UnitRole.AtaqueAereo
+                && actualRole == UnitRole.DisruptorDeCaptura)
+            || (requestedRole == UnitRole.Interceptador
+                && actualRole == UnitRole.InterceptadorDeDisruptor);
     }
 
     public static bool CanSatisfy(UnitData data, UnitRole requestedRole)
@@ -268,6 +282,8 @@ public static class UnitRoleCompatibility
             return UnitRole.Transportador;
         if (primary == UnitRole.DisruptorDeCaptura)
             return UnitRole.AtaqueAereo;
+        if (primary == UnitRole.InterceptadorDeDisruptor)
+            return UnitRole.Interceptador;
         return primary;
     }
 
