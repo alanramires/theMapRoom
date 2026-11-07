@@ -40,17 +40,17 @@ MonoBehaviour:
   - targetClass: 6
     priority: 2
   - targetClass: 5
-    priority: 2
-  - targetClass: 5
-    priority: 2
+    priority: 1
+  - targetClass: 4
+    priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
   playConservative: 1
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
+  aiAttackOnlyListedTargets: 0
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 1
-  preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
   attackAcceptHpLossPercent: 50
   attackEliminationMinPercent: 10
@@ -73,6 +73,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 1
   eliteFrom: {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
   combatModifiers:
@@ -104,12 +105,14 @@ MonoBehaviour:
     lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierServiceProfile: 0
   supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}

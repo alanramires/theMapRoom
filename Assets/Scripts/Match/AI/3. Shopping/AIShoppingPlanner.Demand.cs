@@ -3124,7 +3124,8 @@ public partial class AIShoppingPlanner
         // continua com a vaga antiaerea do pacote e a Vigilancia, sem urgencia. (Peixe
         // Pequeno T1: o Chinook recem-comprado no aeroporto do outro canto custava uma AAA
         // de prioridade 8 antes de qualquer capturador.)
-        int visibleAir = CountEnemyAirInRing(snapshot, out int airSeen);
+        var airInRingByClass = new Dictionary<GameUnitClass, int>();
+        int visibleAir = CountEnemyAirInRing(snapshot, out int airSeen, airInRingByClass);
         if (log && airSeen > visibleAir)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] ameaca aerea: "
                 + $"{visibleAir}/{airSeen} aeronave(s) visiveis dentro do anel — as de fora, e transporte quando ha Disruptor na oferta, nao pedem AA urgente");
@@ -3133,11 +3134,60 @@ public partial class AIShoppingPlanner
             int activeAA = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
                 + CountAtomicRole(snapshot, UnitRole.Antiaereo);
             int desiredAA = Mathf.Max(1, Mathf.CeilToInt(visibleAir / 2f));
-            if (activeAA < desiredAA)
+
+            // O QUE esta no anel decide QUAL antiaereo (autor, 2026-11-07): bombardeiro pede quem
+            // tem Plane em primario (SAM), Apache/Chinook pede quem tem Heli em primario (AAA).
+            // A presa sai da prioridade de alvo da ficha — o papel so diz a vaga. A classe com
+            // mais aeronaves descobertas no anel leva a urgente; sem nenhum antiaereo ofertado
+            // que a tenha em primario, volta a regra antiga (alterna AAA/SAM pela contagem).
+            // ESCADA DA PRESA: quem a tem em PRIMARIO; se ninguem vende, quem a tem em SECUNDARIO.
+            // Bombardeiro no anel sem SAM a venda (so Fabrica Leve): a AAA cumpre o papel. E troca
+            // hit-kill, mas a AAA ($5500) ganha a troca financeira contra o bombardeiro ($22000).
+            GameUnitClass? ringClass = null;
+            BazookaTargetPriority ringTier = BazookaTargetPriority.Primary;
+            int ringClassMissing = 0;
+            foreach (KeyValuePair<GameUnitClass, int> pair in airInRingByClass)
+            {
+                BazookaTargetPriority tier;
+                if (OffersAntiAirFor(snapshot, pair.Key, BazookaTargetPriority.Primary))
+                    tier = BazookaTargetPriority.Primary;
+                else if (OffersAntiAirFor(snapshot, pair.Key, BazookaTargetPriority.Secondary))
+                    tier = BazookaTargetPriority.Secondary;
+                else
+                    continue;
+                int classMissing = Mathf.Max(1, Mathf.CeilToInt(pair.Value / 2f))
+                    - CountOwnAntiAirFor(snapshot, pair.Key, tier);
+                if (classMissing > ringClassMissing)
+                {
+                    ringClassMissing = classMissing;
+                    ringClass = pair.Key;
+                    ringTier = tier;
+                }
+            }
+
+            if (ringClass.HasValue)
+            {
+                AIShoppingDemand classAA = NewRoleDemand(UnitRole.Antiaereo, 1, 8, "threat",
+                    $"aeronaves visiveis={visibleAir}, {ringClass.Value} no anel={airInRingByClass[ringClass.Value]} "
+                    + $"(1 urgente/turno, presa em {(ringTier == BazookaTargetPriority.Primary ? "primario" : "secundario: sem primario a venda")})", true);
+                classAA.TargetClass = ringClass.Value;
+                classAA.MinTargetPriority = ringTier;
+                MergeRoleDemand(demands, classAA, false);
+                int restMissing = desiredAA - activeAA - 1;
+                if (restMissing > 0)
+                    MergeRoleDemand(demands, NewRoleDemand(UnitRole.Antiaereo, restMissing, 15,
+                        "threat-followup", $"aeronaves visiveis={visibleAir}, restante sem urgencia", false), false);
+            }
+            else if (activeAA < desiredAA)
             {
                 UnitRole exact = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
                     <= CountAtomicRole(snapshot, UnitRole.Antiaereo)
                     ? UnitRole.AntiaereoCombatente : UnitRole.Antiaereo;
+                // So alterna entre o que o mapa VENDE: com 1 AAA e nenhum SAM a venda, pedir SAM
+                // urgente nunca fechava.
+                UnitRole other = exact == UnitRole.Antiaereo ? UnitRole.AntiaereoCombatente : UnitRole.Antiaereo;
+                if (!OffersPrimaryRole(snapshot, exact) && OffersPrimaryRole(snapshot, other))
+                    exact = other;
                 // ESCALADA: uma AA urgente por turno. A urgencia (+250000) passa na frente de
                 // tudo; de 0 a 3 num turno so (AI Step T5 amarelo) ela comia o caixa inteiro.
                 // O resto disputa como demanda comum, e volta urgente no turno seguinte se a
@@ -4601,7 +4651,48 @@ public partial class AIShoppingPlanner
         return false;
     }
 
+    // Algum produtor nosso vende antiaereo (CanSatisfy Antiaereo) com esta classe em pelo
+    // menos minTier de prioridade de alvo?
+    private static bool OffersAntiAirFor(AIWorldSnapshot snapshot, GameUnitClass targetClass,
+        BazookaTargetPriority minTier)
+    {
+        if (snapshot?.MyBuildings == null)
+            return false;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (unit != null && UnitRoleCompatibility.CanSatisfy(unit, UnitRole.Antiaereo)
+                    && (int)unit.ResolveAiTargetPriorityForTargetClass(targetClass) >= (int)minTier)
+                    return true;
+        }
+        return false;
+    }
+
+    // Antiaereos nossos em campo com esta classe em pelo menos minTier.
+    private static int CountOwnAntiAirFor(AIWorldSnapshot snapshot, GameUnitClass targetClass,
+        BazookaTargetPriority minTier)
+    {
+        int count = 0;
+        if (snapshot?.MyUnits == null)
+            return 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data) && data != null
+                && UnitRoleCompatibility.CanSatisfy(data, UnitRole.Antiaereo)
+                && (int)data.ResolveAiTargetPriorityForTargetClass(targetClass) >= (int)minTier)
+                count++;
+        return count;
+    }
+
     private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen)
+        => CountEnemyAirInRing(snapshot, out seen, null);
+
+    // byClass (opcional): quantas aeronaves NO ANEL por classe (Heli, Plane, Jet) — para o
+    // antiaereo do anel pedir a peca que tem aquela presa em primario.
+    private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen,
+        Dictionary<GameUnitClass, int> byClass)
     {
         seen = 0;
         int inRing = 0;
@@ -4642,6 +4733,7 @@ public partial class AIShoppingPlanner
             if (board == null)
             {
                 inRing++;
+                AddRingClass(byClass, data.unitClass);
                 continue;
             }
             // Orcamento = movimento CHEIO: e o proximo turno dele. O MP restante do turno
@@ -4651,9 +4743,20 @@ public partial class AIShoppingPlanner
                 // Sem arma (transporte puro): a ameaca e onde ele POUSA a carga.
                 ?? BuildAirRingEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Capture, budget);
             if (envelope != null && TouchesRing(envelope, ours, island))
+            {
                 inRing++;
+                AddRingClass(byClass, data.unitClass);
+            }
         }
         return inRing;
+    }
+
+    private static void AddRingClass(Dictionary<GameUnitClass, int> byClass, GameUnitClass unitClass)
+    {
+        if (byClass == null)
+            return;
+        byClass.TryGetValue(unitClass, out int n);
+        byClass[unitClass] = n + 1;
     }
 
     private static UnitReachEnvelope BuildAirRingEnvelope(UnitManager unit,
