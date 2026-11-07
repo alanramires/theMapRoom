@@ -1,15 +1,34 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-07, **depois** da tag `v10.3.0`.
+Ponto de retomada. Atualizado em 2026-11-07, **depois** da tag `v10.4.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v10.3.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.3.0.md`](relatorio_v10.3.0.md),
-[`relatorio_v10.2.0.md`](relatorio_v10.2.0.md), [`relatorio_v10.1.0.md`](relatorio_v10.1.0.md).
+`v10.4.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.4.0.md`](relatorio_v10.4.0.md),
+[`relatorio_v10.3.0.md`](relatorio_v10.3.0.md), [`relatorio_v10.2.0.md`](relatorio_v10.2.0.md).
+
+**A descoberta da v10.4.0: a Fase 2 jogava sem ver o inimigo.** O `AIWorldSnapshot.BuildLight`
+(o snapshot da Fase 2) omitia `EnemyUnits` sob a promessa "nenhum handler de role lê isso" — e
+Backline, reparo pela linha, fogo de suporte, rally, logística, MelhorDesembarque e questionário
+liam, recebendo lista **vazia**, sem erro ("sem inimigo conhecido, não há frente"). Corrigido em
+`e72deff` (névoa confirmada). **Todo comportamento de posicionamento por linha visto antes disso
+não vale como evidência** — e passa a rodar agora, pela primeira vez. Ataque, ameaça, combate
+aéreo, planner e shopping nunca foram cegos.
+
+O fio do dia foi o mesmo em todas as frentes: **recalcular o que já estava pronto.** A Shopping
+Pressure refazia a compra (agora lê a última compra do `Decide`); o AI Step refazia a névoa e
+varria o terreno a cada unidade (agora ~30 KB e < 5 ms por passo, medido); o
+`GetConstructionAtCell` buscava a cena a cada chamada (agora lê `ConstructionManager.AllActive`
+em Play — o filtro "fora da produtora" custava 13 s por decisão); o courier aéreo refazia o
+MelhorDesembarque (agora a entrega sem LZ no Tático passa pela banda **Operacional** para
+qualquer carga: o passageiro pousa onde dá e anda dois turnos — doutrina do autor). E a **escada
+aérea**: retaguarda pede antiaéreo, vanguarda (tropa fora do guarda-chuva) pede caça pela presa,
+"vende" respeita a cadeia de elite, breakthrough pela classe Artillery; Avião Tanque pela pressão
+do **vaivém**, não pela foto de combustível.
 
 **A descoberta da v10.3.0: a IA comprava por igualdade.** O counter só sossegava quando a
 cobertura *empatava* a força inimiga (efeito Pernalonga × Gaguinho, inclusive contra infantaria
@@ -344,6 +363,32 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
+### O que a v10.4.0 deixou — a Fase 2 acorda
+
+1. **Ver rodando a Fase 2 com inimigo** (`e72deff`): linha de frente/retaguarda
+   (`Services/AIController.Backline.cs`), ferido na vanguarda, reparo pela linha, fogo de suporte
+   atrás da linha, rally, logística. Tudo escrito, nada visto. Se o posicionamento ficar estranho,
+   é daqui.
+2. **Revisão do tabuleiro mudando durante a decisão:** o AI Step do Chinook gravou
+   `executionSameAsDecision=False`. Suspeito: `SimulateDisembarkFromCell`
+   (`SetCurrentCellPosition` provisório) mexendo na revisão — provisório tocando estado
+   confirmado. Não verificado.
+3. **Tempo do Chinook (3,3 s):** 24 `validPaths` numa decisão (1,76 s) — montar por orçamento uma
+   vez; `toolProgression.TransportDelivery` 1,3 s; MelhorDesembarque 385 LZs (podar LZ sem vizinho
+   na faixa de nenhum passageiro).
+4. **Aposentar o plano B do courier** (laço da prioridade 1 em
+   `Units/Transport/AIController.Transportador.Air.cs`) depois de mais testes sem ele aparecer.
+5. **Ver comprando:** Caça pela vanguarda (`origem=vanguarda`, pré-compra após romper a
+   poupança), breakthrough com escala, escada com cadeia (SAM via AAA, Caça A via Caça B), Avião
+   Tanque (`origem=vaivem-aereo`, prioridade 18 — provavelmente perde no carrinho; pré-compra é
+   decisão do autor).
+6. **Entrega Operacional no APC e no navio** — o portão é compartilhado; só o aéreo foi visto.
+7. **Decisões do autor:** demanda do caminhão pela régua do vaivém (*"contador de feridos é
+   idiota"*); degrau "pousa agora, anda dois turnos" (jogada, não viagem); delta de 3 SAM
+   explícito (hoje o guarda-chuva faz de teto).
+8. **Errata:** o commit `43ea971` (churn) diz "canvas vazio"; o canvas é o rascunho do autor
+   "A Escalada da Demanda". Arquivos certos, mensagem errada.
+
 ### O que a v10.3.0 deixou — régua no lugar de igualdade
 
 1. **Ver rodando o que só compilou:** anel e tolerância do counter
@@ -353,10 +398,10 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
    pedindo `InterceptadorDeDisruptor`.
 2. **Custo do anel Operacional do counter** — não medido. Lentidão da IA no Feijão Torto:
    começar por aqui (há cache por inimigo/célula/turno).
-3. **Demanda "bombardeiro inimigo → Caça A"** — o ramo 2 só tem a resposta do chão.
+3. ~~Demanda "bombardeiro inimigo → Caça A"~~ — vanguarda pela presa (v10.4.0, só compilou).
 4. **`aiAttackOnlyListedTargets` (Caça F, BF) sem leitor, de propósito** — quando um furtivo
    "revelar por quê?", é ele. Hoje classe fora da lista vale Terciária e o "ar primeiro" atira.
-5. **SAM à venda mas bloqueado pela cadeia de elite** — a demanda urgente nasceria e não fecharia.
+5. ~~SAM bloqueado pela cadeia de elite~~ — "vende" respeita a cadeia e a escada desce (v10.4.0).
 6. **Freio da conscrição pela fila de carona** — continua decisão do autor.
 7. **Batalha agora com `isAI` 1 nos dois slots e `hardMode` 1** (`a036cfc`, autoria) — rever
    antes de publicar.
@@ -793,6 +838,13 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **lista do snapshot vazia na Fase 2** | a Fase 2 usa `BuildLight`, não `Build`. Até `e72deff` ele não preenchia `EnemyUnits`, e oito sistemas liam vazio sem erro. Antes de confiar numa lista do snapshot, ver qual Build a montou |
+| **consulta com nome de lookup e custo de varredura** | `GetConstructionAtCell` fazia `FindObjectsByType` por chamada; num filtro por célula virou 13 s. Antes de pôr utilitário dentro de laço por célula, ler o corpo dele |
+| **ferramenta que recalcula o jogo** | Shopping Pressure e AI Step refaziam compra/névoa/terreno ao lado do jogo (FPS, FrameSpike de segundos). Ferramenta lê o fato de quem o produziu; só simula sob pedido |
+| **log que só conta uma das recusas** | o MelhorDesembarque logava só `transporter_cell_not_allowed`; seis linhas pareciam "ocupação aérea" e o motivo real morria calado. Toda recusa conta o motivo |
+| **liberar a poupança sem pré-comprar** | o ramo "libera da reserva" soltava o dinheiro e o carrinho (largura) o dava a 3 peças baratas. Ao liberar para uma peça, garantir a peça |
+| **`execution=` do `[AI Perf]` com AI Step ligado** | inclui o tempo do autor lendo antes de clicar. Custo da IA é `decision=` |
+| **salvar `.cs` com o autor em Play** | recarrega o domínio igual a `unity recompile` (duas recargas pareceram "loop travando"). Deixar pronto e salvar quando ele parar |
 | **`snapshot.MyUnits` não tem embarcados** | o limite do jogo (`MatchController.GetSlotUnitCounts`) e o HUD contam todos. Qualquer régua comparada ao teto tem de contar como o teto, senão a festa da carona esconde metade do exército |
 | **sub-rótulo novo some das comparações estritas** | `roles[0] == X` não vê o sub-rótulo. Antes de criar um (Disruptor, `InterceptadorDeDisruptor`), trocar as leituras por `MatchesLabel`/`CanSatisfy` — e conferir que a CONTAGEM e a DEMANDA usam a mesma régua, senão a demanda aceita, a contagem não vê, e a compra entra em loop |
 | **empate de prioridade decide pelo preço** | duas peças com a mesma presa em primário: a barata ganha sempre (a AAA nunca deixaria o SAM nascer). Um PRI por classe; a peça barata entra pelo secundário |
@@ -926,6 +978,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | documento | uso |
 |---|---|
+| [`relatorio_v10.4.0.md`](relatorio_v10.4.0.md) | ler o que o jogo já sabe — Fase 2 vê o inimigo, escada aérea, vaivém, ferramentas leves, entrega Operacional |
 | [`relatorio_v10.0.0.md`](relatorio_v10.0.0.md) | a IA lance a lance aprende o mapa — o de trás paga, o veículo escolhe o par, estrada pelo QG, núcleo por família, ilha sem ligação |
 | [`ilhas.md`](ilhas.md) | as ilhas geográficas do BeachManager e o recorte de autoria |
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
