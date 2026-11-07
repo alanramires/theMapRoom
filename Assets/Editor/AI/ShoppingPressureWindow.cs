@@ -25,9 +25,11 @@ public class ShoppingPressureWindow : EditorWindow
     private Vector2 _rightScroll;
 
     // A reconstrução do snapshot dispara GetDeficits, que loga no console. Por isso a
-    // coluna de pressão é recomputada no máximo a cada RefreshInterval (ou no botão),
-    // enquanto a coluna de objetivos lê o plano vivo a cada repaint (silencioso).
-    private const double RefreshInterval = 1.0;
+    // coluna de pressão é recomputada quando o tabuleiro muda (turno, caixa, unidades),
+    // no botão, ou no máximo a cada RefreshInterval como rede de segurança; a coluna de
+    // objetivos lê o plano vivo a cada repaint (silencioso).
+    private const double RefreshInterval = 10.0;
+    private string _lastFingerprint = string.Empty;
     private List<AIShoppingDemand> _demands = new List<AIShoppingDemand>();
     private AIWorldSnapshot _snapshot;
     private AIShoppingPlanner.AIRosterKnowledge _roster;
@@ -144,9 +146,18 @@ public class ShoppingPressureWindow : EditorWindow
     private void RebuildPressureIfStale(bool force)
     {
         bool teamChanged = _snapshotTeam != team;
+        // Recalcula quando o TABULEIRO muda (turno, caixa, numero de unidades), nao por relogio:
+        // a demanda inteira por segundo, com a janela aberta, pesava no Play e repetia log.
+        // O relogio longo fica como rede de seguranca para mudanca que a impressao nao ve.
+        PlayerSlotId slot = ResolveSelectedSlot();
+        string fingerprint = _matchController != null
+            ? $"{_matchController.CurrentTurn}|{_matchController.GetActualMoney(slot)}|{UnitManager.AllActive.Count}"
+            : string.Empty;
+        bool boardChanged = fingerprint != _lastFingerprint;
         bool stale = EditorApplication.timeSinceStartup - _lastBuild >= RefreshInterval;
-        if (!force && !teamChanged && !stale)
+        if (!force && !teamChanged && !boardChanged && !stale)
             return;
+        _lastFingerprint = fingerprint;
 
         _snapshot = AIWorldSnapshot.Build(ResolveSelectedSlot(), _matchController);
         _demands = AIShoppingPlanner.InspectRoleDemands(_snapshot);

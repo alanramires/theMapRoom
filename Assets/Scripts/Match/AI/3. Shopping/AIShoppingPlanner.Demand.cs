@@ -3125,7 +3125,7 @@ public partial class AIShoppingPlanner
         // Pequeno T1: o Chinook recem-comprado no aeroporto do outro canto custava uma AAA
         // de prioridade 8 antes de qualquer capturador.)
         int visibleAir = CountEnemyAirInRing(snapshot, out int airSeen);
-        if (airSeen > visibleAir)
+        if (log && airSeen > visibleAir)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] ameaca aerea: "
                 + $"{visibleAir}/{airSeen} aeronave(s) visiveis dentro do anel — as de fora, e transporte quando ha Disruptor na oferta, nao pedem AA urgente");
         if (visibleAir > 0)
