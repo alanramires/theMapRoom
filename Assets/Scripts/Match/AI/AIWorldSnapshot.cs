@@ -31,36 +31,6 @@ public class AIWorldSnapshot
     public int Budget;
     public int IncomePerTurn;
 
-    // SONDA (2026-11-07, investigacao — remover quando fechar): o snapshot decide "inimigo
-    // visivel" com IsUnitVisibleForSlotNoCache; o jogo e o AI Step leem IsUnitVisibleForSlot
-    // (nevoa confirmada). No AI Step T8 do Peixe Pequeno o Soldado #25 aparecia na cidade (8,12)
-    // em todo passo, mas um filtro sobre snapshot.EnemyUnits nao o via. Se as duas respostas
-    // discordam, a IA decide com uma visao diferente da do jogo. So registra; nao muda nada.
-    private static readonly HashSet<string> s_visibilityProbeSeen = new HashSet<string>();
-    private static int s_visibilityProbeTurn = int.MinValue;
-
-    private static void ProbeVisibilityDisagreement(
-        MatchController match, UnitManager unit, PlayerSlotId observer, int turn, bool visibleNoCache)
-    {
-        bool visibleConfirmed = match.IsUnitVisibleForSlot(unit, observer);
-        if (visibleConfirmed == visibleNoCache)
-            return;
-        if (turn != s_visibilityProbeTurn)
-        {
-            s_visibilityProbeSeen.Clear();
-            s_visibilityProbeTurn = turn;
-        }
-        string key = $"{observer.Value}:{unit.InstanceId}:{visibleNoCache}";
-        if (!s_visibilityProbeSeen.Add(key))
-            return;
-        Vector3Int cell = unit.CurrentCellPosition;
-        cell.z = 0;
-        Debug.LogWarning($"[AI Visibilidade][T{turn}][slot {observer.Value}] DISCORDA para "
-            + $"{unit.UnitDisplayName}#{unit.InstanceId} (slot {unit.SlotIndex}) em ({cell.x},{cell.y}): "
-            + $"nevoa confirmada={visibleConfirmed} recalculada(NoCache, usada pela IA)={visibleNoCache} "
-            + $"ativo={match.ActiveSlotId.Value}");
-    }
-
     public static AIWorldSnapshot Build(PlayerSlotId aiSlot, MatchController match)
     {
         var snap = new AIWorldSnapshot();
@@ -78,13 +48,7 @@ public class AIWorldSnapshot
             snap.OccupiedCells.Add(p);
 
             if (u.SlotIndex == snap.AISlotIndex) snap.MyUnits.Add(u);
-            else
-            {
-                bool visibleNoCache = match == null || match.IsUnitVisibleForSlotNoCache(u, aiSlot);
-                if (match != null)
-                    ProbeVisibilityDisagreement(match, u, aiSlot, snap.TurnNumber, visibleNoCache);
-                if (visibleNoCache) snap.EnemyUnits.Add(u);
-            }
+            else if (match == null || match.IsUnitVisibleForSlotNoCache(u, aiSlot)) snap.EnemyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)
