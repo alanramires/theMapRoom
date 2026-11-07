@@ -51,6 +51,12 @@ public partial class AIShoppingPlanner
         // Preenchidos ao virar demanda: o que as operacoes ja pediam e o piso aplicado.
         public int RideAirPlanDemand;
         public int RideAirFloor;
+        // Vaivem aereo: turnos que a frota perde voltando para abastecer (ver BuildAirCommutePressure).
+        public float AirCommute;
+        public int AirCommuteUnits;
+        public int ActiveAirTankers;
+        public int DesiredAirTankers;
+        public int AirTankerGap;
     }
 
     public static OperationalPressureInspection InspectOperationalPressure(
@@ -66,7 +72,120 @@ public partial class AIShoppingPlanner
         BuildTransportOperationalPressure(snapshot, result);
         BuildLogisticsOperationalPressure(snapshot, result);
         BuildRideQueuePressure(snapshot, result);
+        BuildAirCommutePressure(snapshot, result);
         return result;
+    }
+
+    // VAIVEM AEREO -> AVIAO TANQUE (autor, 2026-11-07: "os helicopteros estao indo e vindo
+    // freneticamente e ficando sem combustivel"). A pergunta nao e "quantos estao com pouco
+    // combustivel" (a foto de 35% da operacao AirRefuelSupport: quem ja voltou esta reabastecido
+    // em casa e some da conta) — e QUANTO A FROTA PERDE INDO E VOLTANDO. Um helicoptero que
+    // seca a 1 turno do aerodromo custa pouco; a 3 turnos, sao 6 turnos fora da frente. Isso e
+    // o que o tanque compra de volta: ele atende no ar, a 1 hex, onde a frota esta.
+    //
+    // Quem conta: aeronave nossa, fora de transporte, nao-supridora, com o combustivel no
+    // gatilho de reparo da propria ficha (repairTriggerAutonomyPct) — HP baixo o tanque nao
+    // conserta (Reabastecimento nao repara). Custo = turnos ate a recuperacao mais perto
+    // (aerodromo nosso ou supridor aereo nosso que opere na camada dela), alem do primeiro:
+    // o primeiro turno o tanque tambem gastaria para chegar. Ida e volta: x2.
+    // Saturacao natural: com tanque perto da frente, a recuperacao mais perta e ele, e a
+    // conta cai sozinha.
+    private const float AirCommutePerTanker = 3f;
+    private const int MaxDesiredAirTankers = 2;
+
+    private static void BuildAirCommutePressure(
+        AIWorldSnapshot snapshot,
+        OperationalPressureInspection result)
+    {
+        if (snapshot?.MyUnits == null)
+            return;
+
+        // Gate inaplicavel: sem tanque aereo compravel agora, nao ha resposta a pedir.
+        if (!OffersBuyableAirTanker(snapshot))
+            return;
+
+        var airfields = new List<Vector3Int>();
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || construction.SlotIndex != snapshot.AISlotIndex
+                || construction.CurrentCapturePoints < construction.CapturePointsMax
+                || !construction.TryResolveConstructionData(out ConstructionData cData)
+                || cData == null || !cData.allowAircraftTakeoffAndLanding)
+                continue;
+            Vector3Int c = construction.CurrentCellPosition;
+            c.z = 0;
+            airfields.Add(c);
+        }
+
+        var tankers = new List<UnitManager>();
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && !unit.IsEmbarked
+                && unit.TryGetUnitData(out UnitData tData) && IsAirTankerData(tData))
+                tankers.Add(unit);
+        result.ActiveAirTankers = tankers.Count;
+
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked
+                || !unit.TryGetUnitData(out UnitData data) || data == null
+                || data.domain != Domain.Air || data.isSupplier
+                || data.repairTriggerAutonomyPct <= 0)
+                continue;
+            int maxFuel = Mathf.Max(1, unit.GetMaxFuel());
+            if (unit.CurrentFuel * 100f / maxFuel > data.repairTriggerAutonomyPct)
+                continue;
+
+            Vector3Int from = unit.CurrentCellPosition;
+            from.z = 0;
+            // Distancia em hex: para aeronave o terreno nao cobra, entao hex/MP e turno.
+            int nearest = int.MaxValue;
+            foreach (Vector3Int field in airfields)
+                nearest = Mathf.Min(nearest, Mathf.RoundToInt(SectorManager.HexDistance(from, field)));
+            foreach (UnitManager tanker in tankers)
+            {
+                if (!tanker.TryGetUnitData(out UnitData tankerData)
+                    || !PodeSuprirSensor.SupportsOperationDomain(
+                        tankerData, unit.GetDomain(), unit.GetHeightLevel()))
+                    continue;
+                Vector3Int t = tanker.CurrentCellPosition;
+                t.z = 0;
+                nearest = Mathf.Min(nearest, Mathf.Max(0, Mathf.RoundToInt(SectorManager.HexDistance(from, t)) - 1));
+            }
+            if (nearest == int.MaxValue)
+                continue; // sem recuperacao nenhuma: e emergencia de pouso, nao vaivem
+
+            int turns = Mathf.CeilToInt(nearest / (float)Mathf.Max(1, unit.MaxMovementPoints));
+            float lost = Mathf.Max(0, turns - 1) * 2f;
+            if (lost <= 0f)
+                continue;
+            result.AirCommute += lost;
+            result.AirCommuteUnits++;
+        }
+
+        result.DesiredAirTankers = Mathf.Clamp(
+            Mathf.CeilToInt(result.AirCommute / AirCommutePerTanker), 0, MaxDesiredAirTankers);
+        result.AirTankerGap = Mathf.Max(0, result.DesiredAirTankers - result.ActiveAirTankers);
+    }
+
+    private static bool IsAirTankerData(UnitData data)
+        => data != null && data.domain == Domain.Air && data.isSupplier
+            && data.roles != null && data.roles.Count > 0
+            && UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.Logistica);
+
+    private static bool OffersBuyableAirTanker(AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.MyBuildings == null)
+            return false;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+                if (IsAirTankerData(unit) && IsOfferBuyableNow(unit, snapshot))
+                    return true;
+        }
+        return false;
     }
 
     // Teto da fila de carona: no maximo +N onibus aereos ACIMA do que as operacoes ja pedem
@@ -433,6 +552,20 @@ public partial class AIShoppingPlanner
                 ride.Domain = Domain.Air;
                 MergeRoleDemand(demands, ride, false);
             }
+        }
+
+        // TANQUE AEREO pelo vaivem. Trilho proprio (Domain.Air): o teto Hard de logistica e a
+        // conta do caminhao nao o tocam, e o merge com a operacao AirRefuelSupport (mesmo papel e
+        // dominio) fica com o maior.
+        if (pressure.AirTankerGap > 0)
+        {
+            AIShoppingDemand tanker = NewRoleDemand(UnitRole.Logistica, pressure.AirTankerGap,
+                pressure.AirCommuteUnits >= 3 ? 10 : 18,
+                "vaivem-aereo",
+                $"turnos perdidos voltando p/ abastecer={pressure.AirCommute:F0} em {pressure.AirCommuteUnits} aeronave(s) "
+                + $"tanques={pressure.ActiveAirTankers}/{pressure.DesiredAirTankers}", false);
+            tanker.Domain = Domain.Air;
+            MergeRoleDemand(demands, tanker, false);
         }
 
         if (pressure.LogisticsGap > 0)
