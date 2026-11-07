@@ -258,13 +258,20 @@ public partial class AIController
             return null;
         }
 
+        // O filtro roda por CELULA de cada mapa de encontro (agora, proximo turno e o de longo
+        // alcance, que e o tabuleiro inteiro). IsOwnProductionCell pergunta a CENA a cada chamada
+        // (FindObjectsByType): milhares de buscas por decisao, ~13 s. Uma lista, montada uma vez.
+        HashSet<Vector3Int> ownProduction = BuildOwnProductionCells(snapshot.AITeam);
         MelhorEmbarqueResult evaluated =
             MelhorEmbarqueService.EvaluateForPassenger(
                 new MelhorEmbarquePassengerRequest
                 {
                     passenger = passenger,
                     allowPassengerMeetingCell = cell =>
-                        !IsOwnProductionCell(cell, snapshot.AITeam),
+                    {
+                        cell.z = 0;
+                        return !ownProduction.Contains(cell);
+                    },
                     // Vazio de proposito: o passageiro nao escolhe um dono.
                     // O farol persistido entra apenas na preferencia abaixo.
                     transporter = null,
@@ -448,7 +455,11 @@ public partial class AIController
                     out Vector3Int progressionCell,
                     out _,
                     out string progressionReason,
-                    allowCell: cell => !IsOwnProductionCell(cell, snapshot.AITeam))
+                    allowCell: cell =>
+                    {
+                        cell.z = 0;
+                        return !ownProduction.Contains(cell);
+                    })
                 && progressionCell != fromCell)
             {
                 action = BuildMoveBatch(

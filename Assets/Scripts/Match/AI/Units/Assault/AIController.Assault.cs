@@ -1582,11 +1582,43 @@ public partial class AIController
         return bestCell != fromCell;
     }
 
+    // As celulas das nossas produtoras, de uma vez. Para filtro que roda por celula de mapa:
+    // IsOwnProductionCell busca a cena inteira a cada chamada (GetConstructionAtCell ->
+    // FindObjectsByType). Mesma regra: construcao real (nao fake), ativa, que produz para o slot.
+    private HashSet<Vector3Int> BuildOwnProductionCells(TeamId aiTeam)
+    {
+        var cells = new HashSet<Vector3Int>();
+        int slot = AIController.ResolveAISlotKey(aiTeam);
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || !construction.gameObject.activeInHierarchy
+                || construction.IsFakeBuilding || !construction.CanProduceUnitsForSlot(slot))
+                continue;
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            cells.Add(cell);
+        }
+        return cells;
+    }
+
+    // Pelo registro de construcoes ativas, nao pela cena: GetConstructionAtCell faz
+    // FindObjectsByType a cada chamada, e isto roda por celula de caminho. A IA so roda em
+    // Play, onde o registro vale (ferramenta de Editor e outra historia — ela precisa da cena).
     private bool IsOwnProductionCell(Vector3Int cell, TeamId aiTeam)
     {
         cell.z = 0;
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return construction != null && construction.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam));
+        int slot = AIController.ResolveAISlotKey(aiTeam);
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+        {
+            if (construction == null || !construction.gameObject.activeInHierarchy
+                || construction.IsFakeBuilding)
+                continue;
+            Vector3Int at = construction.CurrentCellPosition;
+            at.z = 0;
+            if (at == cell)
+                return construction.CanProduceUnitsForSlot(slot);
+        }
+        return false;
     }
 
     private static bool IsGroundAntiAirOnlyAssault(UnitData data)
