@@ -33,6 +33,12 @@ public class ShoppingPressureWindow : EditorWindow
     private List<AIShoppingDemand> _demands = new List<AIShoppingDemand>();
     private AIWorldSnapshot _snapshot;
     private AIShoppingPlanner.AIRosterKnowledge _roster;
+    // Pressao operacional (eixos, fila de carona, ilha, vaivem aereo) entra no MESMO recalculo
+    // da demanda. Era chamada no desenho — 2 lugares x Layout+Repaint x 10 Hz, ~40 vezes por
+    // segundo de mapa de eixos + fila de carona + inundacao da ilha — e derrubava o FPS do Play.
+    private AIShoppingPlanner.OperationalPressureInspection _operationalPressure;
+    // Idem a pressao de counter: refaz o roster e o anel Operacional por inimigo.
+    private AIShoppingPlanner.CounterPressureInspection _counterPressure;
     private TeamId _snapshotTeam = TeamId.Neutral;
     private double _lastBuild = -999;
 
@@ -162,6 +168,8 @@ public class ShoppingPressureWindow : EditorWindow
         _snapshot = AIWorldSnapshot.Build(ResolveSelectedSlot(), _matchController);
         _demands = AIShoppingPlanner.InspectRoleDemands(_snapshot);
         _roster = AIShoppingPlanner.InspectRosterKnowledge(_snapshot);
+        _operationalPressure = AIShoppingPlanner.InspectOperationalPressure(_snapshot);
+        _counterPressure = AIShoppingPlanner.InspectCounterPressure(_snapshot);
         _snapshotTeam = team;
         _lastBuild = EditorApplication.timeSinceStartup;
     }
@@ -239,7 +247,7 @@ public class ShoppingPressureWindow : EditorWindow
         EditorGUILayout.LabelField("ELITE", EditorStyles.boldLabel);
         DrawEliteQualityStatus(
             snapshot,
-            AIShoppingPlanner.InspectCounterPressure(snapshot),
+            _counterPressure,
             demands);
         DrawActiveEliteCommitment(snapshot);
 
@@ -423,8 +431,9 @@ public class ShoppingPressureWindow : EditorWindow
         if (!_showCounterPressure)
             return;
 
-        AIShoppingPlanner.CounterPressureInspection pressure =
-            AIShoppingPlanner.InspectCounterPressure(snapshot);
+        AIShoppingPlanner.CounterPressureInspection pressure = _counterPressure;
+        if (pressure == null)
+            return;
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField(
@@ -909,8 +918,9 @@ public class ShoppingPressureWindow : EditorWindow
         if (!_showOperationalPressure)
             return;
 
-        AIShoppingPlanner.OperationalPressureInspection pressure =
-            AIShoppingPlanner.InspectOperationalPressure(snapshot);
+        AIShoppingPlanner.OperationalPressureInspection pressure = _operationalPressure;
+        if (pressure == null)
+            return;
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
         EditorGUILayout.LabelField(
@@ -951,6 +961,10 @@ public class ShoppingPressureWindow : EditorWindow
             _subtle);
         EditorGUILayout.LabelField(
             $"logísticos: cobertura {pressure.ActiveLogistics}/{pressure.DesiredLogistics}  gap={pressure.LogisticsGap}",
+            _subtle);
+        EditorGUILayout.LabelField(
+            $"vaivém aéreo: {pressure.AirCommute:F0} turno(s) perdido(s) em {pressure.AirCommuteUnits} aeronave(s)  " +
+            $"tanques {pressure.ActiveAirTankers}/{pressure.DesiredAirTankers}  gap={pressure.AirTankerGap}",
             _subtle);
         EditorGUILayout.EndVertical();
     }
@@ -1038,8 +1052,9 @@ public class ShoppingPressureWindow : EditorWindow
         if (!_showAxisOverview)
             return;
 
-        AIShoppingPlanner.OperationalPressureInspection pressure =
-            AIShoppingPlanner.InspectOperationalPressure(snapshot);
+        AIShoppingPlanner.OperationalPressureInspection pressure = _operationalPressure;
+        if (pressure == null)
+            return;
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
 
