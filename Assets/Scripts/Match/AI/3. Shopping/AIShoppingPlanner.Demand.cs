@@ -1429,6 +1429,10 @@ public partial class AIShoppingPlanner
         // T5 amarelo: Apache + 3 AAA, $2500 de sobra, compromisso de T3 jogado fora.
         // A ESCOLTA (o nosso poder de captura sendo mordido) rompe do mesmo jeito. Contains, e
         // nao igualdade: o MergeRoleDemand concatena a origem ("operation+escolta").
+        // Peca aerea que JA CABE: compra garantida antes do carrinho (ver TryPreCommitDemand).
+        // Sem isso, Caca B de $16000 com $18500 livres perdia para Apache + Chinook + Suprimentos
+        // + Soldados — 6 atendimentos valem mais na soma do beam que 1 escolta (AI Step T7).
+        AIShoppingDemand airPreCommit = null;
         foreach (string airOrigin in new[] { "disruptor", "escolta" })
         {
             AIShoppingDemand airDemand = demands.Find(d => d != null && d.Count > 0
@@ -1441,7 +1445,11 @@ public partial class AIShoppingPlanner
                 continue;
             int spendableBefore = remaining - reserve - conscriptionTax;
             if (spendableBefore >= unitCost)
-                continue; // ja cabe sem tocar na poupanca
+            {
+                if (airPreCommit == null)
+                    airPreCommit = airDemand; // ja cabe sem tocar na poupanca: garante antes do carrinho
+                continue;
+            }
             // NAO CABE NEM ROMPENDO: segura e passa a vez. O imposto de conscricao continua
             // (a massa sai), o resto do caixa fica guardado pra peca — no mesmo horizonte da
             // poupanca do elite (EliteSaveTurns). Liberar a reserva sem fechar a peca so
@@ -1527,6 +1535,12 @@ public partial class AIShoppingPlanner
             TryPreCommitBlitzFirstMbt(
                 snapshot, blitzArmorTarget, eliteCommitment,
                 orders, usedBuildings, occupied, ref remaining);
+        if (airPreCommit != null && airPreCommit.Count > 0)
+            TryPreCommitDemand(
+                snapshot, airPreCommit, eliteCommitment,
+                orders, usedBuildings, occupied, ref remaining,
+                remaining - reserve - conscriptionTax,
+                "escolta/disruptor", $"({airPreCommit.Origin})");
 
         // Nota — fill do fim do turno: consome o imposto comprando a massa (só a reserva elite é
         // intocável lá). Com ConscriptionWhenLosing (Médio/Competitiva), Perdendo nunca chega aqui
@@ -2712,9 +2726,22 @@ public partial class AIShoppingPlanner
         AIElitePurchaseCommitment eliteCommitment,
         List<ShoppingOrder> orders, HashSet<ConstructionManager> usedBuildings,
         HashSet<Vector3Int> occupied, ref int remaining)
+        => TryPreCommitDemand(snapshot, target, eliteCommitment, orders, usedBuildings,
+            occupied, ref remaining, remaining, "blitz_armor", "do 1º MBT");
+
+    // Compra GARANTIDA antes do carrinho: o beam soma cobertura e prefere largura (varias
+    // pecas baratas) a profundidade (uma cara). Para o 1o MBT e para a escolta isso inverte
+    // a intencao. spendLimit = quanto desta compra pode sair sem tocar poupanca/imposto.
+    private static bool TryPreCommitDemand(
+        AIWorldSnapshot snapshot, AIShoppingDemand target,
+        AIElitePurchaseCommitment eliteCommitment,
+        List<ShoppingOrder> orders, HashSet<ConstructionManager> usedBuildings,
+        HashSet<Vector3Int> occupied, ref int remaining, int spendLimit,
+        string logTag, string logWhat)
     {
         if (snapshot?.MyBuildings == null || target == null || target.Count <= 0)
             return false;
+        int budget = Mathf.Min(remaining, spendLimit);
 
         ConstructionManager bestBuilding = null;
         UnitData bestUnit = null;
@@ -2728,7 +2755,7 @@ public partial class AIShoppingPlanner
                 continue;
             foreach (UnitData unit in building.OfferedUnits)
             {
-                if (unit == null || unit.cost <= 0 || unit.cost > remaining
+                if (unit == null || unit.cost <= 0 || unit.cost > budget
                     || unit.militaryForce == MilitaryForce.Navy
                     || !IsEliteChainAvailable(unit, snapshot)
                     || !IsRolePurchaseAllowed(unit, snapshot.Stance, IsEmergencyShoppingDemand(target))
@@ -2751,8 +2778,8 @@ public partial class AIShoppingPlanner
         Vector3Int pc = bestBuilding.CurrentCellPosition; pc.z = 0;
         occupied.Add(pc);
         target.Count = Mathf.Max(0, target.Count - 1);
-        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] blitz_armor: "
-            + $"PRÉ-COMPRA garantida do 1º MBT {bestUnit.displayName} ${bestUnit.cost} em "
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] {logTag}: "
+            + $"PRÉ-COMPRA garantida {logWhat} {bestUnit.displayName} ${bestUnit.cost} em "
             + $"{bestBuilding.ConstructionDisplayName} (fura a soma-de-cobertura do carrinho) restante={remaining}");
         if (eliteCommitment != null
             && string.Equals(bestUnit.id, eliteCommitment.unitId, System.StringComparison.Ordinal))
