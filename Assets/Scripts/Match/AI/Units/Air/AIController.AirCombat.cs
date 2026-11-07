@@ -999,7 +999,7 @@ public partial class AIController
 
         UnitManager best = null;
         int bestPower = 0;
-        bool bestCapturing = false;
+        int bestTier = -1;
         int bestDistance = int.MaxValue;
         if (visibleEnemies != null)
         {
@@ -1018,14 +1018,14 @@ public partial class AIController
                 Vector3Int cell = enemy.CurrentCellPosition;
                 cell.z = 0;
                 int distance = AIActionReachCoordinator.CubicDistance(fromCell, cell);
-                bool capturing = IsCapturingForeignBuilding(enemy, cell);
-                if (PreferDisruptorCaptureTier(capturing, power, bestCapturing, bestPower)
-                    || (capturing == bestCapturing && power == bestPower && distance < bestDistance)
-                    || (capturing == bestCapturing && power == bestPower && distance == bestDistance
+                int targetTier = ResolveDisruptorTargetTier(enemy, cell);
+                if (PreferDisruptorCaptureTier(targetTier, power, bestTier, bestPower)
+                    || (targetTier == bestTier && power == bestPower && distance < bestDistance)
+                    || (targetTier == bestTier && power == bestPower && distance == bestDistance
                         && best != null && enemy.InstanceId < best.InstanceId))
                 {
                     best = enemy;
-                    bestCapturing = capturing;
+                    bestTier = targetTier;
                     bestPower = power;
                     bestDistance = distance;
                 }
@@ -1037,8 +1037,8 @@ public partial class AIController
             anchor = best.CurrentCellPosition;
             anchor.z = 0;
             Vector3Int bestCell = anchor;
-            string state = IsCapturingForeignBuilding(best, bestCell) ? " capturando"
-                : best.GetEmbarkedPassengerCount() > 0 ? $" levando {best.GetEmbarkedPassengerCount()}"
+            string state = bestTier == DisruptorTierInTransit ? $" levando {best.GetEmbarkedPassengerCount()}"
+                : bestTier == DisruptorTierCapturing ? " capturando"
                 : "";
             tier = $"Interdicao:PoderDeCaptura={bestPower}#{best.InstanceId}{state}";
             return true;
@@ -1148,9 +1148,47 @@ public partial class AIController
     }
 
     // Lexicographic priority: capture underway first; combat value breaks ties within a tier.
-    private static bool PreferDisruptorCaptureTier(bool capturing, float score, bool bestCapturing, float bestScore)
+    // A ORDEM DO DISRUPTOR (autor, 2026-11-07): "interceptar poder de captura > quem esta
+    // capturando > o que vier depois". Faixa estrita, nao soma: antes eram duas faixas com
+    // "capturando" no topo, e dentro dela o score (que inclui o bonus de abate) — AI Step T8
+    // amarelo: o Apache #49 matou um Soldado de 4 HP capturando em vez do Chinook com dois
+    // capturadores frescos na frente dele. Dentro da mesma faixa, o score de hoje decide.
+    private const int DisruptorTierInTransit = 2;
+    private const int DisruptorTierCapturing = 1;
+    private const int DisruptorTierOther = 0;
+
+    private int ResolveDisruptorTargetTier(UnitManager enemy, Vector3Int enemyCell)
     {
-        return capturing != bestCapturing ? capturing : score > bestScore;
+        if (CarriesCapturePowerAboard(enemy))
+            return DisruptorTierInTransit;
+        return IsCapturingForeignBuilding(enemy, enemyCell)
+            ? DisruptorTierCapturing
+            : DisruptorTierOther;
+    }
+
+    // Poder de captura A BORDO (o do proprio transportador nao conta): o dinheiro em transito.
+    private static bool CarriesCapturePowerAboard(UnitManager enemy)
+    {
+        if (enemy == null || enemy.GetEmbarkedPassengerCount() <= 0)
+            return false;
+        int aboard = PodeCapturarSensor.GetCombinedCapturePower(enemy)
+            - (PodeCapturarSensor.HasAnyCaptureKey(enemy) ? PodeCapturarSensor.GetCapturePower(enemy) : 0);
+        return aboard > 0;
+    }
+
+    private static string DescribeDisruptorTier(int tier)
+    {
+        switch (tier)
+        {
+            case DisruptorTierInTransit: return "interceptarEmTransito";
+            case DisruptorTierCapturing: return "atrasarCaptura";
+            default: return "poderDeCaptura";
+        }
+    }
+
+    private static bool PreferDisruptorCaptureTier(int tier, float score, int bestTier, float bestScore)
+    {
+        return tier != bestTier ? tier > bestTier : score > bestScore;
     }
 
     // Capturavel que NAO e do inimigo (nosso ou neutro), o mais perto de algum predio
@@ -1338,7 +1376,7 @@ public partial class AIController
             out bool hasAttackableAircraft,
             out bool hasPreferredAttackableAircraft);
         bool isDisruptor = IsCaptureDisruptor(unit);
-        bool bestCapturing = false;
+        int bestTier = -1;
 
         for (int i = 0; i < candidates.Count; i++)
         {
@@ -1420,10 +1458,13 @@ public partial class AIController
                 - GetPathStepCount(paths, cell) * 8f
                 - enemy.InstanceId * 0.001f;
 
-            bool capturing = isDisruptor && deniedCapture > 0 && IsCapturingForeignBuilding(enemy, enemyCell);
-            if (PreferDisruptorCaptureTier(capturing, score, bestCapturing, bestScore))
+            // Faixa so vale para o Disruptor e para tiro que nega captura de fato.
+            int tier = isDisruptor && deniedCapture > 0
+                ? ResolveDisruptorTargetTier(enemy, enemyCell)
+                : DisruptorTierOther;
+            if (PreferDisruptorCaptureTier(tier, score, bestTier, bestScore))
             {
-                bestCapturing = capturing;
+                bestTier = tier;
                 bestScore = score;
                 bestCell = cell;
                 bestTarget = enemy;
@@ -1435,7 +1476,7 @@ public partial class AIController
                     $"value={targetValueScore:F0} posture={postureScore:F0} " +
                     $"weapon={weaponName} hp={enemy.CurrentHP} " +
                     $"noMove={attacksFromCurrentCell}{combatScoreReason} " +
-                    (isDisruptor ? $"capturaNegada={deniedCapture} capturando={capturing} prioridade={(capturing ? "atrasarCaptura" : "poderDeCaptura")} " : "") +
+                    (isDisruptor ? $"capturaNegada={deniedCapture} prioridade={DescribeDisruptorTier(tier)} " : "") +
                     $"{attackDecisionReason}";
             }
         }
