@@ -130,11 +130,42 @@ public partial class AIController
         // When moveTarget is blocked by a ground unit (can't land there), scan all reachable
         // hexes by improvement order and pick the best landable hex that allows disembark.
         {
+            // PODA SEM MUDAR A REGRA. O sensor so desembarca nos 6 vizinhos imediatos do heli, e
+            // a candidata so e aceita se a celula de desembarque do passageiro principal cair na
+            // faixa de entrega dele (IsAirPrimaryDeliveryCell: o alvo, ou a rota do passageiro a
+            // partir do alvo dentro do MP dele). Celula sem NENHUM vizinho na faixa morre no fim
+            // do laco com certeza — depois de pagar simulacao do sensor, escolha por passageiro e
+            // filtro de faixa (o log repetia "alvo conjunto / PassengerTarget" por candidata).
+            // Descarta antes. A distancia de partida e a mesma para todas: calcula uma vez.
+            Vector3Int deliveryTarget = primaryTarget;
+            deliveryTarget.z = 0;
+            int deliveryBudget = Mathf.Max(0, primaryPassenger.MaxMovementPoints);
+            Dictionary<Vector3Int, int> deliveryZone = deliveryBudget > 0
+                ? GetOrBuildDisembarkPassengerRoute(primaryPassenger, deliveryTarget, deliveryBudget)
+                : null;
+            var neighborBuffer = new List<Vector3Int>(6);
+            bool TouchesDeliveryZone(Vector3Int heliCell)
+            {
+                UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, heliCell, neighborBuffer);
+                for (int i = 0; i < neighborBuffer.Count; i++)
+                {
+                    Vector3Int n = neighborBuffer[i];
+                    n.z = 0;
+                    if (n == deliveryTarget)
+                        return true;
+                    if (deliveryZone != null && deliveryZone.TryGetValue(n, out int cost) && cost <= deliveryBudget)
+                        return true;
+                }
+                return false;
+            }
+
+            float routeFromStart = CalculateRouteDistanceOrHex(unit, fromCell, primaryTarget);
             var p1Candidates = new System.Collections.Generic.List<(Vector3Int cell, float improvement)>();
             foreach (Vector3Int candidate in paths.Keys)
             {
                 if (candidate == fromCell || occupied.Contains(candidate)) continue;
-                float imp = CalculateRouteDistanceOrHex(unit, fromCell, primaryTarget)
+                if (!TouchesDeliveryZone(candidate)) continue;
+                float imp = routeFromStart
                           - CalculateRouteDistanceOrHex(unit, candidate, primaryTarget);
                 if (imp >= 1f)
                     p1Candidates.Add((candidate, imp));
