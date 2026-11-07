@@ -112,8 +112,8 @@ public class AIWorldSnapshot
 
     /// <summary>
     /// Versão leve para o loop por-unidade da Fase 2.
-    /// Preenche apenas os campos consumidos pelos handlers de role;
-    /// omite MyUnits, EnemyUnits, OccupiedCells, Stance e IncomePerTurn.
+    /// Preenche os campos consumidos pelos handlers de role (MyUnits, EnemyUnits pela nevoa
+    /// confirmada, predios); omite OccupiedCells, Stance e IncomePerTurn.
     /// </summary>
     public static AIWorldSnapshot BuildLight(PlayerSlotId aiSlot, MatchController match)
     {
@@ -125,12 +125,19 @@ public class AIWorldSnapshot
 
         // MyUnits: necessário para o handler de Logistics (FindLogisticsServiceTarget,
         // TryBuildLogisticsSupplyAction, CalculateLogisticsRearAreaScore, etc.).
-        // Omitimos OccupiedCells e EnemyUnits (com seu custo de fog-of-war) — nenhum
-        // handler de role lê essas listas do snapshot.
+        //
+        // EnemyUnits ENTRA (2026-11-07). O comentario antigo dizia "nenhum handler de role le
+        // essa lista" — valia quando foi escrito; depois nasceram leitores (Backline/linha de
+        // combatentes, fogo de suporte, reparo pela linha, rally, logistica, MelhorDesembarque,
+        // questionario) e todos rodavam a Fase 2 com a lista VAZIA, sem erro: "sem inimigo
+        // conhecido, nao ha frente". Visibilidade pela nevoa CONFIRMADA (IsUnitVisibleForSlot,
+        // leitura do snapshot de nevoa ja calculado), nao a recalculada — o custo que o Light
+        // quis evitar era o do recalculo. OccupiedCells segue omitido.
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u.IsDead || u.IsEmbarked) continue;
             if (u.SlotIndex == snap.AISlotIndex) snap.MyUnits.Add(u);
+            else if (match == null || match.IsUnitVisibleForSlot(u, aiSlot)) snap.EnemyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)
