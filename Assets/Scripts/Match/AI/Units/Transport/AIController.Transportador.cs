@@ -464,6 +464,20 @@ public partial class AIController
         var ocupadoOriginal = new HashSet<Vector3Int>(occupied);
         int aiSlot = ResolveAISlotKey(snapshot.AITeam);
 
+        // Alvo com inimigo VISIVEL em cima (snapshot, fog-honesto) nao vira atracadouro:
+        // "mantem a missao de pegar a cidade, mas pousa em outro lugar e faz o resto a pe e
+        // em combate frontal" (autor, 2026-11-07). Antes a excecao "unica saida" deixava o
+        // Chinook pairar sobre o soldado inimigo no predio que o passageiro ia capturar.
+        var alvosComInimigo = new HashSet<Vector3Int>();
+        if (snapshot.EnemyUnits != null)
+            foreach (UnitManager enemy in snapshot.EnemyUnits)
+                if (enemy != null && !enemy.IsDead && !enemy.IsEmbarked)
+                {
+                    Vector3Int ec = enemy.CurrentCellPosition;
+                    ec.z = 0;
+                    alvosComInimigo.Add(ec);
+                }
+
         IReadOnlyList<ConstructionManager> construcoes = ConstructionManager.AllActive;
         for (int i = 0; construcoes != null && i < construcoes.Count; i++)
         {
@@ -479,7 +493,11 @@ public partial class AIController
             if (!alvos.Contains(cell))
                 continue;
 
-            if (paths != null
+            if (alvosComInimigo.Contains(cell))
+            {
+                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} nao atraca no alvo de captura {cell}: inimigo em cima; pousa na faixa e o passageiro segue a pe");
+            }
+            else if (paths != null
                 && paths.ContainsKey(cell)
                 && IsOnlyDisembarkStopNear(transporter, cell, paths, ocupadoOriginal))
             {
