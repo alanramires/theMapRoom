@@ -25,10 +25,9 @@ public class ShoppingPressureWindow : EditorWindow
     private Vector2 _rightScroll;
 
     // A reconstrução do snapshot dispara GetDeficits, que loga no console. Por isso a
-    // coluna de pressão é recomputada quando o tabuleiro muda (turno, caixa, unidades),
-    // no botão, ou no máximo a cada RefreshInterval como rede de segurança; a coluna de
-    // objetivos lê o plano vivo a cada repaint (silencioso).
-    private const double RefreshInterval = 10.0;
+    // coluna de pressão é recomputada quando o tabuleiro muda (turno, caixa, unidades,
+    // time) ou no botão Atualizar — nunca por relógio. A coluna de objetivos lê o plano
+    // vivo a cada repaint (silencioso).
     private string _lastFingerprint = string.Empty;
     private List<AIShoppingDemand> _demands = new List<AIShoppingDemand>();
     private AIWorldSnapshot _snapshot;
@@ -40,7 +39,6 @@ public class ShoppingPressureWindow : EditorWindow
     // Idem a pressao de counter: refaz o roster e o anel Operacional por inimigo.
     private AIShoppingPlanner.CounterPressureInspection _counterPressure;
     private TeamId _snapshotTeam = TeamId.Neutral;
-    private double _lastBuild = -999;
 
     private GUIStyle _header;
     private GUIStyle _objTitle;
@@ -160,8 +158,11 @@ public class ShoppingPressureWindow : EditorWindow
             ? $"{_matchController.CurrentTurn}|{_matchController.GetActualMoney(slot)}|{UnitManager.AllActive.Count}"
             : string.Empty;
         bool boardChanged = fingerprint != _lastFingerprint;
-        bool stale = EditorApplication.timeSinceStartup - _lastBuild >= RefreshInterval;
-        if (!force && !teamChanged && !boardChanged && !stale)
+        // Sem relogio: o recalculo inteiro (demanda + counter + operacional) custava ate segundos
+        // e, de 10 em 10 s, travava um frame com a IA PARADA esperando o AI Step — FrameSpike de
+        // 1-4 s em Neutral/AwaitingAction, nada se mexendo. Parado, nao ha o que refazer; o que
+        // a impressao nao ve, o botao Atualizar refaz.
+        if (!force && !teamChanged && !boardChanged)
             return;
         _lastFingerprint = fingerprint;
 
@@ -171,7 +172,6 @@ public class ShoppingPressureWindow : EditorWindow
         _operationalPressure = AIShoppingPlanner.InspectOperationalPressure(_snapshot);
         _counterPressure = AIShoppingPlanner.InspectCounterPressure(_snapshot);
         _snapshotTeam = team;
-        _lastBuild = EditorApplication.timeSinceStartup;
     }
 
     private void DrawToolbar()
