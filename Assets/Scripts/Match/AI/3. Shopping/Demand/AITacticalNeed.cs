@@ -137,6 +137,9 @@ public class AIShoppingDemand
     public int MaxEliteLevel = int.MaxValue;
     public float MinRallyArtilleryWeight;
     public bool RequireRallyBreakthrough;
+    // Contra-pressao cujo alvo esta quase todo FORA da nossa terra (outra ilha): resposta
+    // terrestre nao alcanca. So liga quando ha resposta nao-terrestre ofertada.
+    public bool ExcludeLandResponse;
     public string Origin;
     public string Reason;
 }

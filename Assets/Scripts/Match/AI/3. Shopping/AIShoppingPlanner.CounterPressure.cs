@@ -54,6 +54,23 @@ public partial class AIShoppingPlanner
         public int CombatContacts;
         public int AnonymousThreatSignals;
         public int OffLandUnits;
+        // Parte da pressao BRUTA que vem de quem ALCANCA algo nosso neste turno (o anel, mesma
+        // regua do antiaereo): Tatico de combate do inimigo toca predio/unidade nossa ou a
+        // nossa ilha. Sinal anonimo (ele ja nos acertou) conta; memoria antiga nao.
+        // So essa parte pede compra URGENTE.
+        public float InRingAntiInfantry;
+        public float InRingAntiTank;
+        public int InRingUnits;
+
+        public float GetInRing(WeaponCategory category)
+        {
+            switch (category)
+            {
+                case WeaponCategory.AntiInfantaria: return InRingAntiInfantry;
+                case WeaponCategory.AntiTanque: return InRingAntiTank;
+                default: return 0f;
+            }
+        }
 
         public float Get(WeaponCategory category)
         {
@@ -385,6 +402,7 @@ public partial class AIShoppingPlanner
                     + signal.destroyedValue / 20000f,
                     0.1f, 1f) * recency;
                 AddAnonymousWeaponPressure(result, signal.weaponCategory, score);
+                AddInRing(result, signal.weaponCategory, score); // ele ja nos acertou: esta no anel
                 result.AnonymousThreatSignals++;
             }
         }
@@ -394,6 +412,19 @@ public partial class AIShoppingPlanner
         OwnLandProbe ownLand = IsGroundCutOffFromEnemy(snapshot, log: false)
             ? BuildOwnLandProbe(snapshot)
             : null;
+
+        AIController ringAi = AIController.Instance;
+        UnityEngine.Tilemaps.Tilemap ringBoard = ringAi != null ? ringAi.BoardTilemapRef : null;
+        TerrainDatabase ringTerrain = ringAi != null ? ringAi.TerrainDatabaseRef : null;
+        var ours = new HashSet<Vector3Int>();
+        if (snapshot.MyBuildings != null)
+            foreach (ConstructionManager b in snapshot.MyBuildings)
+                if (b != null) { Vector3Int c = b.CurrentCellPosition; c.z = 0; ours.Add(c); }
+        if (snapshot.MyUnits != null)
+            foreach (UnitManager u in snapshot.MyUnits)
+                if (u != null && !u.IsDead) { Vector3Int c = u.CurrentCellPosition; c.z = 0; ours.Add(c); }
+        OwnLandProbe ringIsland = ownLand != null && (ownLand.Island != null || ownLand.Reach != null)
+            ? ownLand : null;
 
         if (snapshot.EnemyUnits != null)
         foreach (UnitManager enemy in snapshot.EnemyUnits)
@@ -406,7 +437,9 @@ public partial class AIShoppingPlanner
             Vector3Int cell = enemy.CurrentCellPosition; cell.z = 0;
             bool offLand = ownLand != null && !enemy.IsEmbarked && enemy.GetDomain() == Domain.Land
                 && !ownLand.Contains(cell);
-            AddPressure(result, byClass, data, score, visible: true, offLand: offLand);
+            bool inRing = !enemy.IsEmbarked && score > 0f
+                && IsCounterEnemyInRing(enemy, data, offLand, ringBoard, ringTerrain, ours, ringIsland);
+            AddPressure(result, byClass, data, score, visible: true, offLand: offLand, inRing: inRing);
         }
 
         if (contacts != null)
@@ -614,7 +647,8 @@ public partial class AIShoppingPlanner
         UnitData data,
         float score,
         bool visible,
-        bool offLand = false)
+        bool offLand = false,
+        bool inRing = false)
     {
         WeaponCategory counter = CounterCategoryFor(data.unitClass);
         if (!byClass.TryGetValue(data.unitClass, out EnemyClassPressureInspection entry))
@@ -659,7 +693,65 @@ public partial class AIShoppingPlanner
             case WeaponCategory.AntiAerea: result.AntiAir += score; break;
             case WeaponCategory.AntiNavio: result.AntiShip += score; break;
         }
+        if (inRing)
+        {
+            result.InRingUnits++;
+            AddInRing(result, counter, score);
+        }
     }
+
+    private static void AddInRing(CounterPressureInspection result, WeaponCategory category, float score)
+    {
+        switch (category)
+        {
+            case WeaponCategory.AntiInfantaria: result.InRingAntiInfantry += score; break;
+            case WeaponCategory.AntiTanque: result.InRingAntiTank += score; break;
+        }
+    }
+
+    // O anel do counter: o Tatico de COMBATE do inimigo (proximo turno, MP cheio) toca predio
+    // ou unidade nossa, ou a nossa ilha. Mesma regua do antiaereo (CountEnemyAirInRing). So
+    // para quem cai em anti-infantaria/antitanque — as duas categorias que geram compra.
+    private static bool IsCounterEnemyInRing(UnitManager enemy, UnitData data, bool offLand,
+        UnityEngine.Tilemaps.Tilemap board, TerrainDatabase terrain,
+        HashSet<Vector3Int> ours, OwnLandProbe island)
+    {
+        if (offLand)
+            return false; // outra ilha: nao chega sem embarcar
+        WeaponCategory category = CounterCategoryFor(data.unitClass);
+        if (category != WeaponCategory.AntiInfantaria && category != WeaponCategory.AntiTanque)
+            return false;
+        if (board == null)
+            return true; // sem tabuleiro nao ha como medir: conta (falha conservadora)
+        // Cache: o mesmo inimigo, na mesma celula, contra o mesmo conjunto nosso, no mesmo turno,
+        // da a mesma resposta. BuildCounterPressure roda mais de uma vez por compra.
+        Vector3Int cell = enemy.CurrentCellPosition; cell.z = 0;
+        AIController ctl = AIController.Instance;
+        int turn = ctl != null && ctl.Match != null ? ctl.Match.CurrentTurn : 0;
+        var key = (enemy.InstanceId, cell, turn, ours.Count);
+        if (s_counterRingCache.TryGetValue(key, out bool cached))
+            return cached;
+        if (s_counterRingCache.Count > 512)
+            s_counterRingCache.Clear();
+        // OPERACIONAL, nao Tatico: a nossa resposta nasce na base e leva turnos para chegar.
+        // Com o Tatico, a pilha de tanques a 2 turnos da frente so virava urgencia depois do
+        // primeiro choque (Feijao Torto: corredor de terra, sem ar). O antiaereo segue Tatico.
+        UnitReachEnvelope envelope = UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = enemy,
+            BoardMap = board,
+            TerrainDatabase = terrain,
+            Intent = ReachIntent.Combat,
+            Band = ReachBand.Operational,
+            FilterByOperationDomain = false
+        });
+        bool hit = envelope != null && TouchesRing(envelope, ours, island);
+        s_counterRingCache[key] = hit;
+        return hit;
+    }
+
+    private static readonly Dictionary<(int, Vector3Int, int, int), bool> s_counterRingCache =
+        new Dictionary<(int, Vector3Int, int, int), bool>();
 
     private static WeaponCategory CounterCategoryFor(GameUnitClass unitClass)
     {
@@ -782,18 +874,52 @@ public partial class AIShoppingPlanner
         AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands,
         CounterPressureInspection pressure,
-        AIRosterKnowledge roster)
+        AIRosterKnowledge roster,
+        bool log = true)
     {
         if (snapshot == null || demands == null || pressure == null)
             return;
 
         AddCounterCategoryDemands(snapshot, demands, pressure,
             WeaponCategory.AntiTanque, pressure.RawAntiTank,
-            pressure.AntiTankCoverage, pressure.AntiTank, 11, 13, roster);
+            pressure.AntiTankCoverage, pressure.AntiTank, 11, 13, roster, log);
         AddCounterCategoryDemands(snapshot, demands, pressure,
             WeaponCategory.AntiInfantaria, pressure.RawAntiInfantry,
-            pressure.AntiInfantryCoverage, pressure.AntiInfantry, 12, 14, roster);
+            pressure.AntiInfantryCoverage, pressure.AntiInfantry, 12, 14, roster, log);
+        s_counterThreatInRing = true;
     }
+
+    // Fora do anel, cobertura a partir desta fracao da forca inimiga ja basta: nao pede compra.
+    private const float CounterToleratedCoverage = 0.6f;
+
+    private static bool CounterThreatInRing(CounterPressureInspection pressure, WeaponCategory category, float coverage)
+        => Mathf.Max(0f, pressure.GetInRing(category) - coverage) > 0.05f;
+
+    private static bool CounterWellCovered(float rawPressure, float coverage)
+        => rawPressure <= 0f || coverage >= rawPressure * CounterToleratedCoverage;
+
+    /// <summary>
+    /// A categoria vai MESMO pedir counter? Mesma regua da demanda (anel + tolerancia). Quem
+    /// cede vaga ao counter (a artilharia da composicao) pergunta aqui — senao, com 60% de
+    /// cobertura, a IA nao comprava counter E nao comprava artilharia.
+    /// </summary>
+    private static bool CounterCategoryWantsResponse(CounterPressureInspection pressure, WeaponCategory category)
+    {
+        if (pressure == null)
+            return false;
+        float raw, coverage;
+        switch (category)
+        {
+            case WeaponCategory.AntiInfantaria: raw = pressure.RawAntiInfantry; coverage = pressure.AntiInfantryCoverage; break;
+            case WeaponCategory.AntiTanque: raw = pressure.RawAntiTank; coverage = pressure.AntiTankCoverage; break;
+            default: return false;
+        }
+        return CounterThreatInRing(pressure, category, coverage) || !CounterWellCovered(raw, coverage);
+    }
+
+    // Contexto da categoria em avaliacao: ha ameaca descoberta NO ANEL? So ela deixa a resposta
+    // basica sair urgente. Estatico porque o AddCounterPressureDemand e chamado de varios ramos.
+    private static bool s_counterThreatInRing = true;
 
     private static void AddCounterCategoryDemands(
         AIWorldSnapshot snapshot,
@@ -805,11 +931,31 @@ public partial class AIShoppingPlanner
         float aggregateUnmet,
         int classPriority,
         int anonymousPriority,
-        AIRosterKnowledge roster)
+        AIRosterKnowledge roster,
+        bool log = true)
     {
         float escalationThreshold = Instance != null
             ? Mathf.Max(1f, Instance.CounterEliteEscalationPressure)
             : 8f;
+
+        // NAO E CORRIDA ARMAMENTISTA (efeito Pernalonga x Gaguinho). Antes, qualquer saldo acima
+        // de 0,05 pedia compra: a cobertura tinha de IGUALAR a forca inimiga, e ela escalava a
+        // cada turno (AI Step T7 Peixe Pequeno: 8,1 contra 4,9, 23 de 27 do outro lado do mar).
+        //   - URGENTE so o que esta no ANEL (mesma regua do antiaereo): quem alcanca algo nosso
+        //     neste turno e nao esta coberto.
+        //   - Fora do anel, so pede (sem urgencia) quando a cobertura nao chega a
+        //     CounterToleratedCoverage da forca — nao precisa empatar, precisa nao perder.
+        bool threatInRing = CounterThreatInRing(pressure, category, coverage);
+        bool wellCovered = CounterWellCovered(rawPressure, coverage);
+        if (!threatInRing && wellCovered)
+        {
+            if (log && aggregateUnmet > 0.05f)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] counter {category}: "
+                    + $"sem compra — cobertura {coverage:F1} >= {CounterToleratedCoverage:P0} de {rawPressure:F1} "
+                    + $"e nada descoberto no anel (anel={pressure.GetInRing(category):F1})");
+            return;
+        }
+        s_counterThreatInRing = threatInRing;
 
         // A decisao de parar de comprar pecas baratas pertence a categoria inteira.
         // Sem isso, uma pressao anti-tank alta fragmentada entre Armored, Artillery,
@@ -938,8 +1084,11 @@ public partial class AIShoppingPlanner
             $"{category}/{(targetClass.HasValue ? targetClass.Value.ToString() : "desconhecido")}"
                 + $" bruto={rawPressure:F1} cobertura={coverage:F1} saldo={unmetPressure:F1}"
                 + $" vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits}"
-                + (pressure.OffLandUnits > 0 ? $" foraDaTerra={pressure.OffLandUnits}" : ""),
-            forceBasicResponse);
+                + (pressure.OffLandUnits > 0 ? $" foraDaTerra={pressure.OffLandUnits}" : "")
+                + $" anel={pressure.GetInRing(category):F1}"
+                + (forceBasicResponse && !s_counterThreatInRing ? " (fora do anel: sem urgencia)" : ""),
+            // Urgente so com ameaca descoberta no anel; fora dele a resposta disputa como comum.
+            forceBasicResponse && s_counterThreatInRing);
         counterDemand.RequiredWeaponCategory = category;
         if (forceBasicResponse)
             counterDemand.MaxEliteLevel = 0;
@@ -960,7 +1109,57 @@ public partial class AIShoppingPlanner
             counterDemand.RequiredUnitId = potentialElite.eliteFrom.id;
             counterDemand.MinTargetPriority = BazookaTargetPriority.Tertiary;
         }
+        // ALVO EM OUTRA ILHA: a cobertura ja desconta a resposta terrestre (not_in_reach), mas a
+        // compra ainda aceitava Soldado contra infantaria do outro lado do mar — AI Step T7
+        // Peixe Pequeno: 2 Soldados "urgentes" com foraDaTerra=23 de vis=27. Com a maior parte
+        // da pressao fora da terra E alguma resposta nao-terrestre ofertada, a terrestre sai da
+        // demanda. Sem resposta aerea/naval no roster, a terrestre segue sendo a melhor que ha.
+        float offShare = CounterOffLandShare(pressure, category, targetClass);
+        if (offShare >= CounterOffLandExcludeShare
+            && string.IsNullOrEmpty(counterDemand.RequiredUnitId) // peca exata ja escolhida: nao anula
+            && OffersNonLandCounter(snapshot, category))
+        {
+            counterDemand.ExcludeLandResponse = true;
+            counterDemand.Reason += $" ({offShare:P0} em outra ilha: sem resposta terrestre)";
+        }
         MergeRoleDemand(demands, counterDemand, false);
+    }
+
+    // Acima desta fatia da pressao (da categoria) fora da nossa terra, resposta terrestre sai.
+    private const float CounterOffLandExcludeShare = 0.5f;
+
+    private static float CounterOffLandShare(
+        CounterPressureInspection pressure, WeaponCategory category, GameUnitClass? targetClass)
+    {
+        if (pressure?.Classes == null)
+            return 0f;
+        float total = 0f, off = 0f;
+        foreach (EnemyClassPressureInspection c in pressure.Classes)
+        {
+            if (c == null || c.CounterCategory != category)
+                continue;
+            if (targetClass.HasValue && c.UnitClass != targetClass.Value)
+                continue;
+            total += c.Score;
+            foreach (float v in c.UnitTypeOffLandScores.Values)
+                off += v;
+        }
+        return total > 0f ? Mathf.Clamp01(off / total) : 0f;
+    }
+
+    private static bool OffersNonLandCounter(AIWorldSnapshot snapshot, WeaponCategory category)
+    {
+        if (snapshot?.MyBuildings == null)
+            return false;
+        foreach (ConstructionManager b in snapshot.MyBuildings)
+        {
+            if (b == null || b.OfferedUnits == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex))
+                continue;
+            foreach (UnitData u in b.OfferedUnits)
+                if (u != null && u.domain != Domain.Land && HasWeaponCategory(u, category))
+                    return true;
+        }
+        return false;
     }
 
     private static float ResolveBasicCounterCoverage(

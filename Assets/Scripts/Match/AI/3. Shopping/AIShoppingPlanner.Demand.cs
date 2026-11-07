@@ -3092,8 +3092,13 @@ public partial class AIShoppingPlanner
         // metralhadora ou outro counter validado pela matriz como resposta acessivel. Quando a pressao baixar, o pacote
         // 2/2/1 volta a completar seu fire support normalmente.
         const float materialCounterGap = 0.4f;
-        bool counterResponseOwnsFireSlot = Mathf.Max(
-            counterPressure.AntiInfantry, counterPressure.AntiTank) >= materialCounterGap;
+        // Cede a vaga so quando o counter VAI pedir compra (anel ou cobertura abaixo da
+        // tolerancia). Saldo material que o counter tolera nao segura mais a artilharia.
+        bool counterResponseOwnsFireSlot =
+            (counterPressure.AntiInfantry >= materialCounterGap
+                && CounterCategoryWantsResponse(counterPressure, WeaponCategory.AntiInfantaria))
+            || (counterPressure.AntiTank >= materialCounterGap
+                && CounterCategoryWantsResponse(counterPressure, WeaponCategory.AntiTanque));
         // Na ilha sem ligacao o fogo e antiaereo, e a regra do counter terrestre nao se aplica.
         int compositionFire = capturers >= massGate && (groundCutOff || !counterResponseOwnsFireSlot)
             ? Mathf.Max(0, packages - fireSupport)
@@ -3271,7 +3276,7 @@ public partial class AIShoppingPlanner
 
         AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
         AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
-        AddCounterPressureDemands(snapshot, demands, counterPressure, roster);
+        AddCounterPressureDemands(snapshot, demands, counterPressure, roster, log);
         bool groundCounterPressureCovered = counterPressure.AntiTank <= 0.05f
             && counterPressure.AntiInfantry <= 0.05f;
         bool rallyAssemblyActive = HasActiveRallyAssembly(
@@ -3547,6 +3552,7 @@ public partial class AIShoppingPlanner
                 || !Mathf.Approximately(current.MinRallyArtilleryWeight,
                     incoming.MinRallyArtilleryWeight)
                 || current.RequireRallyBreakthrough != incoming.RequireRallyBreakthrough
+                || current.ExcludeLandResponse != incoming.ExcludeLandResponse
                 || current.RequiredWeaponCategory != incoming.RequiredWeaponCategory
                 || current.TargetClass != incoming.TargetClass
                 || current.MinTargetPriority != incoming.MinTargetPriority
@@ -3573,6 +3579,8 @@ public partial class AIShoppingPlanner
                 System.StringComparison.Ordinal))
             return false;
         if (demand.Domain.HasValue && unit.domain != demand.Domain.Value)
+            return false;
+        if (demand.ExcludeLandResponse && unit.domain == Domain.Land)
             return false;
         if (demand.RequiredVisionDomain.HasValue
             || demand.RequiredVisionHeight.HasValue)
