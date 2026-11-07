@@ -121,12 +121,19 @@ public static class MelhorDesembarqueService
                     "reason=transporter_cell_not_allowed");
                 continue;
             }
+            // Toda recusa conta o motivo. Antes so a de cima falava, e um "sem LZ" com seis
+            // recusas no log escondia as outras LZs, mortas caladas aqui embaixo — o
+            // diagnostico parecia "ocupacao aerea" quando o defeito estava em outro lugar.
             List<UnitManager> lzOccupants =
                 UnitOccupancyRules.GetUnitsAtCell(
                     request.map, lzCell, request.transporter);
             if (!OccupancyResolver.CanEndMove(
                     request.transporter, lzCell, lzOccupants))
+            {
+                request.diagnosticLog?.Invoke(
+                    $"LZ={lzCell} REJECT reason=cannot_end_move occupants={lzOccupants?.Count ?? 0}");
                 continue;
+            }
 
             if (!PodeDesembarcarSensor.CollectOptionsFromCell(
                     request.transporter,
@@ -135,7 +142,11 @@ public static class MelhorDesembarqueService
                     request.terrainDatabase,
                     options,
                     out string contextReason))
+            {
+                request.diagnosticLog?.Invoke(
+                    $"LZ={lzCell} REJECT reason=sensor_no_option ({contextReason})");
                 continue;
+            }
 
             var lz = new MelhorDesembarqueLzScore
             {
@@ -147,7 +158,21 @@ public static class MelhorDesembarqueService
                 : null;
             SolveBestMatching(request, lz, options, diagnostics);
             if (lz.delivered <= 0)
+            {
+                // O sensor deixou descer, mas nenhum passageiro chega ao alvo dele a partir
+                // daqui dentro do limite de rota. Suspeito classico: o alvo esta ocupado (ex.:
+                // inimigo em cima do predio) e a rota reversa a partir dele sai vazia.
+                if (request.diagnosticLog != null)
+                {
+                    request.diagnosticLog(
+                        $"LZ={lzCell} REJECT reason=delivered_zero sensorOptions={options.Count} " +
+                        "(nenhum passageiro chega ao alvo dele a partir das celulas de desembarque)");
+                    if (diagnostics != null)
+                        for (int i = 0; i < diagnostics.Count; i++)
+                            request.diagnosticLog("  " + diagnostics[i]);
+                }
                 continue;
+            }
 
             lz.score = lz.delivered * 100000f
                      - lz.totalRouteCost * 100f

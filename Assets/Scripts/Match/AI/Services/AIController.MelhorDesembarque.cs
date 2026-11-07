@@ -159,6 +159,18 @@ public partial class AIController
                         target,
                         Mathf.Max(1, routeHorizon));
                 routeCache[passenger.InstanceId] = reverseRoute;
+                // Faixa vazia/minima a partir do alvo = nenhuma LZ entrega este passageiro.
+                // Diz uma vez, com quem esta em cima do alvo (inimigo bloqueando o predio?).
+                if (showAILogs && (reverseRoute == null || reverseRoute.Count <= 1))
+                {
+                    List<UnitManager> onTarget = UnitOccupancyRules.GetUnitsAtCell(boardTilemap, target, passenger);
+                    string who = onTarget == null || onTarget.Count == 0
+                        ? "ninguem"
+                        : string.Join(",", onTarget.ConvertAll(u => $"{u.UnitDisplayName}#{u.InstanceId}(slot {u.SlotIndex})"));
+                    Debug.Log($"{TL("Transporte")}[MelhorDesembarque] faixa do passageiro #{passenger.InstanceId} "
+                        + $"a partir do alvo {target} {(reverseRoute == null ? "NULA" : $"com {reverseRoute.Count} celula(s)")} "
+                        + $"horizonte={Mathf.Max(1, routeHorizon)}; em cima do alvo: {who}");
+                }
             }
 
             int passengerRouteLimit = maxRemainingRouteCost;
