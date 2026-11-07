@@ -25,6 +25,13 @@ Pergunte ao autor o que você não conseguir atribuir. Arquivo órfão costuma
 pertencer a uma frente por um motivo não óbvio — na v7.0.2, um builder de índice
 de topologia era do desembarque porque lia um campo removido.
 
+**Revise cada frente contra "Antes de escrever regra nova — procure a que já existe"**
+(seção Regras de trabalho do `docs/resumo.md`), inclusive as de outra sessão. A pergunta é
+uma só: *esta mudança responde algo que outra função já respondia?* Na v10.4.0 três frentes
+caíram nisso (o filtro da produtora por célula, o AI Step recalculando a névoa, o EVAC aéreo
+escolhendo hospital por fora do `FindRepairConstruction`). Achou? Registre no relatório e
+avise o autor antes de comitar — conserto antes do commit é barato.
+
 ## 1. Escolher o número da versão
 
 `vX.Y.Z`, definido pelo autor:
@@ -149,8 +156,18 @@ Atualize:
 - **Onde eu parei** — o que ficou pela metade, com nomes de arquivo
 - **Armadilhas** — toda que custou tempo hoje entra na tabela
 - **A escada** — se algum degrau mudou de contagem
+- **Regras de trabalho → "Antes de escrever regra nova — procure a que já existe"** — se o
+  dia teve um erro do tipo *regra certa escrita ao lado de uma que já existia* (varredura
+  própria por fora do dono da pergunta, utilitário com custo escondido em laço, ferramenta
+  recalculando o jogo, snapshot errado, recusa calada), a lição entra como item novo, com a
+  função dona da pergunta citada pelo nome.
 
 Corte o que virou obsoleto. O resumo cresce se ninguém podar.
+
+**Exceção: a seção "Regras de trabalho" nunca é podada.** É a diretriz que toda sessão nova
+lê antes de codar (o autor abre a sessão com *"leia o resumo.md, em especial as Regras de
+trabalho"*). Item dela só sai se o autor mandar, ou se a função que ele cita deixar de existir
+— e aí troca-se o nome, não se apaga a regra.
 
 ## Critério de pronto
 
@@ -161,5 +178,6 @@ Corte o que virou obsoleto. O resumo cresce se ninguém podar.
 - [ ] um commit por frente, mais um de churn
 - [ ] tag criada **depois** do último commit, e pushada
 - [ ] `docs/resumo.md` descreve o estado de agora
+- [ ] "Regras de trabalho" do resumo intacta, e com a lição do dia se houve uma
 
 Relate ao autor o que ficou pendente e o que você não conseguiu verificar.
