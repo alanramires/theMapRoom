@@ -1483,6 +1483,11 @@ public partial class AIShoppingPlanner
                 + $"{airOrigin} libera {release} da reserva elite ({reserve}): {airDemand.Reason}");
             reserve -= release;
             hasStrategicReserve = reserve > 0 && reserveTarget != null;
+            // Liberou porque AGORA cabe: garante a peca antes do carrinho, como no caminho de cima.
+            // Sem isto a reserva solta ia para o beam, que prefere largura: AI Step T8 (Peixe
+            // Pequeno) — vanguarda pediu Caca B, liberou 8580, e saiu Apache + Apache + Chinook.
+            if (airPreCommit == null)
+                airPreCommit = airDemand;
         }
         {
             var saving = new System.Text.StringBuilder();
