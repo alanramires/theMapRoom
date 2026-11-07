@@ -1,0 +1,12 @@
+{
+	"nodes":[
+		{"id":"9e38524b74bbcf0c","x":-235,"y":-205,"width":250,"height":60,"type":"text","text":"A Escalada da Demanda"},
+		{"id":"b128d9d03f3e9c13","x":-282,"y":12,"width":250,"height":60,"type":"text","text":"Você Compra Disruptor "},
+		{"id":"4bb1c7ccf19ef01b","x":-660,"y":12,"width":250,"height":60,"type":"text","text":"O oponente compra Capturador"},
+		{"id":"04ed4a623fa67eee","x":80,"y":12,"width":250,"height":60,"type":"text","text":"O oponente compra anti-disruptor"}
+	],
+	"edges":[
+		{"id":"ec9016b59b3c76ec","fromNode":"b128d9d03f3e9c13","fromSide":"left","toNode":"4bb1c7ccf19ef01b","toSide":"right"},
+		{"id":"0c3d40b8b45d8608","fromNode":"04ed4a623fa67eee","fromSide":"left","toNode":"b128d9d03f3e9c13","toSide":"right"}
+	]
+}
