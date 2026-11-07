@@ -1023,5 +1023,29 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 - **Perguntar por que uma coisa existe antes de construir em cima dela.**
 - **Uma frente por commit.** `git add .` só no churn.
 - **Não editar `.asset` no disco com o Inspector aberto.**
-- **Não salvar `.cs` enquanto o autor testa em Play.**
+- **Não salvar `.cs` enquanto o autor testa em Play.** Salvar recarrega o domínio igual a
+  `unity recompile`. Deixe pronto, avise, e salve quando ele disser que parou.
 - Fechar o dia pela skill `.claude/skills/fechamento-do-dia/SKILL.md`.
+
+### Antes de escrever regra nova — procure a que já existe
+
+O erro mais caro da v10 não foi regra errada: foi **regra certa escrita ao lado de uma que já
+existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de codar:
+
+1. **Ache quem já responde a mesma pergunta.** Destino de reparo/EVAC → `FindRepairConstruction`
+   (conscrição, pressão à base, reparo pela linha, elite). Onde descer → `MelhorDesembarque`. Onde
+   embarcar → `MelhorEmbarque`. "Tem construção aqui?" → `GetConstructionAtCell`. Pode-se mover/
+   parar/atacar → o sensor `Pode*`. Várias unidades fazem a mesma coisa (EVAC: APC, Chinook, hospital
+   do supridor); a regra tem de ser **uma só** para todas. Varredura própria por fora do dono da
+   pergunta é o defeito, mesmo quando funciona no caso da frente.
+2. **Leia o corpo do utilitário antes de pô-lo num laço por célula.** Nome de consulta pode
+   esconder custo de varredura (`GetConstructionAtCell` fazia `FindObjectsByType` → 13 s).
+   Montar o conjunto uma vez por decisão e consultar o conjunto.
+3. **Rode o sensor só onde a resposta pode ser usada.** Não simule desembarque/tiro em célula que
+   o filtro do fim vai recusar com certeza (alcance, faixa do passageiro). Pode antes.
+4. **Ferramenta lê, não recalcula.** Shopping Pressure e AI Step leem o fato de quem o produziu; só
+   simulam sob pedido explícito.
+5. **Confira qual snapshot você recebeu.** A Fase 2 usa `BuildLight`; até `e72deff` ele não tinha
+   `EnemyUnits`. Lista vazia não dá erro.
+6. **Toda recusa conta o motivo** no log. "Sem LZ" com um só motivo registrado esconde os outros.
+7. **Compile com `bash tools/compilar.sh`** e diga o que foi visto em Play e o que só compilou.
