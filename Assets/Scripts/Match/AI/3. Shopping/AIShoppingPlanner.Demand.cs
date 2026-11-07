@@ -1433,7 +1433,8 @@ public partial class AIShoppingPlanner
         // Sem isso, Caca B de $16000 com $18500 livres perdia para Apache + Chinook + Suprimentos
         // + Soldados — 6 atendimentos valem mais na soma do beam que 1 escolta (AI Step T7).
         AIShoppingDemand airPreCommit = null;
-        foreach (string airOrigin in new[] { "disruptor", "escolta" })
+        // A VANGUARDA (caca pela presa sobre a tropa descoberta) e a escolta generalizada: mesma regra.
+        foreach (string airOrigin in new[] { "disruptor", "vanguarda", "escolta" })
         {
             AIShoppingDemand airDemand = demands.Find(d => d != null && d.Count > 0
                 && d.Origin != null && d.Origin.Contains(airOrigin));
@@ -3125,10 +3126,22 @@ public partial class AIShoppingPlanner
         // Pequeno T1: o Chinook recem-comprado no aeroporto do outro canto custava uma AAA
         // de prioridade 8 antes de qualquer capturador.)
         var airInRingByClass = new Dictionary<GameUnitClass, int>();
-        int visibleAir = CountEnemyAirInRing(snapshot, out int airSeen, airInRingByClass);
-        if (log && airSeen > visibleAir)
+        var airRearByClass = new Dictionary<GameUnitClass, int>();
+        var airFrontByClass = new Dictionary<GameUnitClass, int>();
+        int ringAir = CountEnemyAirInRing(snapshot, out int airSeen, airInRingByClass,
+            airRearByClass, airFrontByClass);
+        int visibleAir = 0;
+        foreach (int n in airRearByClass.Values) visibleAir += n;
+        int frontAir = 0;
+        foreach (int n in airFrontByClass.Values) frontAir += n;
+        if (log && airSeen > 0)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] ameaca aerea: "
-                + $"{visibleAir}/{airSeen} aeronave(s) visiveis dentro do anel — as de fora, e transporte quando ha Disruptor na oferta, nao pedem AA urgente");
+                + $"{ringAir}/{airSeen} aeronave(s) visiveis dentro do anel; retaguarda descoberta={visibleAir} "
+                + $"vanguarda descoberta={frontAir} — fora do anel, sob o guarda-chuva antiaereo, e transporte "
+                + "quando ha Disruptor na oferta, nao pedem nada");
+        // RETAGUARDA: so a aeronave que alcanca PREDIO nosso fora do guarda-chuva pede antiaereo.
+        // A bateria defende o lugar; a tropa la na frente pede caca (VANGUARDA, abaixo).
+        airInRingByClass = airRearByClass;
         if (visibleAir > 0)
         {
             int activeAA = CountAtomicRole(snapshot, UnitRole.AntiaereoCombatente)
@@ -3204,6 +3217,53 @@ public partial class AIShoppingPlanner
             }
         }
 
+        // VANGUARDA: aeronave inimiga que alcanca tropa nossa FORA de predio e FORA do
+        // guarda-chuva antiaereo pede CACA. "Voce na frente capturando, o cara ergue um
+        // bombardeiro e fica moendo suas tropas, voce ergue um SAM, e ele fica la na base...
+        // onde esta o caca?" (autor, 2026-11-07). A escada e a mesma da bateria, pela presa da
+        // ficha: bombardeiro (Plane) -> quem tem Plane em primario (Caca A); cadeia fechada ->
+        // secundario (Caca B, que abre a cadeia do A). Apache (Heli) -> Caca B. O caca orbita o
+        // capitao (o capturador), entao nasce para ir com a frente, nao para ficar na base.
+        bool frontInterceptorDemanded = false;
+        if (frontAir > 0 && CanAnyOwnProducerOffer(snapshot, UnitRole.Interceptador))
+        {
+            GameUnitClass? frontClass = null;
+            BazookaTargetPriority frontTier = BazookaTargetPriority.Primary;
+            int frontMissing = 0;
+            foreach (KeyValuePair<GameUnitClass, int> pair in airFrontByClass)
+            {
+                BazookaTargetPriority tier;
+                if (OffersRoleFor(snapshot, UnitRole.Interceptador, pair.Key, BazookaTargetPriority.Primary))
+                    tier = BazookaTargetPriority.Primary;
+                else if (OffersRoleFor(snapshot, UnitRole.Interceptador, pair.Key, BazookaTargetPriority.Secondary))
+                    tier = BazookaTargetPriority.Secondary;
+                else
+                    continue;
+                // Em pares, como o Disruptor ("concentrar, nao dividir"), com o teto da escolta.
+                int wanted = Mathf.Min(EscortDemandCap, Mathf.Max(1, Mathf.CeilToInt(pair.Value / 2f)));
+                int missing = wanted - CountOwnRoleFor(snapshot, UnitRole.Interceptador, pair.Key, tier);
+                if (missing > frontMissing)
+                {
+                    frontMissing = missing;
+                    frontClass = pair.Key;
+                    frontTier = tier;
+                }
+            }
+            if (frontClass.HasValue)
+            {
+                AIShoppingDemand fighter = NewRoleDemand(UnitRole.Interceptador, frontMissing, 12,
+                    "vanguarda",
+                    $"{frontClass.Value} sobre tropa fora do guarda-chuva={airFrontByClass[frontClass.Value]} "
+                    + $"(presa em {(frontTier == BazookaTargetPriority.Primary ? "primario" : "secundario: primario fora de alcance")})",
+                    false);
+                fighter.Domain = Domain.Air;
+                fighter.TargetClass = frontClass.Value;
+                fighter.MinTargetPriority = frontTier;
+                MergeRoleDemand(demands, fighter, false);
+                frontInterceptorDemanded = true;
+            }
+        }
+
         // DISRUPTOR: o espelho do capturador no shopping. O counter enxerga CLASSE (helicoptero
         // pede antiaereo) e nao enxerga DINHEIRO; tres Chinooks inimigos carregados passavam sem
         // pedir quem os caca. Transporte inimigo visivel levando poder de captura pede Disruptor
@@ -3246,7 +3306,11 @@ public partial class AIShoppingPlanner
         // nao vende o de disruptores cai no interceptador generico (gate inaplicavel).
         bool offersAntiDisruptor = OffersPrimaryRole(snapshot, UnitRole.InterceptadorDeDisruptor);
         UnitRole escortRole = offersAntiDisruptor ? UnitRole.InterceptadorDeDisruptor : UnitRole.Interceptador;
-        if (enemyDisruptorsInAir > 0 && ownAirTransports > 0
+        // Com a VANGUARDA ja pedindo caca, a escolta nao pede de novo: o Chinook e tropa nossa
+        // fora de predio, entao o Apache sobre ele ja caiu la. Duas demandas (uma com classe de
+        // presa, outra sem) nao se fundiriam e o caixa pagaria dois cacas pela mesma ameaca.
+        if (!frontInterceptorDemanded
+            && enemyDisruptorsInAir > 0 && ownAirTransports > 0
             && CanAnyOwnProducerOffer(snapshot, UnitRole.Interceptador))
         {
             int desiredEscorts = Mathf.Min(EscortDemandCap,
@@ -3267,13 +3331,24 @@ public partial class AIShoppingPlanner
             }
         }
 
-        int enemyArtillery = CountEnemyCombatRole(snapshot, UnitRole.FogoIndireto);
-        if (enemyArtillery >= 3 && CountOwnedAirAttack(snapshot, eliteOnly: true) == 0)
+        // PAREDE -> BOMBARDEIRO, pela PRESA (autor, 2026-11-07: "as aeronaves do cara voam na
+        // sua praia, voce compra baterias anti-aerea, ele fica de olho... qdo voce tiver muitas,
+        // ele compra bombardeiro"). Antes contava PAPEL (CanSatisfy FogoIndireto, que pegava a AA
+        // por acidente) e parava no primeiro elite aereo: a parede de 6 baterias recebia o mesmo
+        // UM bombardeiro que a de 3. Agora conta a CLASSE Artillery (artilharia, AAA e SAM) e a
+        // demanda pede quem a tem em primario. Escala: um bombardeiro por 3 pecas da parede,
+        // ate BreakthroughBomberCap.
+        int enemyWall = CountEnemyClass(snapshot, GameUnitClass.Artillery);
+        int wantedBombers = Mathf.Min(BreakthroughBomberCap, enemyWall / 3);
+        int ownBombers = CountOwnedAirAttack(snapshot, eliteOnly: true);
+        if (wantedBombers > ownBombers)
         {
-            AIShoppingDemand bomber = NewRoleDemand(UnitRole.AtaqueAereo, 1, 12,
-                "breakthrough", $"parede de artilharia={enemyArtillery}", false);
+            AIShoppingDemand bomber = NewRoleDemand(UnitRole.AtaqueAereo, wantedBombers - ownBombers, 12,
+                "breakthrough", $"parede (classe Artillery)={enemyWall}; bombardeiros={ownBombers}/{wantedBombers}", false);
             bomber.Domain = Domain.Air;
             bomber.MinEliteLevel = 1;
+            bomber.TargetClass = GameUnitClass.Artillery;
+            bomber.MinTargetPriority = BazookaTargetPriority.Primary;
             MergeRoleDemand(demands, bomber, false);
         }
 
@@ -4512,6 +4587,14 @@ public partial class AIShoppingPlanner
         return count;
     }
 
+    // "Vende" para a DEMANDA tem de ser o mesmo "vende" do CARRINHO: a ficha esta na prateleira
+    // E a cadeia de elite esta aberta. Sem isto a demanda nascia pedindo SAM com nenhuma AAA em
+    // campo (ou Caca A sem Caca B), o carrinho descartava a ficha (IsEliteChainAvailable) e a
+    // demanda nunca fechava — urgente, segurando o caixa. Com o filtro, a escada da presa desce
+    // ao secundario, compra o elo de baixo, e o elo de baixo abre a cadeia do de cima.
+    private static bool IsOfferBuyableNow(UnitData unit, AIWorldSnapshot snapshot)
+        => unit != null && IsEliteChainAvailable(unit, snapshot);
+
     // Algum produtor nosso vende uma ficha cujo papel PRINCIPAL e este (nao so secundario)?
     private static bool OffersPrimaryRole(AIWorldSnapshot snapshot, UnitRole role)
     {
@@ -4523,7 +4606,8 @@ public partial class AIShoppingPlanner
                 || building.OfferedUnits == null)
                 continue;
             foreach (UnitData unit in building.OfferedUnits)
-                if (unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role)
+                if (unit != null && unit.roles != null && unit.roles.Count > 0 && unit.roles[0] == role
+                    && IsOfferBuyableNow(unit, snapshot))
                     return true;
         }
         return false;
@@ -4627,9 +4711,13 @@ public partial class AIShoppingPlanner
             if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null)
                 continue;
+            // O mesmo filtro do carrinho (DoesUnitMeetShoppingDemand + cadeia): so CanSatisfy pelo
+            // papel estimava o Caca A (Plane em primario, $26000) pelo preco do Caca B ($16000), e a
+            // poupanca rompia/segurava o valor errado.
             foreach (UnitData unit in building.OfferedUnits)
                 if (unit != null && unit.cost > 0 && unit.cost < cheapest
-                    && UnitRoleCompatibility.CanSatisfy(unit, demand.Role))
+                    && DoesUnitMeetShoppingDemand(unit, demand)
+                    && IsOfferBuyableNow(unit, snapshot))
                     cheapest = unit.cost;
         }
         return cheapest == int.MaxValue ? 0 : cheapest * demand.Count;
@@ -4645,7 +4733,8 @@ public partial class AIShoppingPlanner
                 || building.OfferedUnits == null)
                 continue;
             foreach (UnitData unit in building.OfferedUnits)
-                if (unit != null && UnitRoleCompatibility.CanSatisfy(unit, role))
+                if (unit != null && UnitRoleCompatibility.CanSatisfy(unit, role)
+                    && IsOfferBuyableNow(unit, snapshot))
                     return true;
         }
         return false;
@@ -4655,6 +4744,16 @@ public partial class AIShoppingPlanner
     // menos minTier de prioridade de alvo?
     private static bool OffersAntiAirFor(AIWorldSnapshot snapshot, GameUnitClass targetClass,
         BazookaTargetPriority minTier)
+        => OffersRoleFor(snapshot, UnitRole.Antiaereo, targetClass, minTier);
+
+    private static int CountOwnAntiAirFor(AIWorldSnapshot snapshot, GameUnitClass targetClass,
+        BazookaTargetPriority minTier)
+        => CountOwnRoleFor(snapshot, UnitRole.Antiaereo, targetClass, minTier);
+
+    // A ESCADA DA PRESA, para qualquer papel: algum produtor nosso vende (e a cadeia de elite
+    // deixa comprar) uma ficha deste papel com esta classe em pelo menos minTier?
+    private static bool OffersRoleFor(AIWorldSnapshot snapshot, UnitRole role,
+        GameUnitClass targetClass, BazookaTargetPriority minTier)
     {
         if (snapshot?.MyBuildings == null)
             return false;
@@ -4664,23 +4763,24 @@ public partial class AIShoppingPlanner
                 || building.OfferedUnits == null)
                 continue;
             foreach (UnitData unit in building.OfferedUnits)
-                if (unit != null && UnitRoleCompatibility.CanSatisfy(unit, UnitRole.Antiaereo)
-                    && (int)unit.ResolveAiTargetPriorityForTargetClass(targetClass) >= (int)minTier)
+                if (unit != null && UnitRoleCompatibility.CanSatisfy(unit, role)
+                    && (int)unit.ResolveAiTargetPriorityForTargetClass(targetClass) >= (int)minTier
+                    && IsOfferBuyableNow(unit, snapshot))
                     return true;
         }
         return false;
     }
 
-    // Antiaereos nossos em campo com esta classe em pelo menos minTier.
-    private static int CountOwnAntiAirFor(AIWorldSnapshot snapshot, GameUnitClass targetClass,
-        BazookaTargetPriority minTier)
+    // Pecas nossas em campo deste papel com esta classe em pelo menos minTier.
+    private static int CountOwnRoleFor(AIWorldSnapshot snapshot, UnitRole role,
+        GameUnitClass targetClass, BazookaTargetPriority minTier)
     {
         int count = 0;
         if (snapshot?.MyUnits == null)
             return 0;
         foreach (UnitManager unit in snapshot.MyUnits)
             if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data) && data != null
-                && UnitRoleCompatibility.CanSatisfy(data, UnitRole.Antiaereo)
+                && UnitRoleCompatibility.CanSatisfy(data, role)
                 && (int)data.ResolveAiTargetPriorityForTargetClass(targetClass) >= (int)minTier)
                 count++;
         return count;
@@ -4689,10 +4789,28 @@ public partial class AIShoppingPlanner
     private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen)
         => CountEnemyAirInRing(snapshot, out seen, null);
 
-    // byClass (opcional): quantas aeronaves NO ANEL por classe (Heli, Plane, Jet) — para o
-    // antiaereo do anel pedir a peca que tem aquela presa em primario.
     private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen,
         Dictionary<GameUnitClass, int> byClass)
+        => CountEnemyAirInRing(snapshot, out seen, byClass, null, null);
+
+    // byClass (opcional): quantas aeronaves NO ANEL por classe (Heli, Plane, Jet) — para o
+    // antiaereo do anel pedir a peca que tem aquela presa em primario.
+    //
+    // RETAGUARDA x VANGUARDA (autor, 2026-11-07): "voce ergue um SAM e ele fica la na base...
+    // onde esta o caca?". O anel dizia SE a aeronave toca algo nosso; agora diz O QUE ela toca,
+    // e se aquilo ja esta debaixo do GUARDA-CHUVA (celulas que um antiaereo nosso acerta no
+    // proximo turno, por classe de presa):
+    //   rearByClass   toca PREDIO nosso (ou unidade em cima dele) fora do guarda-chuva
+    //                 -> antiaereo, que defende o LUGAR
+    //   frontByClass  toca UNIDADE nossa fora de predio e fora do guarda-chuva
+    //                 -> caca, que vai JUNTO com a tropa
+    // Coberto nao pede nada: o guarda-chuva e o teto natural da bateria — o predio coberto
+    // deixa de pedir, e a base nao lota de SAM (cada bateria a mais tambem e convite para o
+    // bombardeiro, cuja presa primaria e Artillery, a classe da AAA e do SAM).
+    private static int CountEnemyAirInRing(AIWorldSnapshot snapshot, out int seen,
+        Dictionary<GameUnitClass, int> byClass,
+        Dictionary<GameUnitClass, int> rearByClass,
+        Dictionary<GameUnitClass, int> frontByClass)
     {
         seen = 0;
         int inRing = 0;
@@ -4712,12 +4830,20 @@ public partial class AIShoppingPlanner
         bool disruptorAnswersTransports = CanAnyOwnProducerOffer(snapshot, UnitRole.DisruptorDeCaptura);
 
         var ours = new HashSet<Vector3Int>();
+        var ourBuildings = new HashSet<Vector3Int>();
+        var ourUnitsOffBuilding = new HashSet<Vector3Int>();
         if (snapshot.MyBuildings != null)
             foreach (ConstructionManager b in snapshot.MyBuildings)
-                if (b != null) { Vector3Int c = b.CurrentCellPosition; c.z = 0; ours.Add(c); }
+                if (b != null) { Vector3Int c = b.CurrentCellPosition; c.z = 0; ours.Add(c); ourBuildings.Add(c); }
         if (snapshot.MyUnits != null)
             foreach (UnitManager u in snapshot.MyUnits)
                 if (u != null && !u.IsDead) { Vector3Int c = u.CurrentCellPosition; c.z = 0; ours.Add(c); }
+        foreach (Vector3Int c in ours)
+            if (!ourBuildings.Contains(c))
+                ourUnitsOffBuilding.Add(c);
+
+        bool classify = rearByClass != null || frontByClass != null;
+        var umbrellaByClass = classify ? new Dictionary<GameUnitClass, HashSet<Vector3Int>>() : null;
 
         foreach (UnitManager enemy in snapshot.EnemyUnits)
         {
@@ -4734,6 +4860,8 @@ public partial class AIShoppingPlanner
             {
                 inRing++;
                 AddRingClass(byClass, data.unitClass);
+                // Sem tabuleiro tambem nao ha guarda-chuva: a resposta antiga (antiaereo).
+                AddRingClass(rearByClass, data.unitClass);
                 continue;
             }
             // Orcamento = movimento CHEIO: e o proximo turno dele. O MP restante do turno
@@ -4746,9 +4874,70 @@ public partial class AIShoppingPlanner
             {
                 inRing++;
                 AddRingClass(byClass, data.unitClass);
+                if (classify)
+                {
+                    HashSet<Vector3Int> umbrella = GetAntiAirUmbrella(
+                        snapshot, board, ai.TerrainDatabaseRef, data.unitClass, umbrellaByClass);
+                    if (TouchesUncovered(envelope, ourBuildings, umbrella))
+                        AddRingClass(rearByClass, data.unitClass);
+                    if (TouchesUncovered(envelope, ourUnitsOffBuilding, umbrella))
+                        AddRingClass(frontByClass, data.unitClass);
+                }
             }
         }
         return inRing;
+    }
+
+    // GUARDA-CHUVA: celulas que algum antiaereo nosso acerta no proximo turno contra ESTA
+    // classe de presa (prioridade de alvo da ficha >= Secundaria; Terciaria e "nao listada").
+    // Construido uma vez por classe e por chamada. O servico de envelope responde a area;
+    // a uniao e daqui (consumidor).
+    private static HashSet<Vector3Int> GetAntiAirUmbrella(AIWorldSnapshot snapshot,
+        UnityEngine.Tilemaps.Tilemap board, TerrainDatabase terrain, GameUnitClass preyClass,
+        Dictionary<GameUnitClass, HashSet<Vector3Int>> cache)
+    {
+        if (cache.TryGetValue(preyClass, out HashSet<Vector3Int> cached))
+            return cached;
+        var umbrella = new HashSet<Vector3Int>();
+        if (snapshot?.MyUnits != null)
+            foreach (UnitManager unit in snapshot.MyUnits)
+            {
+                if (unit == null || unit.IsDead || unit.IsEmbarked
+                    || !unit.TryGetUnitData(out UnitData data) || data == null
+                    || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Antiaereo)
+                    || (int)data.ResolveAiTargetPriorityForTargetClass(preyClass)
+                        < (int)BazookaTargetPriority.Secondary)
+                    continue;
+                UnitReachEnvelope cover = BuildAirRingEnvelope(unit, board, terrain,
+                    ReachIntent.Combat, Mathf.Max(1, unit.MaxMovementPoints));
+                if (cover == null)
+                    continue;
+                foreach (Vector3Int cell in cover.AttackableCells)
+                {
+                    Vector3Int c = cell;
+                    c.z = 0;
+                    umbrella.Add(c);
+                }
+            }
+        cache[preyClass] = umbrella;
+        return umbrella;
+    }
+
+    private static bool TouchesUncovered(UnitReachEnvelope envelope, HashSet<Vector3Int> targets,
+        HashSet<Vector3Int> umbrella)
+    {
+        if (targets == null || targets.Count == 0)
+            return false;
+        bool Hit(Vector3Int cell)
+        {
+            cell.z = 0;
+            return targets.Contains(cell) && (umbrella == null || !umbrella.Contains(cell));
+        }
+        foreach (Vector3Int cell in envelope.MovementCells)
+            if (Hit(cell)) return true;
+        foreach (Vector3Int cell in envelope.AttackableCells)
+            if (Hit(cell)) return true;
+        return false;
     }
 
     private static void AddRingClass(Dictionary<GameUnitClass, int> byClass, GameUnitClass unitClass)
@@ -4786,6 +4975,21 @@ public partial class AIShoppingPlanner
         foreach (Vector3Int cell in envelope.AttackableCells)
             if (Hit(cell)) return true;
         return false;
+    }
+
+    // Teto do breakthrough: a parede de 9 ja pede 3; dali em diante e o counter que responde.
+    private const int BreakthroughBomberCap = 3;
+
+    private static int CountEnemyClass(AIWorldSnapshot snapshot, GameUnitClass unitClass)
+    {
+        int count = 0;
+        if (snapshot?.EnemyUnits == null)
+            return 0;
+        foreach (UnitManager unit in snapshot.EnemyUnits)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data) && data != null
+                && data.unitClass == unitClass)
+                count++;
+        return count;
     }
 
     private static int CountEnemyDomain(AIWorldSnapshot snapshot, Domain domain)
