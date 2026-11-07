@@ -192,8 +192,10 @@ public partial class AIController
                 // Regra oficial da LZ: o transportador pode terminar em
                 // terreno atualmente visível ou já explorado. Preto
                 // desconhecido continua proibido.
-                allowTransporterCell =
-                    IsConfirmedVisibleOrExploredCellForAI,
+                allowTransporterCell = cell =>
+                    IsConfirmedVisibleOrExploredCellForAI(cell)
+                    && (transporter.GetDomain() != Domain.Air
+                        || CanAirTransportStopAtCell(transporter, cell)),
                 // O FoW do spot não veta a entrega. Depois que a LZ do
                 // transportador foi autorizada, PodeDesembarcar + caminhos
                 // válidos são a fonte de verdade para o passageiro.

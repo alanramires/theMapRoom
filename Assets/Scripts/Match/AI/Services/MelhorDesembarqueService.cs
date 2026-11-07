@@ -118,7 +118,7 @@ public static class MelhorDesembarqueService
             {
                 request.diagnosticLog?.Invoke(
                     $"LZ={lzCell} REJECT " +
-                    "reason=transporter_cell_not_visible_or_explored");
+                    "reason=transporter_cell_not_allowed");
                 continue;
             }
             List<UnitManager> lzOccupants =

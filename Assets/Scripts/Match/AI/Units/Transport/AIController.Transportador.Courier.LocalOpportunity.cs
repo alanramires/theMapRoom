@@ -30,6 +30,13 @@ public partial class AIController
         float bestScore = float.MinValue;
         bool isAirTransporter = transporter.GetDomain() == Domain.Air || IsAirTransporter(transporter);
 
+        UnitManager airPrimary = isAirTransporter
+            ? ResolvePrimaryPassenger(transporter, passengers, plan) : null;
+        Vector3Int airPrimaryTarget = default;
+        bool hasAirPrimaryTarget = airPrimary != null
+            && TryResolveCourierPassengerTarget(airPrimary, plan, snapshot,
+                Vector3Int.zero, fromCell, out airPrimaryTarget);
+
         var transporterCells = new List<Vector3Int> { fromCell };
         if (paths != null)
         {
@@ -101,6 +108,9 @@ public partial class AIController
 
                         Vector3Int dropCell = opt.disembarkCell;
                         dropCell.z = 0;
+                        if (hasAirPrimaryTarget && passenger == airPrimary
+                            && !IsAirPrimaryDeliveryCell(passenger, dropCell, airPrimaryTarget))
+                            continue;
                         float dropDist = SectorManager.HexDistance(dropCell, targetCell);
                         if (dropDist > RogueCourierLocalSectorRange)
                             continue;

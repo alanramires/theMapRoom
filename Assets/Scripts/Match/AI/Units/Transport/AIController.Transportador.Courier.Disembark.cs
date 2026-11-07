@@ -270,16 +270,15 @@ public partial class AIController
 
     // Partial disembark: remove passengers whose best drop-off cell is outside dropOffRange
     // of their own objective. They stay aboard for delivery on the next leg.
-    // When allowStuck is true (helicopter can't move), all passengers are released.
+    // A blocked helicopter keeps the same delivery limits.
 
     private List<PodeDesembarcarOption> FilterDisembarkByTargetRange(
         List<PodeDesembarcarOption> options,
         TeamObjectivePlan plan,
-        AIWorldSnapshot snapshot,
-        bool allowStuck = false)
+        AIWorldSnapshot snapshot)
     {
         bool airCapturePolicy = options.Exists(o => o != null && IsAirCapturePassenger(o.passengerUnit));
-        if (allowStuck || (!airCapturePolicy && options.Count <= 1)) return options;
+        if (!airCapturePolicy && options.Count <= 1) return options;
         var filtered = new List<PodeDesembarcarOption>();
         foreach (PodeDesembarcarOption opt in options)
         {

@@ -146,6 +146,7 @@ public partial class AIController
                 List<PodeDesembarcarOption> optsFromMove = SimulateDisembarkFromCell(unit, candidate);
                 if (optsFromMove == null || optsFromMove.Count == 0) continue;
                 optsFromMove = FilterAirCourierSafeDisembarkOptions(optsFromMove, snapshot.AITeam);
+                optsFromMove = FilterAirPrimaryDeliveryOptions(optsFromMove, primaryPassenger, primaryTarget);
                 if (optsFromMove.Count == 0) continue;
 
                 List<PodeDesembarcarOption> selectedFromMove =
@@ -178,23 +179,22 @@ public partial class AIController
         if (canDisembark && disembarkOptions.Count > 0 && (moveImprovement <= 1f || isStuck))
         {
             disembarkOptions = FilterAirCourierSafeDisembarkOptions(disembarkOptions, snapshot.AITeam);
+            disembarkOptions = FilterAirPrimaryDeliveryOptions(disembarkOptions, primaryPassenger, primaryTarget);
             List<PodeDesembarcarOption> selected =
                 SelectBestDisembarkPerPassenger(disembarkOptions, passengers, plan, snapshot);
-            // Partial disembark — when stuck, release all; otherwise only passengers in range of their target.
-            selected = FilterDisembarkByTargetRange(selected, plan, snapshot, allowStuck: isStuck);
+            // Being blocked never expands the delivery zone.
+            selected = FilterDisembarkByTargetRange(selected, plan, snapshot);
             if (selected.Count > 0)
             {
                 PodeDesembarcarOption primaryOption = selected.Find(o => o.passengerUnit == primaryPassenger);
                 if (primaryOption != null)
                 {
                     Vector3Int dc = primaryOption.disembarkCell; dc.z = 0;
-                    bool inRange = isStuck
-                        || PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget)
-                        || PassageiroChegaAoAlvo(primaryPassenger, fromCell, primaryTarget);
+                    bool inRange = IsAirPrimaryDeliveryCell(primaryPassenger, dc, primaryTarget);
                     if (inRange)
                     {
                         int dropping = selected.Count, keeping = passengers.Count - dropping;
-                        string reason = isStuck ? "bloqueado, libera carga" : $"desembarca para {primaryTarget}";
+                        string reason = isStuck ? "bloqueado, desembarca dentro da faixa tática" : $"desembarca para {primaryTarget}";
                         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — {reason} (desembarca={dropping} fica={keeping})");
                         return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
                     }
@@ -218,8 +218,10 @@ public partial class AIController
         }
 
         if (moveTarget == fromCell)
-            return BuildAirTransportReturnToWaitTarget(unit, snapshot, fromCell, paths, occupied,
-                $"courier sem LZ seguro para #{primaryPassenger.InstanceId} em {primaryTarget}");
+        {
+            Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — sem LZ na faixa tática de #{primaryPassenger.InstanceId} alvo={primaryTarget}; mantém carga, sem aproximação aérea válida.");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
+        }
 
         // Priority 3: move toward target.
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — move para {moveTarget} alvo={primaryTarget} dist={SectorManager.HexDistance(moveTarget, primaryTarget):F0}h passageiro=#{primaryPassenger.InstanceId}");
@@ -262,6 +264,7 @@ public partial class AIController
                 continue;
 
             opts = FilterAirCourierSafeDisembarkOptions(opts, snapshot.AITeam);
+            opts = FilterAirPrimaryDeliveryOptions(opts, primaryPassenger, primaryTarget);
             if (opts.Count == 0)
                 continue;
 
@@ -321,6 +324,37 @@ public partial class AIController
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier â€” LZ alternativo: move+desembarca via {bestTransporterCell} @ {dc} alvo={primaryTarget} score={bestScore:F0}");
         action = BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, bestSelected, bestTransporterCell, bestPath);
         return true;
+    }
+
+    // L0 is the delivery target. Expand by the main passenger's tactical
+    // movement costs, not the helicopter's reach or the passenger's weapon.
+    private bool IsAirPrimaryDeliveryCell(
+        UnitManager passenger, Vector3Int dropCell, Vector3Int target)
+    {
+        if (passenger == null)
+            return false;
+        dropCell.z = 0;
+        target.z = 0;
+        if (dropCell == target)
+            return true;
+        int budget = Mathf.Max(0, passenger.MaxMovementPoints);
+        if (budget == 0)
+            return false;
+        Dictionary<Vector3Int, int> zone =
+            GetOrBuildDisembarkPassengerRoute(passenger, target, budget);
+        return zone != null
+            && zone.TryGetValue(dropCell, out int cost)
+            && cost <= budget;
+    }
+
+    private List<PodeDesembarcarOption> FilterAirPrimaryDeliveryOptions(
+        List<PodeDesembarcarOption> options,
+        UnitManager primary,
+        Vector3Int target)
+    {
+        return options.FindAll(option => option != null
+            && (option.passengerUnit != primary
+                || IsAirPrimaryDeliveryCell(primary, option.disembarkCell, target)));
     }
 
     private List<PodeDesembarcarOption> CollectCurrentDisembarkOptions(UnitManager unit)
@@ -635,22 +669,31 @@ public partial class AIController
     }
 
     // -------------------------------------------------------------------------
-    // Air-specific occupied set — only blocks cells taken by other air units.
-    // Ground units are at a lower height level and do not prevent the helicopter
-    // from landing on the same hex. BuildOccupied (used by ground units) adds ALL
-    // unit positions and would incorrectly cut most of the helicopter's valid paths.
+    // Filter destinations, never crossing cells. Use the same projected-layer
+    // authority as Phase2, including the current enemy-sharing rules.
+    // Surface occupants can prevent unloading without preventing flight.
     // -------------------------------------------------------------------------
+
+    private bool CanAirTransportStopAtCell(UnitManager unit, Vector3Int cell)
+    {
+        return CanAIUnitEndMoveAtCell(
+            unit, cell,
+            UnitOccupancyRules.GetUnitsAtCell(boardTilemap, cell, unit));
+    }
 
     private HashSet<Vector3Int> BuildAirOccupied(UnitManager excludeUnit)
     {
         var set = new HashSet<Vector3Int>();
+        var checkedCells = new HashSet<Vector3Int>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u == excludeUnit || u.IsEmbarked || u.IsDead) continue;
-            if (excludeUnit != null && u.SlotIndex != excludeUnit.SlotIndex) continue;
-            if (u.GetDomain() != Domain.Air || u.IsAircraftGrounded) continue;
-            Vector3Int p = u.CurrentCellPosition; p.z = 0;
-            set.Add(p);
+            if (u == null || u == excludeUnit || u.IsEmbarked || u.IsDead)
+                continue;
+            Vector3Int cell = u.CurrentCellPosition;
+            cell.z = 0;
+            if (checkedCells.Add(cell)
+                && !CanAirTransportStopAtCell(excludeUnit, cell))
+                set.Add(cell);
         }
         return set;
     }
