@@ -63,17 +63,24 @@ O registro inclui:
 
 - turno, slot, fase, revisao do tabuleiro, caixa, decisao, missao e comandos;
 - `stateBeforeDecision`: foto capturada antes da chamada de decisao;
-- `stateBeforeExecution`: foto da revisao anterior a execucao;
-- unidades proprias e inimigos visiveis (HP, municao, combustivel, movimento,
-  posicao, acao e embarque), construcoes visiveis ou lembradas, terreno conhecido,
-  plano, dificuldade e destinos reservados;
+- `stateBeforeExecution`: foto antes da execucao **so quando o tabuleiro mudou**
+  desde a decisao (revisao diferente — tipicamente compras seguidas). Com a mesma
+  revisao vem `null` e `executionSameAsDecision=true`: a decisao nao confirma nada
+  (contrato transacional), entao a foto seria igual. Leia `stateBeforeExecution ?? stateBeforeDecision`;
+- unidades proprias e inimigos visiveis pela nevoa **confirmada** do jogo (HP,
+  municao, combustivel, movimento, posicao, acao e embarque), construcoes visiveis
+  ou lembradas, plano, dificuldade e destinos reservados;
+- terreno conhecido **so no passo marcado** enquanto pendente (e do bake e nao muda;
+  varrer o tabuleiro a cada unidade era o grosso do custo). Fora disso, save + replay;
+- `captureMs` e `persistMs`: o custo do proprio AI Step naquele passo;
 - `candidates`: categoria, acao, alvo, celula, status, gate e motivo; `hasScore`,
   `score`, `scoreScope`, `hasRally`, `rally` e preferencia de embarque quando existem;
 - `rawReasons`: logs originais, alem de `reasons` com coordenadas padronizadas;
 - `actionJson`, resultado do automata, marcacao e nota opcional.
 
 Sao copias de valores feitas naquele instante, nao referencias a unidades vivas.
-Marcar depois nao captura outra foto. A foto e um diagnostico da informacao
+Marcar depois nao captura outra foto de unidades; so acrescenta o terreno, e so se o
+passo ainda estiver pendente. O registro em disco e JSON compacto. A foto e um diagnostico da informacao
 disponivel ao slot, **nao um save completo restauravel**. Dados inimigos ocultos
 nao entram; construcoes apenas lembradas nao recebem HP de captura/posse atuais.
 Falha na foto e indicada em `snapshotWarning` e nos flags `hasStateBeforeDecision`/`hasStateBeforeExecution`, sem alterar a decisao do jogo.

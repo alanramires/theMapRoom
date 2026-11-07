@@ -25,6 +25,11 @@ public partial class AIController
         public int candidatesObserved, replayActionIndex = -1;
         public SaveGameManager.AIReviewSaveReference nearestSave;
         public AIReviewState stateBeforeDecision, stateBeforeExecution;
+        // A decisao nao mexe no tabuleiro (contrato transacional): com a mesma revisao, a foto
+        // antes da execucao seria igual a de antes da decisao e nao e tirada de novo.
+        public bool executionSameAsDecision;
+        // Custo do proprio AI Step neste passo (foto + registro), em ms. E o numero para medir.
+        public float captureMs, persistMs;
         public List<AIReviewCandidate> candidates = new List<AIReviewCandidate>();
         public List<AIReviewParticipant> participants = new List<AIReviewParticipant>();
     }
@@ -317,10 +322,12 @@ public partial class AIController
             planJson = ObjectiveManager.GetPlanForSlot(observer) != null ? JsonUtility.ToJson(ObjectiveManager.GetPlanForSlot(observer)) : "null",
             reservedDestinations = new List<Vector3Int>(plannedDestinations)
         };
+        // Visibilidade pela nevoa CONFIRMADA (a mesma que o jogo e a IA leem), nao recalculada sem
+        // cache: o AI Step registra o que o jogo sabe, nao refaz o jogo por baixo dele.
         foreach (var unit in UnitManager.AllActive)
         {
             if (unit == null || unit.IsDead) continue;
-            if (unit.SlotIndex != observer.Value && (unit.IsEmbarked || !matchController.IsUnitVisibleForSlotNoCache(unit, observer))) continue;
+            if (unit.SlotIndex != observer.Value && (unit.IsEmbarked || !matchController.IsUnitVisibleForSlot(unit, observer))) continue;
             state.units.Add(new AIReviewUnitState
             {
                 id = unit.InstanceId, slot = unit.SlotIndex, hp = unit.CurrentHP,
@@ -347,15 +354,26 @@ public partial class AIController
                 type = visible ? building.name : knownData.name, visible = visible, remembered = remembered
             });
         }
-        if (boardTilemap != null)
-            foreach (var cell in boardTilemap.cellBounds.allPositionsWithin)
-            {
-                bool explored = matchController.IsCellExploredBySlot(observer, cell);
-                if (!explored && !matchController.IsCellKnownForActiveTeam(cell)) continue;
-                var tile = boardTilemap.GetTile(cell);
-                if (tile != null) state.terrain.Add(new AIReviewTileState { cell = cell, tile = tile.name, explored = explored });
-            }
+        // Terreno NAO entra na foto de cada passo: e do bake e nao muda na partida, e varrer o
+        // retangulo inteiro por unidade era o grosso do custo. So o passo MARCADO o recebe
+        // (CaptureAIReviewTerrain, em MarkAIReview); o resto se reproduz por save + replay.
         return state;
+    }
+
+    private void CaptureAIReviewTerrain(AIReviewState state)
+    {
+        if (state == null || matchController == null || boardTilemap == null
+            || (state.terrain != null && state.terrain.Count > 0))
+            return;
+        state.terrain ??= new List<AIReviewTileState>();
+        PlayerSlotId observer = PlayerSlotId.FromIndex(state.slot);
+        foreach (var cell in boardTilemap.cellBounds.allPositionsWithin)
+        {
+            bool explored = matchController.IsCellExploredBySlot(observer, cell);
+            if (!explored && !matchController.IsCellKnownForActiveTeam(cell)) continue;
+            var tile = boardTilemap.GetTile(cell);
+            if (tile != null) state.terrain.Add(new AIReviewTileState { cell = cell, tile = tile.name, explored = explored });
+        }
     }
 
     private static string NormalizeAIReviewCoordinates(string text)
@@ -428,13 +446,21 @@ public partial class AIController
         record.recordedUtc = System.DateTime.UtcNow.ToString("O");
         record.replayActionIndex = replayManager?.ActionStack?.Actions != null ? replayManager.ActionStack.Actions.Count : -1;
         CaptureAIReviewSaveReference(record);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         record.stateBeforeDecision = (currentAIStage == 2 || currentAIStage == 3)
             && aiReviewDecisionState != null && aiReviewDecisionState.turn == record.turn
             && aiReviewDecisionState.slot == record.slot && aiReviewDecisionState.actorId == action.UnitInstanceId
             ? aiReviewDecisionState : CaptureAIReviewState(action.UnitInstanceId);
-        record.stateBeforeExecution = CaptureAIReviewState(action.UnitInstanceId);
+        // Mesma revisao do tabuleiro = nada confirmado entre decidir e executar: a segunda foto
+        // seria identica. So o shopping (varias compras sobre a mesma foto) costuma mudar aqui.
+        record.executionSameAsDecision = record.stateBeforeDecision != null
+            && record.stateBeforeDecision.boardRevision == ThreatRevisionTracker.GlobalBoardRevision;
+        record.stateBeforeExecution = record.executionSameAsDecision
+            ? null : CaptureAIReviewState(action.UnitInstanceId);
+        record.captureMs = (float)clock.Elapsed.TotalMilliseconds + aiReviewDecisionCaptureMs;
+        aiReviewDecisionCaptureMs = 0f; // conta uma vez: as compras seguintes reusam a mesma foto
         record.hasStateBeforeDecision = record.stateBeforeDecision != null;
-        record.hasStateBeforeExecution = record.stateBeforeExecution != null;
+        record.hasStateBeforeExecution = record.stateBeforeExecution != null || record.executionSameAsDecision;
         if (!record.hasStateBeforeDecision || !record.hasStateBeforeExecution)
             record.snapshotWarning = "Uma das fotos nao pode ser capturada; este registro nao deve ser usado como prova do estado completo.";
         record.participants = BuildAIReviewParticipants(record, action);
@@ -551,14 +577,17 @@ public partial class AIController
             string directory = System.IO.Path.Combine(Application.persistentDataPath, "AIReviews", record.sessionId);
             System.IO.Directory.CreateDirectory(directory);
             record.filePath = System.IO.Path.Combine(directory, $"step-{record.id:D6}.json");
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             void Write(string path)
             {
                 string temp = path + ".tmp";
-                System.IO.File.WriteAllText(temp, JsonUtility.ToJson(record, true), new System.Text.UTF8Encoding(false));
+                // Compacto: o formatado inflava o arquivo e a escrita, e quem le e ferramenta.
+                System.IO.File.WriteAllText(temp, JsonUtility.ToJson(record, false), new System.Text.UTF8Encoding(false));
                 if (System.IO.File.Exists(path)) System.IO.File.Replace(temp, path, null);
                 else System.IO.File.Move(temp, path);
             }
             Write(record.filePath);
+            record.persistMs = (float)clock.Elapsed.TotalMilliseconds;
             aiReviewFileMessage = record.markedStrange ? "Passo marcado e salvo: " + record.filePath : "Registro salvo: " + record.filePath;
             return true;
         }
@@ -581,6 +610,11 @@ public partial class AIController
         record.markClassification = NormalizeAIReviewClassification(classification);
         record.markNote = NormalizeAIReviewNote(note);
         CaptureAIReviewSaveReference(record);
+        // O passo marcado e o que vai ser lido: ai sim vale a foto completa. Com o passo ainda
+        // pendente o tabuleiro e o da decisao (nada confirmado), entao o terreno casa com ela.
+        // Passo ja executado nao recebe terreno: seria de outro momento.
+        if (ReferenceEquals(record, pendingAIReview))
+            CaptureAIReviewTerrain(record.stateBeforeExecution ?? record.stateBeforeDecision);
         PersistAIReviewRecord(record);
         bool saved = AppendAIReviewMark(record);
         if (saved) DiagnosticoManager.Registrar(new DiagnosticoEntrada
@@ -878,11 +912,20 @@ public partial class AIController
         aiReviewCapturing = false;
     }
 
+    private float aiReviewDecisionCaptureMs;
+
+    private void CaptureAIReviewDecisionState(string actorId)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        aiReviewDecisionState = CaptureAIReviewState(actorId);
+        aiReviewDecisionCaptureMs = (float)clock.Elapsed.TotalMilliseconds;
+    }
+
     private PlayerAction DecideUnitActionForReview(UnitManager unit, AIWorldSnapshot snapshot)
     {
         BeginAIReviewCapture();
         aiReviewActorId = unit.InstanceId.ToString();
-        if (aiStep) aiReviewDecisionState = CaptureAIReviewState(aiReviewActorId);
+        if (aiStep) CaptureAIReviewDecisionState(aiReviewActorId);
         try { return DecideUnitAction(unit, snapshot); }
         finally { EndAIReviewCapture(); }
     }
@@ -894,7 +937,7 @@ public partial class AIController
         if (!aiStep) return AIShoppingPlanner.Decide(snapshot);
         BeginAIReviewCapture();
         aiReviewActorId = null;
-        aiReviewDecisionState = CaptureAIReviewState(null);
+        CaptureAIReviewDecisionState(null);
         try
         {
             var orders = AIShoppingPlanner.Decide(snapshot);
