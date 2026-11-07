@@ -28,6 +28,7 @@ da cena. Um mapa novo tem de pedir autoria, não código.
 | v10.0.1 | A ilha sem ponte, porta por porta (counter, elite, operação, AA e vigilância sabem da ilha; alocador pelo Tático; blitz só com rota terrestre; LZ do Chinook pousado) | [relatório](docs/relatorio_v10.0.1.md) |
 | v10.1.0 | Você não vai fazer dinheiro não (Disruptor de captura e o capitão = poder de captura combinado; Bombardeiro nega a escolta; demanda de Disruptor; carona que trabalha enquanto espera) | [relatório](docs/relatorio_v10.1.0.md) |
 | v10.2.0 | O dinheiro do elite para de vazar, e o jogo vai para outra pessoa (escolta segura o caixa, folga da conscrição, swap pelo Tático, fila de carona; checklist de publicação, texturas Web, volume, estrada inteira na Campanha) | [relatório](docs/relatorio_v10.2.0.md) |
+| v10.3.0 | Não precisa empatar, precisa não perder (capturadores por prédio, teto com embarcados, escolta pré-comprada, counter por anel e tolerância, Interceptador em dois ramos, antiaéreo pela presa) | [relatório](docs/relatorio_v10.3.0.md) |
 
 ---
 
