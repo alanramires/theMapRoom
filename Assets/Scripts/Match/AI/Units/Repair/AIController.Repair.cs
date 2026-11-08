@@ -710,22 +710,13 @@ public partial class AIController
                     }
                     Vector3Int cc = opt.candidateUnit.CurrentCellPosition; cc.z = 0;
 
-                    // Segurança da fusão, duas camadas:
-                    // (1) SEMPRE — nunca fundir na cara do inimigo. Mesma noção de segurança do evac
-                    //     (IsEvacDropCellSafe): sem inimigo no hex e sem inimigo visível por perto.
-                    //     Direction-agnostic, vale em qualquer orientação.
-                    if (!IsEvacDropCellSafe(cc, aiTeam))
+                    // Same site eligibility as the aircraft recovery anchor.
+                    if (!IsRepairFusionSiteSafe(unit, snapshot, cc))
                     {
-                        Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId}: {cc} sob ameaça inimiga");
-                        continue;
-                    }
-                    // (2) NA INVASÃO — além disso, só na RETAGUARDA SEGURA (atrás da linha): as
-                    //     unidades de reparo empurradas pra frente pela iniciativa acabavam se
-                    //     fundindo no raio do HQ inimigo. A geometria de retaguarda só é confiável
-                    //     na invasão (a âncora é o HQ inimigo), por isso fica gated aqui.
-                    if (snapshot.IsInvading && !IsCellInSafeRear(unit, snapshot, cc))
-                    {
-                        Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId}: {cc} fora da retaguarda segura (vanguarda/HQ inimigo)");
+                        if (!IsEvacDropCellSafe(cc, aiTeam))
+                            Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId}: {cc} sob ameaça inimiga");
+                        else
+                            Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId}: {cc} fora da retaguarda segura (vanguarda/HQ inimigo)");
                         continue;
                     }
 
@@ -1048,6 +1039,21 @@ public partial class AIController
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, repairApproachPaths);
     }
+
+    // Seguranca da fusao de reparo — UMA pergunta para a execucao (TryDecideRepairAction) e para
+    // a ancora de recuperacao da aeronave (CollectAircraftRecoveryAnchors). Na marca T10 a ancora
+    // nao perguntava, e o Apache #65 (2 HP) voava para fundir com um parceiro cercado que a
+    // propria execucao recusaria. Duas camadas:
+    // (1) SEMPRE — nunca fundir na cara do inimigo: a nocao de seguranca do EVAC
+    //     (IsEvacDropCellSafe), sem inimigo no hex nem visivel por perto. Vale em qualquer
+    //     orientacao.
+    // (2) NA INVASAO — alem disso, so na RETAGUARDA SEGURA (atras da linha): unidades de reparo
+    //     empurradas pra frente pela iniciativa acabavam se fundindo no raio do HQ inimigo. A
+    //     geometria de retaguarda so e confiavel na invasao (a ancora e o HQ inimigo), por isso
+    //     fica condicionada a ela.
+    private bool IsRepairFusionSiteSafe(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell)
+        => IsEvacDropCellSafe(cell, snapshot.AITeam)
+            && (!snapshot.IsInvading || IsCellInSafeRear(unit, snapshot, cell));
 
     private static bool IsPotentialRepairFusionTarget(UnitManager receiver, UnitManager candidate)
     {

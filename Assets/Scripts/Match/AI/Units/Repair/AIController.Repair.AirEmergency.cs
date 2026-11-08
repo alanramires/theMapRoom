@@ -3,6 +3,11 @@ using UnityEngine;
 
 public partial class AIController
 {
+    // Only diagnostic deduplication. Recovery evaluation itself is unchanged.
+    private AIWorldSnapshot repairFusionRejectionLogSnapshot;
+    private readonly HashSet<(int actor, int partner, Vector3Int cell)>
+        repairFusionRecoveryRejections = new HashSet<(int, int, Vector3Int)>();
+
     private readonly struct AircraftRecoveryAnchor
     {
         public readonly Vector3Int Cell;
@@ -236,6 +241,11 @@ public partial class AIController
         UnitManager aircraft,
         AIWorldSnapshot snapshot)
     {
+        if (!object.ReferenceEquals(repairFusionRejectionLogSnapshot, snapshot))
+        {
+            repairFusionRejectionLogSnapshot = snapshot;
+            repairFusionRecoveryRejections.Clear();
+        }
         var result = new List<AircraftRecoveryAnchor>();
         var landingFallbacks = new List<AircraftRecoveryAnchor>();
         var seenCells = new HashSet<Vector3Int>();
@@ -323,7 +333,16 @@ public partial class AIController
                     hasPrimaryLandingRecovery = true;
                 }
                 if (IsPotentialRepairFusionTarget(aircraft, ally))
-                    result.Add(new AircraftRecoveryAnchor(cell, "fusao", serviceRadius: 1));
+                {
+                    if (IsRepairFusionSiteSafe(aircraft, snapshot, cell))
+                        result.Add(new AircraftRecoveryAnchor(cell, "fusao", serviceRadius: 1));
+                    else if (repairFusionRecoveryRejections.Add((aircraft.InstanceId, ally.InstanceId, cell)))
+                    {
+                        string reason = !IsEvacDropCellSafe(cell, snapshot.AITeam)
+                            ? "célula sob ameaça" : "fora da retaguarda";
+                        Debug.Log($"{TL("Repair")} fusão com #{ally.InstanceId} recusada como recuperação: {reason} @ {cell}");
+                    }
+                }
             }
         }
 

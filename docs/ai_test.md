@@ -285,3 +285,10 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - Mantido o menor pico de ameaça como critério principal de voo. Com pico igual, agora vence o maior avanço ao anel; exposição acumulada desempata depois. Hospital comum e travas de ameaça zero preservados.
 - Log do fallback registra avanço em hexes, passos, pico e exposição acumulada para tornar o desempate legível no AI Step.
 - Regressão `verificar_evac_predio_vago.cs`: PASS com HQ distante e ameaça uniforme 30 em todo o caminho; usa o deslocamento tático completo de seis passos. Demais cenários passaram. `bash tools/compilar.sh`: duas assemblies passaram; validação fora do Play, sem replay da marca.
+
+### 2026-11-07 — fusão insegura não é âncora de recuperação aérea
+- Marca T10/slot 0: Apache #65 (2 HP) avançava para o Apache #35 (3 HP), em (13,12), perto de inimigos. A aproximação reconhecia tipo/aliança/HP, mas ignorava a segurança exigida pela execução.
+- `IsRepairFusionSiteSafe` compartilha a regra: célula segura pelo EVAC e, na invasão, dentro da retaguarda segura. Execução usa a pergunta única e mantém logs separados de ameaça/retaguarda; a âncora consulta a célula do parceiro antes de aceitar fusão como recuperação.
+- Recusa registra parceiro, motivo e célula uma vez por snapshot/ator/parceiro, sem remover ou consolidar as avaliações repetidas de AircraftRepairRecovery (fora deste escopo).
+- `tools/ai_test/verificar_ancora_fusao_retaguarda.cs`: PASS fora do Play — par compatível 2+3 HP com parceiro cercado não cria âncora nem é escolhido como fusão pela recuperação; o mesmo parceiro em célula segura cria âncora. Log de recusa único mesmo com consultas repetidas; sem fusão executada ou alteração de HP.
+- `bash tools/compilar.sh`: ambas assemblies passaram. Não validado nesta revisão em partida real.
