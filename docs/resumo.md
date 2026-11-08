@@ -1,15 +1,25 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-07, **depois** da tag `v10.5.0`.
+Ponto de retomada. Atualizado em 2026-11-08, **depois** da tag `v10.6.0`.
 Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.5.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.5.0.md`](relatorio_v10.5.0.md),
-[`relatorio_v10.4.0.md`](relatorio_v10.4.0.md), [`relatorio_v10.3.0.md`](relatorio_v10.3.0.md).
+`v10.6.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.6.0.md`](relatorio_v10.6.0.md),
+[`relatorio_v10.5.0.md`](relatorio_v10.5.0.md), [`relatorio_v10.4.0.md`](relatorio_v10.4.0.md).
+
+**A descoberta da v10.6.0: só aceite o que a etapa seguinte aceitaria.** Seis defeitos das marcas
+T10 tinham a mesma forma — uma etapa aceitava promessa que a seguinte recusaria: âncora de fusão
+onde a fusão não acontece (`IsRepairFusionSiteSafe`, agora uma pergunta só); supridor validado no
+hex atual, não na célula onde pousaria (`CanSupplierRecoverAircraft` com célula); hospital aceito
+sem caminho que o aproximasse (→ anel do HQ); substituto do swap "reservando" o segundo prédio
+(`committedCapturer`). E a régua do supridor virou **"o que eu perco se não atender agora?"**:
+4 faixas estritas (`ResolveLogisticsNeed`: autonomia aérea > HP crítico > corretivo > preventivo)
+e, dentro da faixa, **prazo Tático antes do Operacional** (visto em Play). A aeronave ferida que
+espera pouso na produtora reserva a célula — **só na camada da IA**. Skill `pergunte-me` nova.
 
 **A descoberta da v10.5.0: ferido não é carga.** O transporte que leva ferido está num resgate,
 e o ferido tem destino próprio — o do **reparo**. O EVAC aéreo (Codex, revisado antes de cada
@@ -374,6 +384,15 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v10.6.0 deixou — ver rodando
+
+1. **Só a régua do supridor foi vista em Play.** Reserva de pouso, EVAC sem avanço → HQ, fusão
+   segura, célula futura do supridor e swap que captura passaram só nos testes de `tools/ai_test/`.
+2. **`AircraftRepairRecovery` avaliada duas vezes na mesma decisão** — fora do `efb0519` de
+   propósito.
+3. **Doc da régua do atendimento:** `Logistica.md` não descreve faixas nem prazo.
+4. `pergunte-me` na Mylarhis existe sem commit, por escolha do autor.
 
 ### O que a v10.5.0 deixou — o resgate
 
@@ -865,6 +884,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **aceitar o que a etapa seguinte recusa** | a âncora de fusão, o supridor da recuperação aérea e a LZ do hospital aceitavam alvos que a execução recusava (ameaça, pouso na célula, caminho sem avanço) — e a unidade ficava presa no ramo, sem cair no fallback. A primeira etapa pergunta **ao predicado da segunda**, na célula onde a ação vai acontecer |
 | **estado avaliado depois de quem o muda** | o reparo era decidido na Fase 2, depois de o Serviço do Comando curar: quem chegava abaixo do gatilho saía curado e "sem ferimento". Estado que reage a um evento (dano, cura) tem de ser lido **antes** do passo que o altera |
 | **"a IA parou depois do load"** | primeiro F12 (AI Resume). Com `startOnPause: 1` todo Play novo nasce pausado; o `ai replan` destrava por reiniciar o estágio, não por consertar |
 | **outra IA escrevendo ao lado do dono** | a 1ª versão do EVAC aéreo escolhia hospital varrendo prédios por fora do `FindRepairConstruction` e perdia conscrição, pressão, linha e elite. Revisar o diff dela antes do commit |
@@ -1086,3 +1106,8 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
    transporte (APC, Chinook, navio) usa `RankRepairConstructions` / `FindRepairConstruction` com
    `rejectBaseCluster` e `lineSnapshot`; sem hospital, o anel do HQ pela régua do
    `TryDecideRepairFallbackToHQ`.
+10. **Aceite só o que a etapa seguinte aceitaria — perguntando a ela.** Escolha (âncora, alvo, LZ)
+    que a execução pode recusar usa o **mesmo predicado** da execução, na célula futura: fusão →
+    `IsRepairFusionSiteSafe`; pouso do supridor → `PodePousarSensor.Evaluate(atCell:)` via
+    `CanSupplierRecoverAircraft`; prazo de suprimento → envelope + `PodeSuprir` por origem, nunca
+    distância. Cópia parecida do critério "na escolha" é o defeito.
