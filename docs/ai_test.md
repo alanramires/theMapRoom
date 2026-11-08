@@ -225,3 +225,20 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - Aproximação ao encontro e ataque oportunista durante a espera também vetam terminar em produtor próprio.
 - Regressão `tools/ai_test/verificar_encontro_fora_produtora.cs`: PASS no Editor fora do Play; produtora mais barata descartada, vizinho alternativo para a mesma LZ, ausência de alternativa devolve vazio e mapa de passagem preservado.
 - Compilação: 0 erros, 477 avisos existentes.
+
+### 2026-11-07 — EVAC aéreo escolhe prédio vago e LZ conjunta
+- Marca T9/slot 0, Chinook #24 com Soldado #22 (1 HP): EVAC tentava chegar à cidade (0,11), ocupada pelo Soldado #3, mesmo sem desembarque viável.
+- Hospital e ordem vêm de `RankRepairConstructions`, extraído de `FindRepairConstruction` e também usado por ele: preserva conscrição, pressão na base, linha de combate, elite e exceção rebelde. EVAC acrescenta serviço compatível, ocupação do paciente e LZ vizinha; o helicóptero não estaciona no hospital.
+- Prioriza o hospital mais bem ranqueado com entrega materializável agora. O sensor roda apenas em LZ alcançável neste turno, com cache por LZ. Sem alcance, aproxima de uma LZ estimada por distância/ameaça, sem sondagem remota, mantendo a carga; sem hospital elegível, aplica a área segura do fallback de reparo no anel do HQ; sem área segura/HQ conhecido, mantém carga.
+- Retirado `ignoreTurnLimit: true`: a exceção ignorava `ReceivedSuppliesThisTurn` do paciente, não a cota de atendimento do hospital. A entrega agora respeita esse flag como o reparo normal.
+- `tools/ai_test/verificar_evac_predio_vago.cs`: PASS fora do Play — cidade ocupada ignorada, entrega em fábrica livre a partir do lado, aproximação com alcance curto, troca após ocupação, desembarque no anel seguro com todos os hospitais ocupados e aproximação quando o HQ está longe. Planejamento mantém passageiro embarcado e HP intacto.
+- Compilação: 0 erros, 477 avisos existentes.
+
+- Revisão de 2026-11-07: teste ampliado PASS para conscrição do produtor Army no cluster da base, não-elite com base sob pressão, paciente já atendido e zero `AirEvacDisembarkProbes` na aproximação distante. `bash tools/compilar.sh` passou em Assembly-CSharp e Assembly-CSharp-Editor (Git Bash).
+
+- Terceira revisão: fallback de HQ compartilha elegibilidade, segurança e score com `TryDecideRepairFallbackToHQ`; pode soltar em planície livre. `IsEvacDropCellSafe` voltou às descidas e LZs. Fora do fallback final, LZ com ameaça positiva é recusada pela régua conservadora já usada em transporte; rotas também recusam qualquer passo ameaçado (origem não bloqueia a fuga), com cache por célula.
+- O EVAC terrestre agora passa o mesmo `rejectBaseCluster` do aéreo e do reparo normal. O log de destino selecionado voltou ao consumidor `FindRepairConstruction`; `RankRepairConstructions` não anuncia escolha.
+- Regressão ampliada PASS fora do Play: anel seguro recebe o ferido, rota comum com ameaça intermediária perde mesmo com destino livre, alternativa de rota segura preservada, HQ distante aproxima sem sondagem remota. `bash tools/compilar.sh`: ambas assemblies passaram. Sem observação desta revisão em partida real.
+
+- Fallback final em degraus: prefere o anel seguro; sob invasão usa células livres permitidas do anel, minimizando primeiro ameaça da descida, depois pico/total de ameaça da rota e custo. Ameaça positiva e inimigo perto não vetam esse último recurso. Ocupação, produtores fechados e PodeDesembarcar continuam obrigatórios. Sem desembarque imediato, aproxima/escapa; uma origem ameaçada não gera espera quando há movimento permitido.
+- Testes PASS adicionais: inimigo a 1 hex do HQ entrega no anel; log `anel contestado, menor ameaça`; todas as rotas com ameaça positiva ainda entregam na célula de menor ameaça; origem ameaçada com movimento disponível não espera. Compilação via `bash tools/compilar.sh` passou nas duas assemblies. Validado fora do Play.

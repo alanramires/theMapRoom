@@ -132,9 +132,14 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied)
     {
+        if (IsAirTransporter(unit))
+            return DecideAirEvacDeliveryAction(unit, evacuee, snapshot, fromCell, paths, occupied);
+
         // Reuse the same destination logic as the repair system
         ConstructionManager repairDest = FindRepairConstruction(
-            evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied), lineSnapshot: snapshot);
+            evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied),
+            rejectBaseCluster: !IsEliteRepairUnit(evacuee) && IsBaseUnderPressureForRepair(snapshot),
+            lineSnapshot: snapshot);
         Vector3Int target = repairDest != null ? repairDest.CurrentCellPosition : fromCell;
         target.z = 0;
 
@@ -209,6 +214,338 @@ public partial class AIController
         // Priority 3: keep moving toward repair destination
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} EVAC courier — move para {moveTarget} destino={target} dist={SectorManager.HexDistance(moveTarget, target):F0}h");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+    }
+
+    // Hospital eligibility and order belong to Repair. EVAC adds the free
+    // patient cell and adjacent LZ; only this turn's LZs run the drop sensor.
+    private PlayerAction DecideAirEvacDeliveryAction(
+        UnitManager transporter, UnitManager patient, AIWorldSnapshot snapshot,
+        Vector3Int from, Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        var threatByCell = new Dictionary<Vector3Int, float>();
+        var originalPaths = paths;
+        paths = BuildSafeAirEvacPaths(from, paths, snapshot.AITeam, threatByCell);
+        ConstructionManager bestBuilding = null;
+        Vector3Int bestLz = from;
+        PodeDesembarcarOption bestDrop = null;
+        ConstructionManager approachBuilding = null;
+        Vector3Int approachLz = from;
+        var neighbors = new List<Vector3Int>(6);
+        var dropsByLz = new Dictionary<Vector3Int, List<PodeDesembarcarOption>>();
+        bool rejectBaseCluster = !IsEliteRepairUnit(patient)
+            && IsBaseUnderPressureForRepair(snapshot);
+        List<ConstructionManager> hospitals = RankRepairConstructions(
+            patient, from, snapshot.AITeam,
+            occupied != null ? new HashSet<Vector3Int>(occupied) : new HashSet<Vector3Int>(),
+            rejectBaseCluster: rejectBaseCluster, lineSnapshot: snapshot);
+
+        foreach (ConstructionManager building in hospitals)
+        {
+            // Do not bypass ReceivedSuppliesThisTurn. This is a concrete
+            // delivery decision, not the "does any repair facility exist?" query.
+            if (!CanSurfaceRepairConstructionServe(building, patient, snapshot.AITeam))
+                continue;
+            Vector3Int target = building.CurrentCellPosition;
+            target.z = 0;
+            if (!IsConfirmedVisibleOrExploredCellForAI(target)
+                || !IsEvacDropCellSafe(target, snapshot.AITeam)
+                || (plannedDestinations != null && plannedDestinations.Contains(target))
+                || !OccupancyResolver.CanEndMove(patient, target,
+                    UnitOccupancyRules.GetUnitsAtCell(boardTilemap, target, transporter)))
+                continue;
+
+            float bestScore = float.MinValue;
+            float futureScore = float.MinValue;
+            Vector3Int futureLz = from;
+            bool hasFutureLz = false;
+            UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, target, neighbors);
+            foreach (Vector3Int rawLz in neighbors)
+            {
+                Vector3Int lz = rawLz; lz.z = 0;
+                if (!boardTilemap.HasTile(lz)
+                    || !IsConfirmedVisibleOrExploredCellForAI(lz)
+                    || (occupied != null && occupied.Contains(lz))
+                    || (plannedDestinations != null && plannedDestinations.Contains(lz) && lz != from)
+                    || IsOwnProductionCell(lz, snapshot.AITeam)
+                    || !CanAirTransportStopAtCell(transporter, lz))
+                    continue;
+
+                float threat = GetAirEvacThreat(lz, snapshot.AITeam, threatByCell);
+                if (threat > 0f || !IsEvacDropCellSafe(lz, snapshot.AITeam))
+                    continue;
+                bool reachable = lz == from || (paths != null && paths.ContainsKey(lz));
+                if (!reachable)
+                {
+                    if (originalPaths != null && originalPaths.ContainsKey(lz))
+                        continue; // reachable only through a threatened flight path
+                    // Direction only. No remote drop simulation or landing promise.
+                    float score = -SectorManager.HexDistance(from, lz) * 100f - threat;
+                    if (!hasFutureLz || score > futureScore)
+                    {
+                        futureScore = score; futureLz = lz; hasFutureLz = true;
+                    }
+                    continue;
+                }
+
+                if (!dropsByLz.TryGetValue(lz, out List<PodeDesembarcarOption> options))
+                {
+                    options = new List<PodeDesembarcarOption>();
+                    AIDecisionPerf.AddCount("AirEvacDisembarkProbes");
+                    PodeDesembarcarSensor.CollectOptionsFromCell(
+                        transporter, lz, boardTilemap, terrainDatabase, options, out _);
+                    dropsByLz[lz] = options;
+                }
+                PodeDesembarcarOption drop = options.Find(option =>
+                    option.passengerUnit == patient && option.disembarkCell == target);
+                if (drop == null)
+                    continue;
+                float immediateScore = -GetPathStepCount(paths, lz) * 100f - threat;
+                if (bestDrop == null || immediateScore > bestScore)
+                {
+                    bestScore = immediateScore; bestBuilding = building; bestLz = lz; bestDrop = drop;
+                }
+            }
+            // First materializable hospital in Repair's order. If none is
+            // materializable, approach its highest-ranked estimated destination.
+            if (bestDrop != null)
+                break;
+            if (approachBuilding == null && hasFutureLz)
+            {
+                approachBuilding = building; approachLz = futureLz;
+            }
+        }
+
+        if (bestDrop != null)
+        {
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC entrega #{patient.InstanceId} em {bestBuilding.name}@{bestDrop.disembarkCell} via LZ={bestLz}");
+            var selected = new List<PodeDesembarcarOption> { bestDrop };
+            if (bestLz == from)
+                return BuildDesembarcarBatch(transporter, snapshot.AITeam, from, selected);
+            paths.TryGetValue(bestLz, out List<Vector3Int> path);
+            return BuildDesembarcarBatch(transporter, snapshot.AITeam, from, selected, bestLz, path);
+        }
+
+        if (approachBuilding == null)
+            return DecideAirEvacHqFallback(transporter, patient, snapshot, from,
+                originalPaths, occupied, dropsByLz, threatByCell, rejectBaseCluster);
+
+        Vector3Int move = from;
+        if (approachBuilding != null && paths != null)
+        {
+            var stopBans = occupied != null ? new HashSet<Vector3Int>(occupied) : new HashSet<Vector3Int>();
+            foreach (Vector3Int cell in paths.Keys)
+                if (IsOwnProductionCell(cell, snapshot.AITeam)
+                    || cell == approachBuilding.CurrentCellPosition)
+                    stopBans.Add(cell);
+            move = FindAirTransportMove(from, approachLz, paths, stopBans, snapshot.AITeam);
+        }
+        Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC mantém #{patient.InstanceId} a bordo; "
+            + (approachBuilding != null
+                ? $"aproxima via {move} para LZ estimada={approachLz}, reparo={approachBuilding.name}"
+                : "sem prédio elegível de reparo vago com LZ disponível"));
+        return BuildMoveBatch(transporter, snapshot.AITeam, from, move, paths);
+    }
+
+    // Same threat estimator and zero-threat gate already used by conservative
+    // transport/rear-area decisions. Cache once per cell for the whole EVAC.
+    private float GetAirEvacThreat(Vector3Int cell, TeamId team, Dictionary<Vector3Int, float> cache)
+    {
+        cell.z = 0;
+        if (!cache.TryGetValue(cell, out float threat))
+        {
+            threat = CalculateThreatLevel(cell, team);
+            cache[cell] = threat;
+        }
+        return threat;
+    }
+
+    private Dictionary<Vector3Int, List<Vector3Int>> BuildSafeAirEvacPaths(
+        Vector3Int from, Dictionary<Vector3Int, List<Vector3Int>> paths,
+        TeamId team, Dictionary<Vector3Int, float> threatByCell)
+    {
+        var safe = new Dictionary<Vector3Int, List<Vector3Int>>();
+        if (paths == null) return safe;
+        foreach (var pair in paths)
+        {
+            bool clear = pair.Key == from || GetAirEvacThreat(pair.Key, team, threatByCell) <= 0f;
+            if (clear && pair.Value != null)
+                foreach (Vector3Int cell in pair.Value)
+                    if (cell != from && GetAirEvacThreat(cell, team, threatByCell) > 0f)
+                    {
+                        clear = false;
+                        break;
+                    }
+            if (clear) safe[pair.Key] = pair.Value;
+            else AIDecisionPerf.AddCount("AirEvacUnsafeRoutesRejected");
+        }
+        return safe;
+    }
+
+    private PlayerAction DecideAirEvacHqFallback(
+        UnitManager transporter, UnitManager patient, AIWorldSnapshot snapshot,
+        Vector3Int from, Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        Dictionary<Vector3Int, List<PodeDesembarcarOption>> dropsByLz,
+        Dictionary<Vector3Int, float> threatByCell, bool avoidBaseClusterCells)
+    {
+        if (snapshot.MyHQ == null)
+        {
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC sem hospital elegível nem HQ para fallback seguro; mantém paciente #{patient.InstanceId}");
+            return BuildMoveBatch(transporter, snapshot.AITeam, from, from, paths);
+        }
+        Vector3Int hq = snapshot.MyHQ.CurrentCellPosition; hq.z = 0;
+        // Enumerate only the HQ ring, not the map; policy and scoring belong
+        // to the same fallback used by the patient when travelling alone.
+        var ring = new HashSet<Vector3Int> { hq };
+        var frontier = new List<Vector3Int> { hq };
+        var neighbors = new List<Vector3Int>(6);
+        for (int distance = 0; distance < DefenseEnemyRange; distance++)
+        {
+            var next = new List<Vector3Int>();
+            foreach (Vector3Int cell in frontier)
+            {
+                UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, cell, neighbors);
+                foreach (Vector3Int neighbor in neighbors)
+                    if (ring.Add(neighbor)) next.Add(neighbor);
+            }
+            frontier = next;
+        }
+        var freeRing = new HashSet<Vector3Int>();
+        var safeRing = new HashSet<Vector3Int>();
+        foreach (Vector3Int cell in ring)
+        {
+            if (!boardTilemap.HasTile(cell) || !IsConfirmedVisibleOrExploredCellForAI(cell)
+                || !IsRepairHqFallbackCellAllowed(patient, cell, snapshot.AITeam, avoidBaseClusterCells)
+                || (plannedDestinations != null && plannedDestinations.Contains(cell))
+                || !OccupancyResolver.CanEndMove(patient, cell,
+                    UnitOccupancyRules.GetUnitsAtCell(boardTilemap, cell, transporter)))
+                continue;
+            freeRing.Add(cell);
+            if (IsSafeRepairHqFallbackPosition(patient, cell, hq, snapshot.AITeam, avoidBaseClusterCells)
+                && IsEvacDropCellSafe(cell, snapshot.AITeam)
+                && GetAirEvacThreat(cell, snapshot.AITeam, threatByCell) <= 0f)
+                safeRing.Add(cell);
+        }
+        HashSet<Vector3Int> targetRing = safeRing.Count > 0 ? safeRing : freeRing;
+        string tier = safeRing.Count > 0 ? "anel seguro" : "anel contestado, menor ameaça";
+        Vector3Int anchor = hq;
+        float anchorThreat = float.MaxValue, anchorScore = float.MinValue;
+        foreach (Vector3Int cell in targetRing)
+        {
+            float threat = GetAirEvacThreat(cell, snapshot.AITeam, threatByCell);
+            float score = ScoreRepairHqFallbackCell(cell, hq, snapshot.AITeam);
+            if (threat < anchorThreat || (threat == anchorThreat && score > anchorScore))
+            {
+                anchorThreat = threat; anchorScore = score; anchor = cell;
+            }
+        }
+        if (paths == null) paths = new Dictionary<Vector3Int, List<Vector3Int>>();
+        var routeThreats = new Dictionary<Vector3Int, (float peak, float total)>();
+        foreach (var pair in paths)
+        {
+            float peak = GetAirEvacThreat(pair.Key, snapshot.AITeam, threatByCell);
+            float total = peak;
+            if (pair.Value != null)
+                foreach (Vector3Int cell in pair.Value)
+                {
+                    if (cell == from || cell == pair.Key) continue;
+                    float threat = GetAirEvacThreat(cell, snapshot.AITeam, threatByCell);
+                    peak = Mathf.Max(peak, threat); total += threat;
+                }
+            routeThreats[pair.Key] = (peak, total);
+        }
+
+        // Patient cell threat wins first, then flight peak/total threat.
+        // A zero-threat route wins within the selected patient-cell tier.
+        // Nearby enemies never veto this final fallback.
+        {
+            PodeDesembarcarOption bestDrop = null;
+            Vector3Int bestLz = from;
+            float bestDropThreat = float.MaxValue, bestPeak = float.MaxValue, bestTotal = float.MaxValue;
+            int bestCost = int.MaxValue;
+            float bestScore = float.MinValue;
+            foreach (var pair in paths)
+            {
+                Vector3Int lz = pair.Key;
+                var risk = routeThreats[lz];
+                if (targetRing.Count == 0 || SectorManager.HexDistance(lz, hq) > DefenseEnemyRange + 1
+                    || (occupied != null && occupied.Contains(lz) && lz != from)
+                    || (plannedDestinations != null && plannedDestinations.Contains(lz) && lz != from)
+                    || IsOwnProductionCell(lz, snapshot.AITeam)
+                    || !CanAirTransportStopAtCell(transporter, lz)) continue;
+                if (!dropsByLz.TryGetValue(lz, out List<PodeDesembarcarOption> options))
+                {
+                    options = new List<PodeDesembarcarOption>();
+                    AIDecisionPerf.AddCount("AirEvacDisembarkProbes");
+                    PodeDesembarcarSensor.CollectOptionsFromCell(
+                        transporter, lz, boardTilemap, terrainDatabase, options, out _);
+                    dropsByLz[lz] = options;
+                }
+                int cost = GetPathStepCount(paths, lz);
+                foreach (var option in options)
+                {
+                    if (option.passengerUnit != patient || !targetRing.Contains(option.disembarkCell)) continue;
+                    float threat = GetAirEvacThreat(option.disembarkCell, snapshot.AITeam, threatByCell);
+                    float score = ScoreRepairHqFallbackCell(option.disembarkCell, hq, snapshot.AITeam);
+                    bool better = bestDrop == null || threat < bestDropThreat
+                        || (threat == bestDropThreat && (risk.peak < bestPeak
+                            || (risk.peak == bestPeak && (risk.total < bestTotal
+                                || (risk.total == bestTotal && (cost < bestCost
+                                    || (cost == bestCost && score > bestScore)))))));
+                    if (better)
+                    {
+                        bestDrop = option; bestLz = lz; bestCost = cost; bestScore = score;
+                        bestDropThreat = threat; bestPeak = risk.peak; bestTotal = risk.total;
+                    }
+                }
+            }
+            if (bestDrop != null)
+            {
+                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC {tier}: libera #{patient.InstanceId} @ {bestDrop.disembarkCell}, LZ={bestLz}, ameaçaDescida={bestDropThreat:F1}, ameaçaRota={bestPeak:F1}");
+                var selected = new List<PodeDesembarcarOption> { bestDrop };
+                if (bestLz == from) return BuildDesembarcarBatch(transporter, snapshot.AITeam, from, selected);
+                return BuildDesembarcarBatch(transporter, snapshot.AITeam, from, selected, bestLz, paths[bestLz]);
+            }
+
+        }
+        // A materializable delivery wins before any approach, including when
+        // its route only becomes available in the least-threat flight tier.
+        for (int flightTier = 0; flightTier < 2; flightTier++)
+        {
+            Vector3Int move = from;
+            float movePeak = float.MaxValue, moveTotal = float.MaxValue, moveDistance = float.MaxValue;
+            float originDistance = SectorManager.HexDistance(from, anchor);
+            bool originThreatened = GetAirEvacThreat(from, snapshot.AITeam, threatByCell) > 0f;
+            // Progress to the ring first. If trapped on a threatened origin,
+            // allow escape in any direction instead of returning a wait action.
+            for (int escape = 0; escape < (originThreatened ? 2 : 1) && move == from; escape++)
+                foreach (var pair in paths)
+                {
+                    Vector3Int cell = pair.Key;
+                    var risk = routeThreats[cell];
+                    float dist = SectorManager.HexDistance(cell, anchor);
+                    if (cell == from || (flightTier == 0 && risk.peak > 0f)
+                        || (escape == 0 && dist >= originDistance)
+                        || (occupied != null && occupied.Contains(cell))
+                        || (plannedDestinations != null && plannedDestinations.Contains(cell))
+                        || IsOwnProductionCell(cell, snapshot.AITeam)
+                        || !CanAirTransportStopAtCell(transporter, cell)) continue;
+                    if (move == from || risk.peak < movePeak
+                        || (risk.peak == movePeak && (risk.total < moveTotal
+                            || (risk.total == moveTotal && dist < moveDistance))))
+                    {
+                        move = cell; movePeak = risk.peak; moveTotal = risk.total; moveDistance = dist;
+                    }
+                }
+            if (move != from)
+            {
+                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC {tier}: aproxima/escapa via {move}, ameaçaRota={movePeak:F1}; paciente a bordo até desembarque materializável");
+                return BuildMoveBatch(transporter, snapshot.AITeam, from, move, paths);
+            }
+        }
+        Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC {tier}: sem movimento ou desembarque fisicamente permitido; células livres={freeRing.Count}");
+        return BuildMoveBatch(transporter, snapshot.AITeam, from, from, paths);
     }
 
     private List<PodeDesembarcarOption> SelectEvacDisembarkForPassenger(

@@ -492,16 +492,8 @@ public partial class AIController
         // Não-elite sob pressão não pode SEGURAR em cima de uma construção do cluster da base:
         // se está numa, tem que sair pros arredores (loop abaixo já exclui essas células).
         // Conscrição comprando: mesmo tratamento pra produtor do exército, pra TODOS.
-        bool conscriptionProducerBan = IsConscriptionParkingBanActive();
-        bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
-        bool fromOnBaseCluster = (avoidBaseClusterCells && IsOwnBaseClusterCell(fromCell, aiTeam))
-            || (conscriptionProducerBan && IsConscriptionClosedProducerCell(fromCell, aiTeam))
-            || (logisticsProducerBan && IsLogisticsProductionCell(aiTeam, fromCell));
-
-        bool safeNearHQ = !fromOnBaseCluster
-            && SectorManager.HexDistance(fromCell, hqCell) <= DefenseEnemyRange
-            && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange)
-            && !HasNearbyVisibleEnemy(hqCell, aiTeam, DefenseEnemyRange);
+        bool safeNearHQ = IsSafeRepairHqFallbackPosition(
+            unit, fromCell, hqCell, aiTeam, avoidBaseClusterCells);
         if (safeNearHQ)
         {
             Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda nos arredores do HQ {hqCell} (sem ameaça)");
@@ -514,15 +506,9 @@ public partial class AIController
         foreach (Vector3Int cell in paths.Keys)
         {
             if (cell != fromCell && occupied.Contains(cell)) continue;
-            // Recolhe pros ARREDORES do HQ sem parar em base/âncora/HQ (deixa a produção livre).
-            if (avoidBaseClusterCells && cell != fromCell && IsOwnBaseClusterCell(cell, aiTeam)) continue;
-            if (conscriptionProducerBan && cell != fromCell && IsConscriptionClosedProducerCell(cell, aiTeam)) continue;
-            if (logisticsProducerBan && cell != fromCell && IsLogisticsProductionCell(aiTeam, cell)) continue;
-
-            float dist = SectorManager.HexDistance(cell, hqCell);
-            float threat = CalculateThreatLevel(cell, aiTeam);
-            float hqAdjacencyBonus = SectorManager.HexDistance(cell, hqCell) <= DefenseEnemyRange ? 25f : 0f;
-            float score = -dist * 100f - threat * ThreatWeight + hqAdjacencyBonus;
+            if (cell != fromCell && !IsRepairHqFallbackCellAllowed(
+                    unit, cell, aiTeam, avoidBaseClusterCells)) continue;
+            float score = ScoreRepairHqFallbackCell(cell, hqCell, aiTeam);
             if (score > bestScore)
             {
                 bestScore = score;
@@ -536,6 +522,31 @@ public partial class AIController
     }
 
 
+    private bool IsRepairHqFallbackCellAllowed(
+        UnitManager unit, Vector3Int cell, TeamId team, bool avoidBaseClusterCells)
+    {
+        return !(avoidBaseClusterCells && IsOwnBaseClusterCell(cell, team))
+            && !(IsConscriptionParkingBanActive() && IsConscriptionClosedProducerCell(cell, team))
+            && !(IsPrimaryLogisticsUnit(unit) && IsLogisticsProductionCell(team, cell));
+    }
+
+    private bool IsSafeRepairHqFallbackPosition(
+        UnitManager unit, Vector3Int cell, Vector3Int hqCell,
+        TeamId team, bool avoidBaseClusterCells)
+    {
+        return IsRepairHqFallbackCellAllowed(unit, cell, team, avoidBaseClusterCells)
+            && SectorManager.HexDistance(cell, hqCell) <= DefenseEnemyRange
+            && !HasNearbyVisibleEnemy(cell, team, DefenseEnemyRange)
+            && !HasNearbyVisibleEnemy(hqCell, team, DefenseEnemyRange);
+    }
+
+    private float ScoreRepairHqFallbackCell(Vector3Int cell, Vector3Int hqCell, TeamId team)
+    {
+        float dist = SectorManager.HexDistance(cell, hqCell);
+        return -dist * 100f - CalculateThreatLevel(cell, team) * ThreatWeight
+            + (dist <= DefenseEnemyRange ? 25f : 0f);
+    }
+
     private ConstructionManager FindRepairConstruction(
         UnitManager unit,
         Vector3Int fromCell,
@@ -545,8 +556,40 @@ public partial class AIController
         Dictionary<Vector3Int, int> defenseReservedCells = null,
         AIWorldSnapshot lineSnapshot = null)
     {
-        ConstructionManager best = null;
-        float bestScore = float.MinValue;
+        List<ConstructionManager> ranked = RankRepairConstructions(
+            unit, fromCell, aiTeam, occupied, rejectBaseCluster,
+            defenseReservedCells, lineSnapshot);
+        ConstructionManager best = ranked.Count > 0 ? ranked[0] : null;
+        if (best != null)
+        {
+            Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
+            string home = IsRepairHomeConstruction(best, aiTeam) ? " home" : string.Empty;
+            string aircraft = IsAirportConstruction(best)
+                ? " airport"
+                : IsAircraftRepairConstruction(best) ? " air-capable" : string.Empty;
+            string preferredAircraft = IsPreferredAircraftRepairConstruction(best, aiTeam) ? " preferredAir" : string.Empty;
+            string safe = !HasNearbyVisibleEnemy(bc, aiTeam, DefenseEnemyRange) ? " safe" : string.Empty;
+            string takeoff = TryScoreRepairCandidateTakeoff(unit, bc, out _, out string takeoffLabel, out _)
+                ? $" takeoff={takeoffLabel}"
+                : string.Empty;
+            string cohesion = unit != null && unit.GetAircraftType() != AircraftType.None
+                ? $" coh={CalculateAircraftRepairCohesionScore(unit, bc, aiTeam):F0}"
+                : string.Empty;
+            Debug.Log($"[Repair] destino{home}{aircraft}{preferredAircraft}{safe}{takeoff} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1}{cohesion} ");
+        }
+        return best;
+    }
+
+    private List<ConstructionManager> RankRepairConstructions(
+        UnitManager unit,
+        Vector3Int fromCell,
+        TeamId aiTeam,
+        HashSet<Vector3Int> occupied,
+        bool rejectBaseCluster = false,
+        Dictionary<Vector3Int, int> defenseReservedCells = null,
+        AIWorldSnapshot lineSnapshot = null)
+    {
+        var scored = new List<(ConstructionManager building, float score, int order)>();
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
         bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
         bool eliteRelaxSafety = EliteHoldsDangerousRepair(unit);
@@ -734,30 +777,14 @@ public partial class AIController
                     score += 7500f;
             }
 
-            if (score > bestScore)
-            {
-                bestScore = score;
-                best = c;
-            }
+            scored.Add((c, score, scored.Count));
         }
-        if (best != null)
-        {
-            Vector3Int bc = best.CurrentCellPosition; bc.z = 0;
-            string home = IsRepairHomeConstruction(best, aiTeam) ? " home" : string.Empty;
-            string aircraft = IsAirportConstruction(best)
-                ? " airport"
-                : IsAircraftRepairConstruction(best) ? " air-capable" : string.Empty;
-            string preferredAircraft = IsPreferredAircraftRepairConstruction(best, aiTeam) ? " preferredAir" : string.Empty;
-            string safe = !HasNearbyVisibleEnemy(bc, aiTeam, DefenseEnemyRange) ? " safe" : string.Empty;
-            string takeoff = TryScoreRepairCandidateTakeoff(unit, bc, out _, out string takeoffLabel, out _)
-                ? $" takeoff={takeoffLabel}"
-                : string.Empty;
-            string cohesion = unit != null && unit.GetAircraftType() != AircraftType.None
-                ? $" coh={CalculateAircraftRepairCohesionScore(unit, bc, aiTeam):F0}"
-                : string.Empty;
-            Debug.Log($"[Repair] destino{home}{aircraft}{preferredAircraft}{safe}{takeoff} selecionado {bc} dist={SectorManager.HexDistance(fromCell, bc):F1}{cohesion} score={bestScore:F0}");
-        }
-        return best;
+        // Keep traversal order on ties, matching the original single winner.
+        scored.Sort((left, right) => {
+            int scoreOrder = right.score.CompareTo(left.score);
+            return scoreOrder != 0 ? scoreOrder : left.order.CompareTo(right.order);
+        });
+        return scored.ConvertAll(candidate => candidate.building);
     }
 
     private UnitManager FindBestNavalRepairPlatform(
