@@ -272,3 +272,16 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - `verificar_evac_predio_vago.cs`: PASS de regressão. `bash tools/compilar.sh`: ambas assemblies passaram. Sem observação desta política em partida real.
 
 - Revisão de escopo: retirado o predicado e seus bloqueios de `OccupancyResolver` e retirado o veto de `TurnStateManager.ConstructionShopping`; política restrita à IA. `verificar_reserva_pouso_reparo.cs` e regressão completa de EVAC passaram fora do Play. `bash tools/compilar.sh`: duas assemblies passaram.
+
+### 2026-11-07 — EVAC não espera por hospital sem aproximação viável
+- Marca T10/slot 0, Chinook #56 com Soldado #27 (2 HP): hospital estimado em (3,13) mantinha a decisão em (3,4), sem acionar o HQ.
+- LZ hospitalar estimada agora exige ao menos um destino dos caminhos seguros atuais que realmente reduza a distância até ela, fora das paradas proibidas. Sem esse avanço, o hospital é descartado para aproximação e a busca segue para o próximo; se nenhum permitir avançar, usa o fallback do HQ com os caminhos originais e os degraus já existentes.
+- A guarda final também aciona o HQ se o seletor de aproximação inesperadamente devolver origem igual a destino. Reusa caminhos e reservas já calculados; não sonda desembarque remoto nem relaxa ameaça em hospital comum. Recusa de aproximação ganha motivo no log.
+- Regressão `verificar_evac_predio_vago.cs`: PASS para hospital melhor ranqueado sem progresso seguido de outro com avanço; hospital futuro existente sem nenhum passo libera entrega no anel do HQ. Casos anteriores e contadores preservados.
+- `bash tools/compilar.sh`: ambas assemblies passaram. Validado fora do Play, sem executar a partida da marca.
+
+### 2026-11-07 — aproximação ao HQ não economiza MP por ameaça acumulada
+- Marca T10/slot 0, Chinook #56: fallback do HQ já acionado, mas escolhia só (3,4) → (2,5), com seis MP disponíveis. O desempate priorizava soma da ameaça da rota antes do progresso, favorecendo caminhos curtos.
+- Mantido o menor pico de ameaça como critério principal de voo. Com pico igual, agora vence o maior avanço ao anel; exposição acumulada desempata depois. Hospital comum e travas de ameaça zero preservados.
+- Log do fallback registra avanço em hexes, passos, pico e exposição acumulada para tornar o desempate legível no AI Step.
+- Regressão `verificar_evac_predio_vago.cs`: PASS com HQ distante e ameaça uniforme 30 em todo o caminho; usa o deslocamento tático completo de seis passos. Demais cenários passaram. `bash tools/compilar.sh`: duas assemblies passaram; validação fora do Play, sem replay da marca.

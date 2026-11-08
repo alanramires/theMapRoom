@@ -116,6 +116,39 @@ try{
     var healthyCargo=Decide(paths);
     if(healthyCargo.SubSteps.Count!=1||healthyCargo.SubSteps[0].TargetInstanceId!=main.InstanceId.ToString())
         throw new System.Exception("Passageiro saudavel foi descarregado pelo EVAC.");
+    // A ranked hospital may exist while no current endpoint advances to it.
+    // A theoretical future LZ must not suppress the HQ fallback.
+    var homeBefore=first.CurrentCellPosition;
+    var producerBefore=second.CurrentCellPosition;
+    var carrierBefore=carrier.CurrentCellPosition;
+    var nearHq=new UnityEngine.Vector3Int(2,2,0);
+    Set(first,"currentCellPosition",nearHq);first.transform.position=HexCoordinates.GetCellCenterWorld(map,nearHq);
+    snapshot.MyHQ=first;
+    var noProgressPaths=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>{
+        {carrierBefore,new System.Collections.Generic.List<UnityEngine.Vector3Int>{carrierBefore}}};
+    var stalledHospital=Decide(noProgressPaths);
+    if(stalledHospital.SensorAction!=SensorActionType.Disembark||stalledHospital.SubSteps.Count!=1)
+        throw new System.Exception("Hospital estimado sem progresso suprimiu fallback materializavel no HQ.");
+    snapshot.MyHQ=null;
+    Set(first,"currentCellPosition",homeBefore);first.transform.position=HexCoordinates.GetCellCenterWorld(map,homeBefore);
+
+    // The top hospital is left, but only a rightward step exists: use the next hospital.
+    var leftHospital=new UnityEngine.Vector3Int(0,2,0);
+    var rightHospital=new UnityEngine.Vector3Int(9,2,0);
+    var middle=new UnityEngine.Vector3Int(4,2,0);
+    var rightStep=new UnityEngine.Vector3Int(6,2,0);
+    Set(first,"currentCellPosition",leftHospital);first.transform.position=HexCoordinates.GetCellCenterWorld(map,leftHospital);
+    Set(second,"currentCellPosition",rightHospital);second.transform.position=HexCoordinates.GetCellCenterWorld(map,rightHospital);
+    Set(carrier,"currentCellPosition",middle);carrier.transform.position=HexCoordinates.GetCellCenterWorld(map,middle);
+    var rightPaths=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>{
+        {middle,new System.Collections.Generic.List<UnityEngine.Vector3Int>{middle}},
+        {rightStep,new System.Collections.Generic.List<UnityEngine.Vector3Int>{middle,new UnityEngine.Vector3Int(5,2,0),rightStep}}};
+    var alternativeHospital=Decide(rightPaths);
+    if(alternativeHospital.SensorAction!=SensorActionType.None||alternativeHospital.MoveTo!=rightStep)
+        throw new System.Exception("Nao pulou hospital sem progresso para aproximar de outro hospital.");
+    Set(first,"currentCellPosition",homeBefore);first.transform.position=HexCoordinates.GetCellCenterWorld(map,homeBefore);
+    Set(second,"currentCellPosition",producerBefore);second.transform.position=HexCoordinates.GetCellCenterWorld(map,producerBefore);
+    Set(carrier,"currentCellPosition",carrierBefore);carrier.transform.position=HexCoordinates.GetCellCenterWorld(map,carrierBefore);
     second.DebugSetSellingRule(ConstructionUnitMarketRule.FreeMarket,ownSlot);
     Set(second,"sector",ConstructionSector.Base0);Set(ai,"conscriptionDoctrine",true);
     if(!(bool)typeof(AIController).GetMethod("IsConscriptionClosedProducerConstruction",flags).Invoke(ai,new object[]{second,TeamId.Blue}))
@@ -256,6 +289,22 @@ try{
         new System.Collections.Generic.Dictionary<int,System.Collections.Generic.HashSet<UnityEngine.Vector3Int>>{{main.InstanceId,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()}}});
     if(hotEscape.SensorAction==SensorActionType.None&&hotEscape.MoveTo==carrier.CurrentCellPosition)
         throw new System.Exception("Fallback devolveu espera em origem ameacada com rotas disponiveis.");
+    // Uniform danger on every step: accumulated exposure must not shrink a
+    // full tactical flight to one hex when peak danger is identical.
+    var distantHq=new UnityEngine.Vector3Int(20,5,0);
+    for(int x=10;x<23;x++)for(int y=0;y<8;y++)map.SetTile(new UnityEngine.Vector3Int(x,y,0),plain.paletteTile);
+    Set(first,"currentCellPosition",distantHq);first.transform.position=HexCoordinates.GetCellCenterWorld(map,distantHq);
+    var uniformRisk=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,float>();
+    for(int x=-4;x<27;x++)for(int y=-4;y<13;y++)uniformRisk[new UnityEngine.Vector3Int(x,y,0)]=30f;
+    var fullAdvance=(PlayerAction)lastResort.Invoke(ai,new object[]{carrier,main,snapshot,carrier.CurrentCellPosition,paths,
+        new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),
+        new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<PodeDesembarcarOption>>(),uniformRisk,true,
+        new System.Collections.Generic.Dictionary<int,System.Collections.Generic.HashSet<UnityEngine.Vector3Int>>{{main.InstanceId,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()}}});
+    int travelled=fullAdvance.MovementPath!=null?fullAdvance.MovementPath.Count-1:0;
+    if(fullAdvance.SensorAction!=SensorActionType.None||travelled<carrier.RemainingMovementPoints
+        ||SectorManager.HexDistance(fullAdvance.MoveTo,distantHq)>=SectorManager.HexDistance(carrier.CurrentCellPosition,distantHq)-1)
+        throw new System.Exception("Ameaca uniforme fez aproximacao ao HQ economizar movimento: passos="+travelled);
+    Set(first,"currentCellPosition",farHq);first.transform.position=HexCoordinates.GetCellCenterWorld(map,farHq);
     var routeFixture=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>{
         {origin,new System.Collections.Generic.List<UnityEngine.Vector3Int>{origin}},
         {hot,new System.Collections.Generic.List<UnityEngine.Vector3Int>{origin,hot}},
@@ -281,7 +330,7 @@ try{
         throw new System.Exception("EVAC terrestre reconstruiu repairCells/ranking na mesma decisao: builds="+builds+" ranks="+ranks);
     pairPerf.GetMethod("End").Invoke(null,null);
     if(!main.IsEmbarked||main.CurrentHP!=1)throw new System.Exception("Planejamento alterou passageiro confirmado.");
-    return "PASS: cidade ocupada descartada; entrega direta na fabrica livre a partir de LZ vizinha; alcance curto aproxima mantendo carga; nova ocupacao troca destino; sem hospital nem HQ de referencia mantem carga; conscricao e pressao respeitadas; paciente ja atendido rejeitado; aproximacao sem sondagem distante; fallback descarrega no anel HQ e aproxima quando longe; base invadida entrega no anel contestado; todas as rotas ameacadas ainda entregam; origem ameacada nao espera; caminho com ameaca rejeitado mesmo com destino seguro; uma vaga retem secundario, que assume entrega seguinte; dois hospitais entregam dupla; repairCells unica no aereo, HQ e terrestre; ranking auxiliar silencioso; dupla no anel HQ com secundario fora do contorno e trecho tatico a pe; celula externa com inimigo perto rejeitada no seguro e aceita no contestado; saudavel permanece a bordo; passageiro inalterado.";
+    return "PASS: cidade ocupada descartada; entrega direta na fabrica livre a partir de LZ vizinha; alcance curto aproxima mantendo carga; nova ocupacao troca destino; sem hospital nem HQ de referencia mantem carga; conscricao e pressao respeitadas; paciente ja atendido rejeitado; aproximacao sem sondagem distante; fallback descarrega no anel HQ e aproxima quando longe; base invadida entrega no anel contestado; todas as rotas ameacadas ainda entregam; origem ameacada nao espera; caminho com ameaca rejeitado mesmo com destino seguro; uma vaga retem secundario, que assume entrega seguinte; dois hospitais entregam dupla; repairCells unica no aereo, HQ e terrestre; ranking auxiliar silencioso; dupla no anel HQ com secundario fora do contorno e trecho tatico a pe; celula externa com inimigo perto rejeitada no seguro e aceita no contestado; hospital sem progresso tenta outro e depois HQ; ameaca uniforme usa deslocamento tatico completo rumo ao HQ; saudavel permanece a bordo; passageiro inalterado.";
 }finally{
     UnityEngine.Application.logMessageReceived-=captureLog;
     foreach(var pair in fogRestore)Set(pair.Key,"debugFogOfWarEnabled",pair.Value);

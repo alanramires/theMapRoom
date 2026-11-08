@@ -228,6 +228,9 @@ public partial class AIController
         var threatByCell = new Dictionary<Vector3Int, float>();
         var originalPaths = paths;
         paths = BuildSafeAirEvacPaths(from, paths, snapshot.AITeam, threatByCell);
+        var approachStopBans = occupied != null ? new HashSet<Vector3Int>(occupied) : new HashSet<Vector3Int>();
+        foreach (Vector3Int cell in paths.Keys)
+            if (IsOwnProductionCell(cell, snapshot.AITeam)) approachStopBans.Add(cell);
         ConstructionManager bestBuilding = null;
         Vector3Int bestLz = from;
         PodeDesembarcarOption bestDrop = null;
@@ -266,6 +269,7 @@ public partial class AIController
             float futureScore = float.MinValue;
             Vector3Int futureLz = from;
             bool hasFutureLz = false;
+            int stalledFutureLzs = 0;
             UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, target, neighbors);
             foreach (Vector3Int rawLz in neighbors)
             {
@@ -286,8 +290,18 @@ public partial class AIController
                 {
                     if (originalPaths != null && originalPaths.ContainsKey(lz))
                         continue; // reachable only through a threatened flight path
+                    // A theoretical LZ must permit real progress this turn.
+                    // Cheap endpoint checks on the already-built safe paths;
+                    // do not run sensors or pathfinding for a distant LZ.
+                    float currentDistance = SectorManager.HexDistance(from, lz);
+                    bool canAdvance = false;
+                    foreach (Vector3Int step in paths.Keys)
+                        if (step != from && step != target && !approachStopBans.Contains(step)
+                            && SectorManager.HexDistance(step, lz) < currentDistance)
+                        { canAdvance = true; break; }
+                    if (!canAdvance) { stalledFutureLzs++; continue; }
                     // Direction only. No remote drop simulation or landing promise.
-                    float score = -SectorManager.HexDistance(from, lz) * 100f - threat;
+                    float score = -currentDistance * 100f - threat;
                     if (!hasFutureLz || score > futureScore)
                     {
                         futureScore = score; futureLz = lz; hasFutureLz = true;
@@ -320,6 +334,8 @@ public partial class AIController
                     bestOrders = orders; bestRepairCount = repaired; bestHospitalRank = hospitalRank;
                 }
             }
+            if (!hasFutureLz && stalledFutureLzs > 0)
+                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC recusa aproximação de {building.name}: {stalledFutureLzs} LZ(s) estimada(s) sem avanço permitido nesta rodada; tenta outro destino");
             // Joint deliveries win; Repair's order breaks equivalent delivery ties.
             // No materializable delivery: approach its highest-ranked destination.
             if (approachBuilding == null && hasFutureLz)
@@ -346,12 +362,14 @@ public partial class AIController
         Vector3Int move = from;
         if (approachBuilding != null && paths != null)
         {
-            var stopBans = occupied != null ? new HashSet<Vector3Int>(occupied) : new HashSet<Vector3Int>();
-            foreach (Vector3Int cell in paths.Keys)
-                if (IsOwnProductionCell(cell, snapshot.AITeam)
-                    || cell == approachBuilding.CurrentCellPosition)
-                    stopBans.Add(cell);
+            var stopBans = new HashSet<Vector3Int>(approachStopBans) { approachBuilding.CurrentCellPosition };
             move = FindAirTransportMove(from, approachLz, paths, stopBans, snapshot.AITeam);
+        }
+        if (move == from)
+        {
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC aproximação sem avanço; aciona fallback do HQ para #{patient.InstanceId}");
+            return DecideAirEvacHqFallback(transporter, patient, snapshot, from,
+                originalPaths, occupied, dropsByLz, threatByCell, rejectBaseCluster, repairCells);
         }
         Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC mantém #{patient.InstanceId} a bordo; "
             + (approachBuilding != null
@@ -625,16 +643,18 @@ public partial class AIController
                         || (plannedDestinations != null && plannedDestinations.Contains(cell))
                         || IsOwnProductionCell(cell, snapshot.AITeam)
                         || !CanAirTransportStopAtCell(transporter, cell)) continue;
+                    // Equal peak danger must not reward spending less MP:
+                    // first advance toward the ring, then compare accumulated exposure.
                     if (move == from || risk.peak < movePeak
-                        || (risk.peak == movePeak && (risk.total < moveTotal
-                            || (risk.total == moveTotal && dist < moveDistance))))
+                        || (risk.peak == movePeak && (dist < moveDistance
+                            || (dist == moveDistance && risk.total < moveTotal))))
                     {
                         move = cell; movePeak = risk.peak; moveTotal = risk.total; moveDistance = dist;
                     }
                 }
             if (move != from)
             {
-                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC {tier}: aproxima/escapa via {move}, ameaçaRota={movePeak:F1}; paciente a bordo até desembarque materializável");
+                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} EVAC {tier}: aproxima/escapa via {move}, avanço={originDistance - moveDistance:F0}h, passos={Mathf.Max(0, GetPathStepCount(paths, move) - 1)}, ameaçaRota={movePeak:F1}, exposição={moveTotal:F1}; paciente a bordo até desembarque materializável");
                 return BuildMoveBatch(transporter, snapshot.AITeam, from, move, paths);
             }
         }
