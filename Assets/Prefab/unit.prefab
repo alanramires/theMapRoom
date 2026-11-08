@@ -942,6 +942,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 91c68547898718044a274b3a284d7f89, type: 3}
   - {fileID: 21300000, guid: e85639b7cd5e70f4096ba414d04a220e, type: 3}
   - {fileID: 21300000, guid: 90e1e8314c827c6409e4c1ec4e0ec6c9, type: 3}
+  transportEvacSprite: {fileID: 21300000, guid: f88824c8efdd75243b7dbc56e82720a3, type: 3}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 500
