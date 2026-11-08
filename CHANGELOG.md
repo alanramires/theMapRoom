@@ -30,6 +30,7 @@ da cena. Um mapa novo tem de pedir autoria, não código.
 | v10.2.0 | O dinheiro do elite para de vazar, e o jogo vai para outra pessoa (escolta segura o caixa, folga da conscrição, swap pelo Tático, fila de carona; checklist de publicação, texturas Web, volume, estrada inteira na Campanha) | [relatório](docs/relatorio_v10.2.0.md) |
 | v10.3.0 | Não precisa empatar, precisa não perder (capturadores por prédio, teto com embarcados, escolta pré-comprada, counter por anel e tolerância, Interceptador em dois ramos, antiaéreo pela presa) | [relatório](docs/relatorio_v10.3.0.md) |
 | v10.4.0 | Ler o que o jogo já sabe (Fase 2 volta a ver o inimigo; escada aérea — vanguarda pede caça, cadeia na demanda; Avião Tanque pelo vaivém; AI Step e Shopping Pressure param de refazer o jogo; GetConstructionAtCell sem busca na cena; entrega pela banda Operacional) | [relatório](docs/relatorio_v10.4.0.md) |
+| v10.5.0 | Ferido não é carga (EVAC aéreo pela regra do reparo, anel do HQ como último recurso, EVAC conjunto; reparo avaliado antes do Serviço do Comando; Disruptor por faixa estrita; cruz EVAC no HUD; diretrizes "procure a que já existe" na skill de fechamento) | [relatório](docs/relatorio_v10.5.0.md) |
 
 ---
 
