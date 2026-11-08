@@ -14,7 +14,7 @@ T Asset<T>(string id)where T:UnityEngine.Object{
 }
 var fogRestore=new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<MatchController,bool>>();
 var evacLogs=new System.Collections.Generic.List<string>();
-UnityEngine.Application.LogCallback captureLog=(message,stack,type)=>{if(message.Contains("EVAC"))evacLogs.Add(message);};
+UnityEngine.Application.LogCallback captureLog=(message,stack,type)=>{if(message.Contains("EVAC")||message.Contains("[Repair]"))evacLogs.Add(message);};
 UnityEngine.Application.logMessageReceived+=captureLog;
 try{
     foreach(var mc in UnityEngine.Object.FindObjectsByType<MatchController>()){fogRestore.Add(new System.Collections.Generic.KeyValuePair<MatchController,bool>(mc,(bool)typeof(MatchController).GetField("debugFogOfWarEnabled",flags).GetValue(mc)));Set(mc,"debugFogOfWarEnabled",false);}
@@ -80,6 +80,42 @@ try{
         throw new System.Exception("Nao entregou na produtora livre: "+action.DebugLabel);
     if(action.MoveTo==second.CurrentCellPosition||SectorManager.HexDistance(action.MoveTo,second.CurrentCellPosition)!=1f)
         throw new System.Exception("Helicoptero nao ficou ao lado do predio de reparo.");
+    // One repair vacancy: only the primary leaves; secondary remains aboard.
+    Set(extra,"currentDomain",Domain.Land);Set(extra,"teamId",TeamId.Blue);
+    Set(extra,"currentHP",1);Set(extra,"isUnderRepair",true);
+    var pairPerf=typeof(AIController).Assembly.GetType("AIDecisionPerf");
+    evacLogs.Clear();pairPerf.GetMethod("Begin").Invoke(null,null);
+    var pairDrop=Decide(paths);
+    var pairCounters=(System.Collections.Generic.Dictionary<string,long>)pairPerf.GetField("Counters",System.Reflection.BindingFlags.Static|System.Reflection.BindingFlags.NonPublic).GetValue(null);
+    if(!pairCounters.TryGetValue("EvacRepairCellsBuilds",out long builds)||builds!=1
+        ||!pairCounters.TryGetValue("RepairConstructionRankings",out long ranks)||ranks!=2)
+        throw new System.Exception("Entrega reconstruiu repairCells/ranking por ferido.");
+    pairPerf.GetMethod("End").Invoke(null,null);
+    if(evacLogs.Exists(message=>message.Contains("[Repair] skip")))throw new System.Exception("Consulta auxiliar imprimiu logs de skip.");
+    if(pairDrop.SensorAction!=SensorActionType.Disembark||pairDrop.SubSteps.Count!=1
+        ||pairDrop.SubSteps[0].TargetInstanceId!=main.InstanceId.ToString()
+        ||pairDrop.SubSteps[0].TargetHex!=second.CurrentCellPosition||!extra.IsEmbarked)
+        throw new System.Exception("Uma vaga de reparo deveria reter o secundario a bordo.");
+    // After the primary has left, the remaining wounded owns the next delivery.
+    Set(main,"isEmbarked",false);
+    var nextDelivery=(PlayerAction)method.Invoke(ai,new object[]{carrier,extra,snapshot,carrier.CurrentCellPosition,paths,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()});
+    if(nextDelivery.SensorAction!=SensorActionType.Disembark||nextDelivery.SubSteps.Count!=1
+        ||nextDelivery.SubSteps[0].TargetInstanceId!=extra.InstanceId.ToString()
+        ||nextDelivery.SubSteps[0].TargetHex!=second.CurrentCellPosition)
+        throw new System.Exception("Ferido retido nao assumiu entrega seguinte no hospital elegivel.");
+    Set(main,"isEmbarked",true);
+    // Two free hospitals next to a common LZ: prefer both in repair.
+    ally.gameObject.SetActive(false);UnitOccupancyRules.NotifyUnitOccupancyChanged(ally,first.CurrentCellPosition,first.CurrentCellPosition);
+    var twoHospitals=Decide(paths);
+    if(twoHospitals.SubSteps.Count!=2||!twoHospitals.SubSteps.Exists(step=>step.TargetHex==first.CurrentCellPosition)
+        ||!twoHospitals.SubSteps.Exists(step=>step.TargetHex==second.CurrentCellPosition))
+        throw new System.Exception("Nao preferiu dois hospitais livres em vez de soltar no chao.");
+    ally.gameObject.SetActive(true);Set(ally,"boardTilemap",map);Set(ally,"currentCellPosition",first.CurrentCellPosition);Set(ally,"isDead",false);
+    UnitOccupancyRules.NotifyUnitOccupancyChanged(ally,first.CurrentCellPosition,first.CurrentCellPosition);
+    Set(extra,"currentHP",10);Set(extra,"isUnderRepair",false);
+    var healthyCargo=Decide(paths);
+    if(healthyCargo.SubSteps.Count!=1||healthyCargo.SubSteps[0].TargetInstanceId!=main.InstanceId.ToString())
+        throw new System.Exception("Passageiro saudavel foi descarregado pelo EVAC.");
     second.DebugSetSellingRule(ConstructionUnitMarketRule.FreeMarket,ownSlot);
     Set(second,"sector",ConstructionSector.Base0);Set(ai,"conscriptionDoctrine",true);
     if(!(bool)typeof(AIController).GetMethod("IsConscriptionClosedProducerConstruction",flags).Invoke(ai,new object[]{second,TeamId.Blue}))
@@ -129,6 +165,17 @@ try{
     var invadedNeighbors=new System.Collections.Generic.List<UnityEngine.Vector3Int>();
     UnitMovementPathRules.GetImmediateHexNeighbors(map,first.CurrentCellPosition,invadedNeighbors);
     var invasion=invadedNeighbors[0];
+    Set(extra,"currentHP",1);Set(extra,"isUnderRepair",true);
+    pairPerf.GetMethod("Begin").Invoke(null,null);
+    var twoInRing=Decide(paths);
+    if(!pairCounters.TryGetValue("EvacRepairCellsBuilds",out builds)||builds!=1
+        ||!pairCounters.TryGetValue("RepairConstructionRankings",out ranks)||ranks!=2)
+        throw new System.Exception("Fallback HQ reconstruiu o mapa de reparo da mesma decisao.");
+    pairPerf.GetMethod("End").Invoke(null,null);
+    if(twoInRing.SensorAction!=SensorActionType.Disembark||twoInRing.SubSteps.Count!=2
+        ||twoInRing.SubSteps[0].TargetHex==twoInRing.SubSteps[1].TargetHex)
+        throw new System.Exception("Fallback do HQ nao descarregou os dois feridos.");
+    Set(extra,"currentHP",10);Set(extra,"isUnderRepair",false);
     var danger=Unit(800103,soldier,invasion,false);
     Set(danger,"slotIndex",ownSlot==0?1:0);Set(danger,"teamId",TeamId.Yellow);
     UnitManager.AllActive.Add(danger);snapshot.EnemyUnits.Add(danger);
@@ -145,7 +192,8 @@ try{
     hotMap[leastThreatCell]=1f;
     var contested=(PlayerAction)lastResort.Invoke(ai,new object[]{carrier,main,snapshot,carrier.CurrentCellPosition,paths,
         new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),
-        new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<PodeDesembarcarOption>>(),hotMap,true});
+        new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<PodeDesembarcarOption>>(),hotMap,true,
+        new System.Collections.Generic.Dictionary<int,System.Collections.Generic.HashSet<UnityEngine.Vector3Int>>{{main.InstanceId,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()}}});
     if(contested.SensorAction!=SensorActionType.Disembark||contested.SubSteps[0].TargetHex!=leastThreatCell)
         throw new System.Exception("Fallback nao entregou na celula livre com menor ameaca, aceitando rota contestada.");
     UnitManager.AllActive.Remove(danger);snapshot.EnemyUnits.Remove(danger);
@@ -169,7 +217,8 @@ try{
     hotMap[carrier.CurrentCellPosition]=200f;
     var hotEscape=(PlayerAction)lastResort.Invoke(ai,new object[]{carrier,main,snapshot,carrier.CurrentCellPosition,shortPaths,
         new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),
-        new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<PodeDesembarcarOption>>(),hotMap,true});
+        new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<PodeDesembarcarOption>>(),hotMap,true,
+        new System.Collections.Generic.Dictionary<int,System.Collections.Generic.HashSet<UnityEngine.Vector3Int>>{{main.InstanceId,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()}}});
     if(hotEscape.SensorAction==SensorActionType.None&&hotEscape.MoveTo==carrier.CurrentCellPosition)
         throw new System.Exception("Fallback devolveu espera em origem ameacada com rotas disponiveis.");
     var routeFixture=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>{
@@ -181,8 +230,23 @@ try{
     var safeRoutes=(System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>)typeof(AIController).GetMethod("BuildSafeAirEvacPaths",flags).Invoke(ai,new object[]{origin,routeFixture,TeamId.Blue,threats});
     if(safeRoutes.ContainsKey(hot)||safeRoutes.ContainsKey(beyond)||!safeRoutes.ContainsKey(safeEnd))
         throw new System.Exception("Rota atravessou ameaca para chegar a destino seguro, ou perdeu alternativa segura.");
+    // Terrestrial EVAC: parking/selection share the entry-point repair map.
+    var apc=Asset<UnitData>("apc");
+    Set(unitDb,"units",new System.Collections.Generic.List<UnitData>{soldier,chinook,apc});
+    typeof(UnitDatabase).GetMethod("RebuildLookup",flags).Invoke(unitDb,null);
+    Set(carrier,"unitId",apc.id);Set(carrier,"currentDomain",Domain.Land);Set(carrier,"currentHeightLevel",HeightLevel.Surface);
+    Set(extra,"currentHP",1);Set(extra,"isUnderRepair",true);
+    Set(carrier,"transportedUnitSlots",new System.Collections.Generic.List<UnitTransportSeatRuntime>{
+        new UnitTransportSeatRuntime{slotId=apc.transportSlots[0].slotId,slotIndex=0,seatIndex=0,embarkedUnit=main}});
+    var groundPaths=UnitMovementPathRules.CalcularCaminhosValidos(map,carrier,carrier.RemainingMovementPoints,terrain);
+    pairPerf.GetMethod("Begin").Invoke(null,null);
+    typeof(AIController).GetMethod("DecideEvacCourierAction",flags).Invoke(ai,new object[]{carrier,main,new System.Collections.Generic.List<UnitManager>{main,extra},snapshot,carrier.CurrentCellPosition,groundPaths,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()});
+    if(!pairCounters.TryGetValue("EvacRepairCellsBuilds",out builds)||builds!=1
+        ||!pairCounters.TryGetValue("RepairConstructionRankings",out ranks)||ranks!=1)
+        throw new System.Exception("EVAC terrestre reconstruiu repairCells/ranking na mesma decisao: builds="+builds+" ranks="+ranks);
+    pairPerf.GetMethod("End").Invoke(null,null);
     if(!main.IsEmbarked||main.CurrentHP!=1)throw new System.Exception("Planejamento alterou passageiro confirmado.");
-    return "PASS: cidade ocupada descartada; entrega direta na fabrica livre a partir de LZ vizinha; alcance curto aproxima mantendo carga; nova ocupacao troca destino; sem hospital nem HQ de referencia mantem carga; conscricao e pressao respeitadas; paciente ja atendido rejeitado; aproximacao sem sondagem distante; fallback descarrega no anel HQ e aproxima quando longe; base invadida entrega no anel contestado; todas as rotas ameacadas ainda entregam; origem ameacada nao espera; caminho com ameaca rejeitado mesmo com destino seguro; passageiro inalterado.";
+    return "PASS: cidade ocupada descartada; entrega direta na fabrica livre a partir de LZ vizinha; alcance curto aproxima mantendo carga; nova ocupacao troca destino; sem hospital nem HQ de referencia mantem carga; conscricao e pressao respeitadas; paciente ja atendido rejeitado; aproximacao sem sondagem distante; fallback descarrega no anel HQ e aproxima quando longe; base invadida entrega no anel contestado; todas as rotas ameacadas ainda entregam; origem ameacada nao espera; caminho com ameaca rejeitado mesmo com destino seguro; uma vaga retem secundario, que assume entrega seguinte; dois hospitais entregam dupla; repairCells unica no aereo, HQ e terrestre; ranking auxiliar silencioso; dupla no anel HQ; saudavel permanece a bordo; passageiro inalterado.";
 }finally{
     UnityEngine.Application.logMessageReceived-=captureLog;
     foreach(var pair in fogRestore)Set(pair.Key,"debugFogOfWarEnabled",pair.Value);

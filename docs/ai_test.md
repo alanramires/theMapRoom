@@ -242,3 +242,15 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 
 - Fallback final em degraus: prefere o anel seguro; sob invasão usa células livres permitidas do anel, minimizando primeiro ameaça da descida, depois pico/total de ameaça da rota e custo. Ameaça positiva e inimigo perto não vetam esse último recurso. Ocupação, produtores fechados e PodeDesembarcar continuam obrigatórios. Sem desembarque imediato, aproxima/escapa; uma origem ameaçada não gera espera quando há movimento permitido.
 - Testes PASS adicionais: inimigo a 1 hex do HQ entrega no anel; log `anel contestado, menor ameaça`; todas as rotas com ameaça positiva ainda entregam na célula de menor ameaça; origem ameaçada com movimento disponível não espera. Compilação via `bash tools/compilar.sh` passou nas duas assemblies. Validado fora do Play.
+
+### 2026-11-07 — entrega conjunta de feridos no EVAC
+- O EVAC passa a comparar LZs pela quantidade de feridos desembarcados em células distintas, depois pela quantidade entregue diretamente em reparo; o ranking de hospitais desempata entregas equivalentes.
+- Reutiliza o matching do `MelhorDesembarqueService` sobre as opções já sondadas, sem novo scan de movimento/topologia/sensor. Preferência opcional de spot separa reparo de terreno livre, sem falsificar custo de rota; consumidores sem preferência mantêm o comportamento.
+- Sem duas vagas de reparo, o principal desce no hospital e o secundário ferido permanece a bordo para a próxima entrega. Terreno livre só é aceito pelo fallback final do anel do HQ. Mantém as travas de segurança da entrega comum e a política de hospitais. Passageiros saudáveis não entram na entrega de EVAC.
+- Seleção compartilhada dos EVACs terrestre/naval recebe o snapshot existente e também combina feridos; estacionamento ao lado do hospital considera a quantidade entregue.
+- `verificar_evac_predio_vago.cs`: PASS fora do Play, incluindo dois hospitais, secundário retido sem vaga e atendido na entrega seguinte, dois feridos no anel HQ, spots exclusivos, passageiro saudável retido e estado confirmado inalterado. `verificar_passageiro_prioritario.cs`: PASS.
+- `bash tools/compilar.sh`: Assembly-CSharp e Assembly-CSharp-Editor passaram. Ainda sem validação desta alteração em partida real.
+
+- Revisão do EVAC conjunto: `repairCells` é construída uma vez na entrada de cada decisão aérea/terrestre/naval e passada a estacionamento, seleção e fallback HQ. O hospital principal já ranqueado é reutilizado; só o secundário exige o ranking próprio. Ranking auxiliar usa `log: false`; `FindRepairConstruction` preserva o diagnóstico normal da escolha.
+- Regressão PASS com contadores: aéreo com dois feridos e fallback HQ fazem 1 `EvacRepairCellsBuilds` e 2 `RepairConstructionRankings`; APC (um banco) faz 1 de cada, sem reconstrução na seleção/estacionamento. Consulta auxiliar não imprime `[Repair] skip`. Uma vaga retém secundário, que assume a entrega seguinte; duas vagas e fallback no anel continuam descarregando dois.
+- `bash tools/compilar.sh`: ambas assemblies passaram. Testes executados fora do Play; sem observação desta revisão em partida real.

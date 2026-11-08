@@ -331,7 +331,11 @@ public partial class AIController
         HashSet<Vector3Int> occupied)
     {
         ConstructionManager repairDest = FindRepairConstruction(
-            evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied));
+            evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied),
+            rejectBaseCluster: !IsEliteRepairUnit(evacuee) && IsBaseUnderPressureForRepair(snapshot),
+            lineSnapshot: snapshot);
+        var repairCells = BuildEvacRepairCells(unit, evacuee, snapshot, fromCell,
+            repairDest != null ? new List<ConstructionManager> { repairDest } : new List<ConstructionManager>());
         Vector3Int target = repairDest != null
             ? repairDest.CurrentCellPosition
             : FindTransportWaitTarget(snapshot.AITeam, fromCell);
@@ -342,7 +346,7 @@ public partial class AIController
         if (here.Count > 0)
         {
             List<PodeDesembarcarOption> selected =
-                SelectEvacDisembarkForPassenger(here, evacuee, target, snapshot.AITeam);
+                SelectEvacDisembarkForPassenger(here, evacuee, target, snapshot, repairCells);
             if (selected.Count > 0)
             {
                 Vector3Int dropCell = selected[0].disembarkCell;
@@ -378,7 +382,7 @@ public partial class AIController
                     continue;
 
                 List<PodeDesembarcarOption> selected =
-                    SelectEvacDisembarkForPassenger(options, evacuee, target, snapshot.AITeam);
+                    SelectEvacDisembarkForPassenger(options, evacuee, target, snapshot, repairCells);
                 if (selected.Count == 0)
                     continue;
 

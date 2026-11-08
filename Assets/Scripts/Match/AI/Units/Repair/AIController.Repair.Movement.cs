@@ -587,8 +587,10 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         bool rejectBaseCluster = false,
         Dictionary<Vector3Int, int> defenseReservedCells = null,
-        AIWorldSnapshot lineSnapshot = null)
+        AIWorldSnapshot lineSnapshot = null,
+        bool log = true)
     {
+        AIDecisionPerf.AddCount("RepairConstructionRankings");
         var scored = new List<(ConstructionManager building, float score, int order)>();
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
         bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
@@ -627,7 +629,7 @@ public partial class AIController
             bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
             if (rejectBaseCluster && IsBaseClusterConstruction(c))
             {
-                Debug.Log($"[Repair] skip {cc} base/âncora/HQ fechado p/ não-elite sob pressão dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} base/âncora/HQ fechado p/ não-elite sob pressão dist={dist:F1}");
                 continue;
             }
             bool conscriptionClosed = conscriptionProducerBan
@@ -635,14 +637,14 @@ public partial class AIController
             bool logisticsProducer = logisticsProducerBan && c.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam));
             if (conscriptionClosed && !eliteRelaxSafety)
             {
-                Debug.Log($"[Repair] skip {cc} base/âncora de produção fechada pela conscrição dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} base/âncora de produção fechada pela conscrição dist={dist:F1}");
                 continue;
             }
             // Elite: base fechada NÃO é descartada — fica como ÚLTIMO recurso (penalidade pesada
             // no score abaixo). Sem isso o elite ferido não achava NENHUM destino (só sobravam base
             // fechada + ocupados + neutros) e recuava pro HQ fechado sem reparar.
             if (conscriptionClosed && eliteRelaxSafety)
-                Debug.Log($"[Repair] {cc} base fechada pela conscrição, mas ELEGÍVEL p/ elite (último recurso) dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] {cc} base fechada pela conscrição, mas ELEGÍVEL p/ elite (último recurso) dist={dist:F1}");
             bool isAircraftFacility = IsAircraftRepairConstruction(c);
             bool isPreferredAircraftFacility = IsPreferredAircraftRepairConstruction(c, aiTeam);
             if (restrictToPreferredAircraftFacility && !isPreferredAircraftFacility)
@@ -650,12 +652,12 @@ public partial class AIController
 
             if (c.SlotIndex != ResolveAISlotKey(aiTeam))
             {
-                Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
                 continue;
             }
             if (c.CurrentCapturePoints < c.CapturePointsMax)
             {
-                Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
                 continue;
             }
             PosicaoNaLinha linePosition = useRepairLine && !isHomeRepair
@@ -663,7 +665,7 @@ public partial class AIController
                 : PosicaoNaLinha.SemLinha;
             if (linePosition == PosicaoNaLinha.Vanguarda)
             {
-                Debug.Log($"[Repair] skip {cc} à frente da linha de combatentes (não-elite recua) dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} à frente da linha de combatentes (não-elite recua) dist={dist:F1}");
                 continue;
             }
             bool behindLine = linePosition == PosicaoNaLinha.AtrasDaLinha;
@@ -674,42 +676,42 @@ public partial class AIController
                 && !behindLine
                 && !IsRepairConstructionSectorSafe(c, aiTeam))
             {
-                Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
                 continue;
             }
             if (!isHomeRepair && rebelIgnoresSectorSafety)
-                Debug.Log($"[Repair] rebelde aceita {cc} apesar do setor={c.Sector}; avaliando servico e ameaca local.");
+                if (log) Debug.Log($"[Repair] rebelde aceita {cc} apesar do setor={c.Sector}; avaliando servico e ameaca local.");
             bool occupiedCell = occupied.Contains(cc) && cc != fromCell;
             if (occupiedCell && !isHomeRepair)
             {
-                Debug.Log($"[Repair] skip {cc} ocupado dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} ocupado dist={dist:F1}");
                 continue;
             }
             if (occupiedCell && isHomeRepair)
-                Debug.Log($"[Repair] home {cc} ocupado, mantendo como fallback de reparo dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] home {cc} ocupado, mantendo como fallback de reparo dist={dist:F1}");
 
             bool safe = !HasNearbyVisibleEnemy(cc, aiTeam, DefenseEnemyRange);
             if (!safe && !isHomeRepair && !eliteRelaxSafety && behindLine)
             {
                 if (HasNearbyVisibleEnemy(cc, aiTeam, 1))
                 {
-                    Debug.Log($"[Repair] skip {cc} atrás da linha, mas com inimigo encostado dist={dist:F1}");
+                    if (log) Debug.Log($"[Repair] skip {cc} atrás da linha, mas com inimigo encostado dist={dist:F1}");
                     continue;
                 }
-                Debug.Log($"[Repair] {cc} atrás da linha de combatentes: ELEGÍVEL apesar de inimigo a ≤{DefenseEnemyRange} dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] {cc} atrás da linha de combatentes: ELEGÍVEL apesar de inimigo a ≤{DefenseEnemyRange} dist={dist:F1}");
             }
             else if (!safe && !isHomeRepair && !eliteRelaxSafety)
             {
-                Debug.Log($"[Repair] skip {cc} unsafe (não-home) dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} unsafe (não-home) dist={dist:F1}");
                 continue;
             }
             if (!safe && !isHomeRepair && eliteRelaxSafety)
-                Debug.Log($"[Repair] {cc} sob ameaça mas ELEGÍVEL (elite segura base avançada) dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] {cc} sob ameaça mas ELEGÍVEL (elite segura base avançada) dist={dist:F1}");
             // VTOL: elegibilidade é PODER POUSAR ali (o resolver decide — regras da
             // construção + skills). Cidade que permite pouso entra; sem pouso, fora.
             if (vtolStyle && !AirOperationResolver.CanLand(unit, boardTilemap, terrainDatabase, cc))
             {
-                Debug.Log($"[Repair] skip {cc} VTOL sem pouso permitido dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] skip {cc} VTOL sem pouso permitido dist={dist:F1}");
                 continue;
             }
             float aircraftTakeoffScore = 0f;
@@ -717,7 +719,7 @@ public partial class AIController
             {
                 if (!TryScoreRepairCandidateTakeoff(unit, cc, out aircraftTakeoffScore, out _, out string takeoffReason))
                 {
-                    Debug.Log($"[Repair] skip {cc} aircraftTakeoff=blocked ({takeoffReason}) dist={dist:F1}");
+                    if (log) Debug.Log($"[Repair] skip {cc} aircraftTakeoff=blocked ({takeoffReason}) dist={dist:F1}");
                     continue;
                 }
             }
@@ -728,7 +730,7 @@ public partial class AIController
                 disembarkablePassengers = CountRepairPassengerDisembarkOptions(unit, fromCell, cc);
                 if (disembarkablePassengers <= 0)
                 {
-                    Debug.Log($"[Repair] skip {cc} carga presa: PodeDesembarcar=0/{passengerCount} dist={dist:F1}");
+                    if (log) Debug.Log($"[Repair] skip {cc} carga presa: PodeDesembarcar=0/{passengerCount} dist={dist:F1}");
                     continue;
                 }
             }
@@ -756,7 +758,7 @@ public partial class AIController
             if (defenseReservedCells != null && defenseReservedCells.TryGetValue(cc, out int reserveOwnerId))
             {
                 score -= DefenseReserveRepairPenalty;
-                Debug.Log($"[Repair] {cc} reservado (defesa {c.Sector}, dono=Unit#{reserveOwnerId}) — penalizado, não excluído dist={dist:F1}");
+                if (log) Debug.Log($"[Repair] {cc} reservado (defesa {c.Sector}, dono=Unit#{reserveOwnerId}) — penalizado, não excluído dist={dist:F1}");
             }
             float aircraftCohesion = 0f;
             // VTOL não recebe o viés de aeroporto (+70k/+20k): repara no prédio pousável

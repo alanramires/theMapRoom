@@ -14,6 +14,7 @@ public sealed class MelhorDesembarqueSpotScore
     public PodeDesembarcarOption option;
     public Vector3Int target;
     public int routeCost;
+    public int preferenceCost;
 }
 
 public sealed class MelhorDesembarqueLzScore
@@ -23,6 +24,7 @@ public sealed class MelhorDesembarqueLzScore
     public int delivered;
     public int passengerPriorityCost;
     public int totalRouteCost;
+    public int preferenceCost;
     public int routeProgress;
     public int displayScore;
     public float score;
@@ -44,6 +46,8 @@ public sealed class MelhorDesembarqueRequest
     // Quando definido, a LZ pertence a este passageiro principal. Os demais
     // apenas pegam carona no mesmo desembarque se o matching tambem os servir.
     public int requiredPassengerInstanceId = -1;
+    // Optional consumer preference, after delivered count and passenger priority.
+    public Func<UnitManager, Vector3Int, int> disembarkPreferenceCost;
     public Func<Vector3Int, bool> allowTransporterCell;
     public Func<Vector3Int, bool> allowDisembarkCell;
     public Func<UnitManager, Vector3Int, bool> allowPassengerDisembarkCell;
@@ -316,9 +320,21 @@ public static class MelhorDesembarqueService
         int byPassengerPriority =
             a.passengerPriorityCost.CompareTo(b.passengerPriorityCost);
         if (byPassengerPriority != 0) return byPassengerPriority;
+        int byPreference = a.preferenceCost.CompareTo(b.preferenceCost);
+        if (byPreference != 0) return byPreference;
         int byRoute = a.totalRouteCost.CompareTo(b.totalRouteCost);
         if (byRoute != 0) return byRoute;
         return a.moveCost.CompareTo(b.moveCost);
+    }
+
+    // Reuse the matching authority on already-collected sensor options.
+    // No second movement scan, topology scan or disembark probe.
+    public static MelhorDesembarqueLzScore MatchOptions(
+        MelhorDesembarqueRequest request, List<PodeDesembarcarOption> options)
+    {
+        var result = new MelhorDesembarqueLzScore();
+        SolveBestMatching(request, result, options, null);
+        return result;
     }
 
     private static void SolveBestMatching(
@@ -390,7 +406,9 @@ public static class MelhorDesembarqueService
             {
                 option = option,
                 target = target,
-                routeCost = routeCost
+                routeCost = routeCost,
+                preferenceCost = request.disembarkPreferenceCost != null
+                    ? request.disembarkPreferenceCost(option.passengerUnit, spotCell) : 0
             });
         }
 
@@ -445,9 +463,11 @@ public static class MelhorDesembarqueService
             int count = current.Count;
             int cost = 0;
             int priorityCost = 0;
+            int preferenceCost = 0;
             for (int i = 0; i < current.Count; i++)
             {
                 cost += current[i].routeCost;
+                preferenceCost += current[i].preferenceCost;
                 priorityCost += ResolvePassengerPriority(
                     request, current[i].option.passengerUnit);
             }
@@ -456,11 +476,16 @@ public static class MelhorDesembarqueService
                     && priorityCost > best.passengerPriorityCost)
                 || (count == best.delivered
                     && priorityCost == best.passengerPriorityCost
+                    && preferenceCost > best.preferenceCost)
+                || (count == best.delivered
+                    && priorityCost == best.passengerPriorityCost
+                    && preferenceCost == best.preferenceCost
                     && cost >= best.totalRouteCost))
                 return;
 
             best.delivered = count;
             best.passengerPriorityCost = priorityCost;
+            best.preferenceCost = preferenceCost;
             best.totalRouteCost = cost;
             best.spots.Clear();
             best.spots.AddRange(current);
