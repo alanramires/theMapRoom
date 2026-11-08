@@ -1317,26 +1317,20 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         planning.SupplyBaseDefense =
             IsLogisticsBaseDefenseEmergency(snapshot);
-        planning.SupplyTarget = FindLogisticsServiceTarget(
+        planning.SupplyTarget = FindLogisticsServiceTargetWithTiming(
             unit,
             snapshot,
             planning.Origin,
             planning.TransporterReach,
             occupied,
             planning.SupplyBaseDefense,
+            out LogisticsServiceTiming serviceTiming,
             AIReachDecisionStages.Operational);
         if (planning.SupplyTarget == null)
             return;
 
-        Vector3Int targetCell =
-            planning.SupplyTarget.CurrentCellPosition;
-        targetCell.z = 0;
-        planning.SupplyTier =
-            SectorManager.HexDistance(
-                planning.Origin, targetCell)
-            <= planning.MovementBudget
-                ? AIReachDecisionTier.Tactical
-                : AIReachDecisionTier.Operational;
+        planning.SupplyTier = serviceTiming.Turns <= 1
+            ? AIReachDecisionTier.Tactical : AIReachDecisionTier.Operational;
     }
 
     private QueroCaronaResult GetOrEvaluateTransportRideNeed(

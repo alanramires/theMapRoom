@@ -19,12 +19,46 @@ public partial class AIController
         AIReachDecisionStages stages =
             AIReachDecisionStages.Operational
             | AIReachDecisionStages.Strategic)
+        => FindLogisticsServiceTargetWithTiming(logistics, snapshot, fromCell,
+            paths, occupied, baseDefense, out _, stages);
+
+    private UnitManager FindLogisticsServiceTargetWithTiming(
+        UnitManager logistics,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        bool baseDefense,
+        out LogisticsServiceTiming selectedTiming,
+        AIReachDecisionStages stages =
+            AIReachDecisionStages.Operational
+            | AIReachDecisionStages.Strategic)
     {
+        selectedTiming = default;
         if (logistics == null || snapshot == null || snapshot.MyUnits == null)
             return null;
 
-        var compatibilityByTargetId =
-            new Dictionary<int, bool>();
+        UnitReachEnvelope envelope =
+            UnitReachEnvelopeService.Build(new UnitReachRequest
+            {
+                Unit = logistics,
+                BoardMap = boardTilemap,
+                TerrainDatabase = terrainDatabase,
+                Intent = ReachIntent.Service,
+                SubStep = AIActionReachCoordinator.UsesCubicSectorReach(logistics)
+                    ? ReachSubStep.Aereo : ReachSubStep.Terrestre,
+                Band = ReachBand.Operational,
+                OperationalTurns = 2,
+                // A IA valida dominio/camada por candidato, via PodeSuprir
+                // (CanSupplyLogisticsTargetFromAnyLegalOrigin). Ligar o
+                // filtro aqui mudaria o conjunto de candidatos.
+                FilterByOperationDomain = false
+            });
+        if (envelope == null || envelope.ActionCells.Count == 0)
+            return null;
+
+        var timingByTargetId = new Dictionary<int, LogisticsServiceTiming>();
+        var targetsByOrigin = new Dictionary<Vector3Int, List<UnitManager>>();
         bool IsCandidate(UnitManager ally)
         {
             bool structurallyEligible = ally != null
@@ -40,26 +74,25 @@ public partial class AIController
             if (!structurallyEligible)
                 return false;
 
-            if (!compatibilityByTargetId.TryGetValue(
-                    ally.InstanceId, out bool compatible))
+            if (!timingByTargetId.TryGetValue(ally.InstanceId, out LogisticsServiceTiming timing))
             {
-                compatible =
-                    CanSupplyLogisticsTargetFromAnyLegalOrigin(
-                        logistics, ally, snapshot,
-                        out string compatibilityReason);
-                compatibilityByTargetId[ally.InstanceId] =
-                    compatible;
+                bool compatible = CanSupplyLogisticsTargetFromAnyLegalOrigin(
+                    logistics, ally, snapshot, envelope, targetsByOrigin,
+                    out string compatibilityReason, out int turns, out Vector3Int origin);
+                timing = new LogisticsServiceTiming(compatible, turns, origin);
+                timingByTargetId[ally.InstanceId] = timing;
                 if (!compatible && showAILogs)
+                    Debug.Log($"{TL("Logistics")} {logistics.InstanceId} descarta {ally.UnitDisplayName}#{ally.InstanceId}: PodeSuprir sem origem compativel ({compatibilityReason}).");
+                if (compatible && turns > 1
+                    && ResolveLogisticsNeed(snapshot, ally).Tier == LogisticsNeedTier.AircraftAutonomy)
                 {
-                    Debug.Log($"{TL("Logistics")} " +
-                              $"{logistics.InstanceId} descarta " +
-                              $"{ally.UnitDisplayName}#{ally.InstanceId}: " +
-                              $"PodeSuprir sem origem compativel " +
-                              $"({compatibilityReason}).");
+                    if (showAILogs)
+                        Debug.Log($"{TL("Logistics")} {logistics.InstanceId} descarta #{ally.InstanceId}: cai antes do atendimento (prazo=Operacional); pouso de emergencia cuida da aeronave.");
+                    timing = new LogisticsServiceTiming(false, turns, origin);
+                    timingByTargetId[ally.InstanceId] = timing;
                 }
             }
-
-            return compatible;
+            return timing.Compatible;
         }
 
         float ScoreCandidate(UnitManager ally)
@@ -68,7 +101,8 @@ public partial class AIController
             allyCell.z = 0;
             LogisticsNeed need = ResolveLogisticsNeed(snapshot, ally);
             int cubic = AIActionReachCoordinator.CubicDistance(fromCell, allyCell);
-            return need.WithContext(-cubic * 45f - ally.InstanceId * 0.001f);
+            return need.WithDeadline(timingByTargetId[ally.InstanceId].Turns,
+                -cubic * 45f - ally.InstanceId * 0.001f);
         }
 
         bool EvaluateOperational(
@@ -82,26 +116,6 @@ public partial class AIController
             // Operational deixou de ser MP x2 num bolso so e passou a ser soma
             // de turnos (restante agora + MP cheio depois), que e o alcance que
             // a unidade realmente tem.
-            UnitReachEnvelope envelope =
-                UnitReachEnvelopeService.Build(new UnitReachRequest
-                {
-                    Unit = logistics,
-                    BoardMap = boardTilemap,
-                    TerrainDatabase = terrainDatabase,
-                    Intent = ReachIntent.Service,
-                    SubStep =
-                        AIActionReachCoordinator.UsesCubicSectorReach(logistics)
-                            ? ReachSubStep.Aereo
-                            : ReachSubStep.Terrestre,
-                    Band = ReachBand.Operational,
-                    OperationalTurns = 2,
-                    // A IA valida dominio/camada por candidato, via PodeSuprir
-                    // (CanSupplyLogisticsTargetFromAnyLegalOrigin). Ligar o
-                    // filtro aqui mudaria o conjunto de candidatos.
-                    FilterByOperationDomain = false
-                });
-            if (envelope == null || envelope.ActionCells.Count == 0)
-                return false;
 
             UnitManager best = null;
             float bestScore = float.MinValue;
@@ -110,10 +124,7 @@ public partial class AIController
                 UnitManager ally = snapshot.MyUnits[i];
                 if (!IsCandidate(ally))
                     continue;
-                Vector3Int allyCell =
-                    ally.CurrentCellPosition;
-                allyCell.z = 0;
-                if (!envelope.CanAct(allyCell))
+                if (timingByTargetId[ally.InstanceId].Turns > 2)
                     continue;
                 float score = ScoreCandidate(ally);
                 if (score <= bestScore)
@@ -131,10 +142,8 @@ public partial class AIController
             // quantos turnos. A banda REAL vem dele: o envelope Operational
             // contem o Tactical, entao a maior parte das respostas se completa
             // nesta rodada — o rotulo da etapa do coordenador nao descreve isso.
-            string origin = envelope.TryGetOrigin(target, out ReachOrigin from)
-                ? $" de={from.FromCell} sobra={from.RemainingMovement}" +
-                  $" turnos={(envelope.TryGetTurns(from.FromCell, out int t) ? t : 1)}"
-                : string.Empty;
+            LogisticsServiceTiming timing = timingByTargetId[best.InstanceId];
+            string origin = $" de={timing.Origin} turnos={timing.Turns}";
             candidate = new AIReachDecisionCandidate<UnitManager>
             {
                 Value = best,
@@ -142,7 +151,7 @@ public partial class AIController
                 TargetCell = target,
                 Score = bestScore,
                 Reason =
-                    $"service_hotzone banda={envelope.ResolveActionBand(target)}{origin}"
+                    $"service_hotzone prazo={(timing.Turns <= 1 ? "Tactical" : "Operational")}{origin}"
             };
             return true;
         }
@@ -207,20 +216,36 @@ public partial class AIController
                 });
         if (reach.Found && reach.Decision != null)
         {
+            selectedTiming = timingByTargetId[reach.Decision.Value.InstanceId];
             if (showAILogs)
-                Debug.Log($"{TL("Logistics")} aproximacao alvo=#{reach.Decision.Value.InstanceId} {ResolveLogisticsNeed(snapshot, reach.Decision.Value).Diagnostic}");
+                Debug.Log($"{TL("Logistics")} aproximacao alvo=#{reach.Decision.Value.InstanceId} {ResolveLogisticsNeed(snapshot, reach.Decision.Value).Diagnostic} prazo={(timingByTargetId[reach.Decision.Value.InstanceId].Turns <= 1 ? "Tactical" : "Operational")}");
             return reach.Decision.Value;
         }
         return null;
+    }
+
+    private readonly struct LogisticsServiceTiming
+    {
+        public readonly bool Compatible;
+        public readonly int Turns;
+        public readonly Vector3Int Origin;
+        public LogisticsServiceTiming(bool compatible, int turns, Vector3Int origin)
+        { Compatible = compatible; Turns = turns; Origin = origin; }
     }
 
     private bool CanSupplyLogisticsTargetFromAnyLegalOrigin(
         UnitManager logistics,
         UnitManager target,
         AIWorldSnapshot snapshot,
-        out string reason)
+        UnitReachEnvelope envelope,
+        Dictionary<Vector3Int, List<UnitManager>> targetsByOrigin,
+        out string reason,
+        out int serviceTurns,
+        out Vector3Int serviceOrigin)
     {
         reason = "sem origem candidata";
+        serviceTurns = int.MaxValue;
+        serviceOrigin = default;
         if (logistics == null
             || target == null
             || snapshot == null)
@@ -236,7 +261,6 @@ public partial class AIController
         origins.Add(targetCell);
         origins.AddRange(neighbors);
         var visited = new HashSet<Vector3Int>();
-        int limit = Mathf.Max(1, GetLogisticsServiceLimit(logistics));
         string lastSensorReason = reason;
 
         for (int i = 0; i < origins.Count; i++)
@@ -256,17 +280,19 @@ public partial class AIController
                     logistics, origin, occupants))
                 continue;
 
-            List<UnitManager> validTargets =
-                CollectLogisticsTargetsBySupplySensorAtCell(
-                    logistics,
-                    snapshot,
-                    origin,
-                    limit,
-                    allowPreventiveMaintenance: true,
-                    out _,
-                    out _,
-                    out string sensorReason);
-            lastSensorReason = sensorReason;
+            // Reuse each origin's sensor response across targets. No new
+            // path search per patient; turns come from the shared envelope.
+            int turns = envelope.TryGetTurns(origin, out int arrivalTurns)
+                ? arrivalTurns : int.MaxValue - 1;
+            if (turns >= serviceTurns) continue;
+            if (!targetsByOrigin.TryGetValue(origin, out List<UnitManager> validTargets))
+            {
+                validTargets = CollectLogisticsTargetsBySupplySensorAtCell(
+                    logistics, snapshot, origin, int.MaxValue,
+                    allowPreventiveMaintenance: true, out _, out _, out string sensorReason);
+                targetsByOrigin[origin] = validTargets;
+                lastSensorReason = sensorReason;
+            }
             for (int t = 0; t < validTargets.Count; t++)
             {
                 UnitManager valid = validTargets[t];
@@ -274,11 +300,15 @@ public partial class AIController
                     && valid.InstanceId == target.InstanceId)
                 {
                     reason = $"origem={origin}";
-                    return true;
+                    serviceTurns = turns;
+                    serviceOrigin = origin;
+                    if (turns <= 1) return true;
+                    break;
                 }
             }
         }
 
+        if (serviceTurns < int.MaxValue) return true;
         reason = string.IsNullOrWhiteSpace(lastSensorReason)
             ? "dominio/camada/terreno/servico incompativeis"
             : lastSensorReason;
@@ -555,7 +585,7 @@ public partial class AIController
         if (preferCurrentCell) context += 250f;
         if (!baseDefense && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor))
             context -= 2200f;
-        return primaryNeed.WithContext(context);
+        return primaryNeed.WithDeadline(1, context);
     }
 
     private static bool HasCriticalLogisticsTarget(List<UnitManager> targets)
@@ -627,7 +657,7 @@ public partial class AIController
         if (!showAILogs || targets == null) return;
         for (int i = 0; i < targets.Count; i++)
             if (targets[i] != null)
-                Debug.Log($"{TL("Logistics")} atendimento ordem={i + 1} alvo=#{targets[i].InstanceId} {ResolveLogisticsNeed(snapshot, targets[i]).Diagnostic}");
+                Debug.Log($"{TL("Logistics")} atendimento ordem={i + 1} prazo=Tactical alvo=#{targets[i].InstanceId} {ResolveLogisticsNeed(snapshot, targets[i]).Diagnostic}");
     }
 
     private string BuildLogisticsSupplyDebug(
@@ -819,7 +849,7 @@ public partial class AIController
 
             if (forward)
                 context -= critical ? 900f : 2600f;
-            float score = ResolveLogisticsNeed(snapshot, candidateTarget).WithContext(context);
+            float score = ResolveLogisticsNeed(snapshot, candidateTarget).WithDeadline(1, context);
 
             if (score > bestScore)
             {
@@ -875,7 +905,7 @@ public partial class AIController
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
         TeamId aiTeam = snapshot != null ? snapshot.AITeam : target.TeamId;
-        return ResolveLogisticsNeed(snapshot, target).WithContext(
+        return ResolveLogisticsNeed(snapshot, target).WithDeadline(1,
             CalculateThreatLevel(targetCell, aiTeam) * 35f
             - SectorManager.HexDistance(serviceCell, targetCell) * 10f
             - target.InstanceId * 0.001f);
@@ -907,8 +937,8 @@ public partial class AIController
         {
             Vector3Int ac = a.CurrentCellPosition; ac.z = 0;
             Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
-            float sa = ResolveLogisticsNeed(snapshot, a).WithContext(CalculateThreatLevel(ac, snapshot.AITeam) * 35f - a.InstanceId * 0.001f);
-            float sb = ResolveLogisticsNeed(snapshot, b).WithContext(CalculateThreatLevel(bc, snapshot.AITeam) * 35f - b.InstanceId * 0.001f);
+            float sa = ResolveLogisticsNeed(snapshot, a).WithDeadline(1, CalculateThreatLevel(ac, snapshot.AITeam) * 35f - a.InstanceId * 0.001f);
+            float sb = ResolveLogisticsNeed(snapshot, b).WithDeadline(1, CalculateThreatLevel(bc, snapshot.AITeam) * 35f - b.InstanceId * 0.001f);
             return sb.CompareTo(sa);
         });
 
@@ -1142,6 +1172,10 @@ public partial class AIController
         public float Score => (int)Tier * 1000000f
             + Mathf.Clamp(Severity + Value + Strategic, -100000f, 100000f);
         public float WithContext(float context) => Score + Mathf.Clamp(context, -10000f, 10000f);
+        // Tier gap is 1M; deadline gap is 300k, greater than the full
+        // within-tier/context spread (220k) and smaller than any tier gap.
+        public float WithDeadline(int turns, float context = 0f)
+            => WithContext(context) + (turns <= 1 ? 300000f : 0f);
         public string Diagnostic => $"faixa={Tier} gravidade={Severity:F0} valor={Value:F0} estrategico={Strategic:F0} necessidade={Score:F0}";
     }
 
