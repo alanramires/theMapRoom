@@ -441,6 +441,35 @@ public class UnitManager : MonoBehaviour
         isUnderRepair = value;
         if (recordTransition)
             JogadasManager.RegistrarEstadoReparo(this, before, value);
+        // A bordo, o indicador do transportador (T / EVAC) depende deste estado: o
+        // embarque e o desembarque ja refazem o HUD; entrar/sair do reparo a bordo, nao.
+        if (isEmbarked && embarkedTransporter != null)
+            embarkedTransporter.RefreshHudWidgetsOnly();
+    }
+
+    // Indicador EVAC (debug da IA): transportador da IA levando ferido, com "Show AI Unit
+    // HUD" ligado — o mesmo criterio do icone de manutencao. Fora disso, o "T" de sempre.
+    public bool ShouldShowAIEvacIndicator()
+    {
+        if (!AIController.ShowAIHUD || !IsCarryingRepairPatient())
+            return false;
+        if (matchController == null)
+            TryAutoAssignMatchController();
+        return matchController != null
+            && matchController.IsPlayerAI(PlayerSlotId.FromIndex(SlotIndex));
+    }
+
+    public bool IsCarryingRepairPatient()
+    {
+        if (transportedUnitSlots == null)
+            return false;
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitManager passenger = transportedUnitSlots[i] != null ? transportedUnitSlots[i].embarkedUnit : null;
+            if (passenger != null && passenger.IsEmbarked && !passenger.IsDead && passenger.IsUnderRepair)
+                return true;
+        }
+        return false;
     }
     public void SetAIAssignedPlan(string planKey, string planName, string badge, int role, bool badgeVisible)
     {

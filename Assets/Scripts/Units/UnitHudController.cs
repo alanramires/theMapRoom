@@ -88,6 +88,11 @@ public class UnitHudController : MonoBehaviour
     [Tooltip("Sprites por eixo: [0] = eixo 1, [1] = eixo 2, [2] = eixo 3.")]
     [SerializeField] private Sprite[] eixoSprites = new Sprite[3];
 
+    [Header("AI EVAC")]
+    [Tooltip("Sprite do indicador de transporte quando a unidade da IA leva ferido (IsUnderRepair) a bordo. "
+        + "So com 'Show AI Unit HUD' ligado; desligado (ou vazio), fica o indicador normal de transporte.")]
+    [SerializeField] private Sprite transportEvacSprite;
+
     [Header("Sorting")]
     [SerializeField] private bool applyHudSorting = true;
     [SerializeField] private string hudSortingLayerName = "SFX";
@@ -684,19 +689,23 @@ public class UnitHudController : MonoBehaviour
         {
             UnitManager owner = ResolveOwnerUnit();
             int passengerCount = owner != null ? owner.GetEmbarkedPassengerCount() : 0;
-            ApplyTransportIndicatorSprite(passengerCount);
+            bool evac = owner != null && owner.ShouldShowAIEvacIndicator();
+            ApplyTransportIndicatorSprite(passengerCount, evac);
         }
 
         if (transportIndicatorRoot.gameObject.activeSelf != show)
             transportIndicatorRoot.gameObject.SetActive(show);
     }
 
-    private void ApplyTransportIndicatorSprite(int passengerCount)
+    private void ApplyTransportIndicatorSprite(int passengerCount, bool evac)
     {
         if (transportIndicatorImage == null)
             return;
 
-        Sprite target = passengerCount >= 2 ? transportMultiSprite : transportSingleSprite;
+        // EVAC (debug da IA) vence o "T"; sem sprite atribuido, segue o indicador normal.
+        Sprite target = evac && transportEvacSprite != null
+            ? transportEvacSprite
+            : passengerCount >= 2 ? transportMultiSprite : transportSingleSprite;
         if (target != null && transportIndicatorImage.sprite != target)
             transportIndicatorImage.sprite = target;
     }
