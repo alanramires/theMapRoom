@@ -1,15 +1,27 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-07, **depois** da tag `v10.4.0`.
-Leia isto primeiro.
+Ponto de retomada. Atualizado em 2026-11-07, **depois** da tag `v10.5.0`.
+Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.4.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.4.0.md`](relatorio_v10.4.0.md),
-[`relatorio_v10.3.0.md`](relatorio_v10.3.0.md), [`relatorio_v10.2.0.md`](relatorio_v10.2.0.md).
+`v10.5.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
+ar (v9.2.0). Relatórios: [`relatorio_v10.5.0.md`](relatorio_v10.5.0.md),
+[`relatorio_v10.4.0.md`](relatorio_v10.4.0.md), [`relatorio_v10.3.0.md`](relatorio_v10.3.0.md).
+
+**A descoberta da v10.5.0: ferido não é carga.** O transporte que leva ferido está num resgate,
+e o ferido tem destino próprio — o do **reparo**. O EVAC aéreo (Codex, revisado antes de cada
+commit) escolhe o hospital pelo `RankRepairConstructions` (o mesmo ranking do
+`FindRepairConstruction`), para ao lado e solta o ferido no prédio; sem hospital, o **anel do HQ**
+é o último recurso e nunca falha (seguro → contestado → aproxima/foge); dois feridos descem juntos
+(sem vaga, o secundário fica a bordo; no anel, desce perto e vai a pé). E o reparo passou a ser
+**avaliado antes do Serviço do Comando curar**: quem chegava abaixo do gatilho era curado e pulava
+a faixa de reparo — o Chinook com soldados de 2 HP não virava EVAC. O Disruptor ganhou ordem
+estrita: em trânsito > capturando > resto (visto em Play). A cruz EVAC no HUD (debug da IA) mostra
+quem está em resgate. E a primeira versão do EVAC foi pega pela diretriz nova: escolhia hospital
+por fora do dono da pergunta.
 
 **A descoberta da v10.4.0: a Fase 2 jogava sem ver o inimigo.** O `AIWorldSnapshot.BuildLight`
 (o snapshot da Fase 2) omitia `EnemyUnits` sob a promessa "nenhum handler de role lê isso" — e
@@ -362,6 +374,21 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v10.5.0 deixou — o resgate
+
+1. **Serviço do Comando depois de load:** o autor viu o serviço rodar de novo após carregar. Se o
+   save era do meio do turno, a IA pode decidir o estágio de retomada (`RunAITurn`, `resumeStage`)
+   **antes** de o load restaurar `aiRuntimeStage` (`SaveGameManager.cs:2308`) — e cobrar o serviço
+   duas vezes. Sinal: `Stage 1 ja concluido pelo save` no Console. Não verificado.
+2. **Ver rodando:** anel do HQ (seguro e contestado), EVAC conjunto e dupla no anel — só nos
+   testes do Codex (`tools/ai_test/verificar_evac_predio_vago.cs`, fora do Play).
+3. **Volume do `AudioManager.prefab` 0,49 → 0,70** (`e78eb0a`): comitado como autoria; se veio do
+   slider do `Panel_Config` em Play, é estado de runtime gravado no prefab das três cenas.
+4. **`startOnPause: 1` na Batalha:** é o "IA parada depois do load" (F12 destrava). Desligar antes de
+   publicar (o checklist de publicação faz).
+5. **Doc do Disruptor:** nenhum doc de doutrina o descreve (só o rascunho). Lugar: `Assalto.md` ou
+   `Papeis.md`.
 
 ### O que a v10.4.0 deixou — a Fase 2 acorda
 
@@ -838,6 +865,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **estado avaliado depois de quem o muda** | o reparo era decidido na Fase 2, depois de o Serviço do Comando curar: quem chegava abaixo do gatilho saía curado e "sem ferimento". Estado que reage a um evento (dano, cura) tem de ser lido **antes** do passo que o altera |
+| **"a IA parou depois do load"** | primeiro F12 (AI Resume). Com `startOnPause: 1` todo Play novo nasce pausado; o `ai replan` destrava por reiniciar o estágio, não por consertar |
+| **outra IA escrevendo ao lado do dono** | a 1ª versão do EVAC aéreo escolhia hospital varrendo prédios por fora do `FindRepairConstruction` e perdia conscrição, pressão, linha e elite. Revisar o diff dela antes do commit |
 | **lista do snapshot vazia na Fase 2** | a Fase 2 usa `BuildLight`, não `Build`. Até `e72deff` ele não preenchia `EnemyUnits`, e oito sistemas liam vazio sem erro. Antes de confiar numa lista do snapshot, ver qual Build a montou |
 | **consulta com nome de lookup e custo de varredura** | `GetConstructionAtCell` fazia `FindObjectsByType` por chamada; num filtro por célula virou 13 s. Antes de pôr utilitário dentro de laço por célula, ler o corpo dele |
 | **ferramenta que recalcula o jogo** | Shopping Pressure e AI Step refaziam compra/névoa/terreno ao lado do jogo (FPS, FrameSpike de segundos). Ferramenta lê o fato de quem o produziu; só simula sob pedido |
@@ -1049,3 +1079,10 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
    `EnemyUnits`. Lista vazia não dá erro.
 6. **Toda recusa conta o motivo** no log. "Sem LZ" com um só motivo registrado esconde os outros.
 7. **Compile com `bash tools/compilar.sh`** e diga o que foi visto em Play e o que só compilou.
+8. **Leia o estado antes de quem o muda.** O reparo (`UpdateRepairState`) era avaliado depois de o
+   Serviço do Comando curar, e o ferido pulava a faixa de reparo. Estado que reage a dano ou cura
+   tem de ser lido no começo da Fase 1, não depois dela.
+9. **Destino de quem está ferido é do reparo, não de quem o carrega.** EVAC de qualquer
+   transporte (APC, Chinook, navio) usa `RankRepairConstructions` / `FindRepairConstruction` com
+   `rejectBaseCluster` e `lineSnapshot`; sem hospital, o anel do HQ pela régua do
+   `TryDecideRepairFallbackToHQ`.
