@@ -142,7 +142,7 @@ public partial class AIController
     }
 
     // Libera o edificio e tenta continuar a agenda normal da unidade:
-    // primeiro combate util em qualquer hex alcancavel, depois movimento de agenda.
+    // captura oportunista fora do hex cedido, combate util e, por ultimo, movimento de agenda.
     private PlayerAction DecideSwapVacateAction(UnitManager occupant, UnitManager incoming, AIWorldSnapshot snapshot)
     {
         Vector3Int fromCell = occupant.CurrentCellPosition; fromCell.z = 0;
@@ -158,6 +158,18 @@ public partial class AIController
         if (objectiveCell == Vector3Int.zero)
             objectiveCell = fromCell;
         objectiveCell.z = 0;
+
+        if (TryFindUnreservedOpportunisticCapture(
+                occupant, snapshot.AITeam, paths, occupied, fromCell,
+                out Vector3Int captureCell, "swap", excludeCurrentCell: true,
+                committedCapturer: incoming))
+        {
+            plannedDestinations.Add(captureCell);
+            Debug.Log($"{TL("Swap")} {occupant.InstanceId} cede edificio para #{incoming.InstanceId} e captura oportunista @ {captureCell}");
+            TraceAIReviewCandidate("Swap", "Capture", captureCell, null, true,
+                "swap_opportunistic_capture", "Captura outro predio e libera o atual para o substituto.");
+            return BuildCaptureBatch(occupant, snapshot.AITeam, fromCell, captureCell, paths);
+        }
 
         if (TryBuildSwapVacateCombatAction(occupant, incoming, snapshot, fromCell, paths, occupied, plan, out PlayerAction combatAction))
             return combatAction;

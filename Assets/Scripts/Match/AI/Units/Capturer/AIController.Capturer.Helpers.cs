@@ -104,7 +104,8 @@ public partial class AIController
         Vector3Int excludeCell,
         out Vector3Int captureCell,
         string context,
-        bool excludeCurrentCell = false)
+        bool excludeCurrentCell = false,
+        UnitManager committedCapturer = null)
     {
         captureCell = Vector3Int.zero;
         HashSet<Vector3Int> skippedCaptureCells = null;
@@ -118,7 +119,7 @@ public partial class AIController
             excludeCurrentCell,
             skippedCaptureCells))
         {
-            if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, aiTeam, candidateCell, paths, out UnitManager reservedFor))
+            if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, aiTeam, candidateCell, paths, out UnitManager reservedFor, committedCapturer))
             {
                 Debug.Log($"{TL("Oportunista")} {unit.InstanceId} cede captura oportunista @ {candidateCell} para {reservedFor.InstanceId} ({context})");
                 skippedCaptureCells ??= new HashSet<Vector3Int>();
@@ -138,7 +139,8 @@ public partial class AIController
         TeamId aiTeam,
         Vector3Int captureCell,
         Dictionary<Vector3Int, List<Vector3Int>> opportunistPaths,
-        out UnitManager reservedFor)
+        out UnitManager reservedFor,
+        UnitManager committedCapturer = null)
     {
         reservedFor = null;
 
@@ -150,7 +152,7 @@ public partial class AIController
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
 
         if (TryFindAssignedCapturerForCaptureTarget(
-                opportunist, plan, captureTarget, aiTeam, captureCell, out UnitManager assignedCapturer))
+                opportunist, plan, captureTarget, aiTeam, captureCell, out UnitManager assignedCapturer, committedCapturer))
         {
             reservedFor = assignedCapturer;
             return true;
@@ -158,7 +160,7 @@ public partial class AIController
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
-            if (candidate == opportunist || candidate.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
+            if (candidate == opportunist || candidate == committedCapturer || candidate.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair) continue;
             if (!SimulateCaptureSensor(candidate, captureCell, out _)) continue;
 
@@ -206,7 +208,8 @@ public partial class AIController
         ConstructionManager captureTarget,
         TeamId aiTeam,
         Vector3Int captureCell,
-        out UnitManager assignedCapturer)
+        out UnitManager assignedCapturer,
+        UnitManager committedCapturer = null)
     {
         assignedCapturer = null;
         if (plan == null || captureTarget == null) return false;
@@ -224,7 +227,7 @@ public partial class AIController
                 if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
 
                 UnitManager candidate = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                if (candidate == null || candidate == opportunist) continue;
+                if (candidate == null || candidate == opportunist || candidate == committedCapturer) continue;
                 if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair) continue;
                 if (!SimulateCaptureSensor(candidate, captureCell, out _)) continue;
 
