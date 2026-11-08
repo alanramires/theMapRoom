@@ -577,6 +577,15 @@ public partial class AIController
                 occupants);
         }
 
+        // AI maintenance policy only. Human movement still uses the unchanged
+        // OccupancyResolver and may share Air + surface as before.
+        if (OccupancyResolver.IsBlockingLayer(unit) && occupants != null)
+            foreach (UnitManager occupant in occupants)
+                if (occupant != null && occupant != unit
+                    && PlayerSlotRelations.AreAllies(occupant, unit)
+                    && IsAircraftReservingRepairLanding(occupant))
+                    return false;
+
         return OccupancyResolver.CanEndMove(
             unit, destination, occupants);
     }

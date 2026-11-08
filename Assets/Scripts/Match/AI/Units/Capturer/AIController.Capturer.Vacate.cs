@@ -93,7 +93,17 @@ public partial class AIController
         ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
         if (current == null || !current.CanProduceUnitsForSlot(snapshot.AISlotIndex))
             return false;
-        if (!AreAllAffordableHomeProducersOccupied(snapshot, out int occupiedProducers, out int totalProducers, out int cheapestOffer))
+        if (IsAircraftReservingRepairLanding(unit))
+            return false; // Never expel the aircraft that returned for maintenance.
+        UnitManager landingAircraft = null;
+        if (OccupancyResolver.IsBlockingLayer(unit))
+            foreach (UnitManager candidate in UnitOccupancyRules.GetUnitsAtCell(boardTilemap, fromCell, unit))
+                if (PlayerSlotRelations.AreAllies(candidate, unit)
+                    && IsAircraftReservingRepairLanding(candidate))
+                { landingAircraft = candidate; break; }
+        int occupiedProducers = 0, totalProducers = 0, cheapestOffer = 0;
+        if (landingAircraft == null
+            && !AreAllAffordableHomeProducersOccupied(snapshot, out occupiedProducers, out totalProducers, out cheapestOffer))
             return false;
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
@@ -106,6 +116,9 @@ public partial class AIController
         if (!TryFindProductionUnlockVacateCell(unit, snapshot, fromCell, paths, occupied, out Vector3Int moveCell, out string reason))
             return false;
 
+        if (landingAircraft != null)
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} libera solo para pouso de manutenção da aeronave #{landingAircraft.InstanceId} via {moveCell} ({reason})");
+        else
         Debug.Log($"{TL("Base")} {unit.InstanceId} libera produtora travada ({occupiedProducers}/{totalProducers} ocupadas, cheapest=${cheapestOffer}) via {moveCell} ({reason})");
         action = BuildVacateBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
         return true;

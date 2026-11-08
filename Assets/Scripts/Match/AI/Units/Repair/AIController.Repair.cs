@@ -262,6 +262,48 @@ public partial class AIController
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Reserva de pouso para manutenção (politica da IA, nao regra do jogo): a
+    // aeronave ferida que paira sobre uma construcao aliada que a atende espera o
+    // Servico do Comando pousa-la. Ninguem da IA termina ali embaixo e o shopping da
+    // IA nao compra ali, senao ela nao tem onde pousar. Derivada do estado atual —
+    // some sozinha quando ela pousa, sai do reparo ou nao precisa mais de servico.
+    // -------------------------------------------------------------------------
+    internal static bool IsAircraftReservingRepairLanding(UnitManager aircraft)
+    {
+        if (aircraft == null || aircraft.IsDead || aircraft.IsEmbarked
+            || !aircraft.IsUnderRepair || aircraft.GetAircraftType() == AircraftType.None
+            || OccupancyResolver.GetHeightBand(aircraft) != HeightBand.Air || aircraft.BoardTilemap == null)
+            return false;
+        ConstructionManager site = ConstructionOccupancyRules.GetConstructionAtCell(
+            aircraft.BoardTilemap, aircraft.CurrentCellPosition);
+        if (site == null || !PlayerSlotRelations.AreAllies(aircraft, site)
+            || site.CurrentCapturePoints < site.CapturePointsMax || !site.CanProvideSupplies
+            || !site.TryResolveConstructionData(out ConstructionData data)
+            || data == null || !data.allowAircraftTakeoffAndLanding)
+            return false;
+        foreach (ServiceData service in site.OfferedServices)
+            if (service != null && service.isService
+                && PodeSuprirSensor.UnitNeedsService(aircraft, service))
+                return true;
+        return false;
+    }
+
+    // Mesmo ponto de injecao da conscricao (BuildOccupied): filtro de destino de todos
+    // os ramos de decisao da IA.
+    private void AddRepairLandingReservedCells(HashSet<Vector3Int> cells, UnitManager mover)
+    {
+        foreach (UnitManager aircraft in UnitManager.AllActive)
+        {
+            if (aircraft == mover || aircraft == null) continue;
+            if (mover != null ? !PlayerSlotRelations.AreAllies(aircraft, mover)
+                : aircraft.SlotIndex != currentAISlotIndex) continue;
+            if (!IsAircraftReservingRepairLanding(aircraft)) continue;
+            Vector3Int cell = aircraft.CurrentCellPosition; cell.z = 0;
+            cells.Add(cell);
+        }
+    }
+
     // Pressão à base: macro Perdendo OU inimigo VISÍVEL perto de uma base/HQ/âncora própria.
     private bool IsBaseUnderPressureForRepair(AIWorldSnapshot snapshot)
     {

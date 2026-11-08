@@ -263,3 +263,12 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - `bash tools/compilar.sh`: ambas assemblies passaram. Validado fora do Play.
 - Revisão da borda externa: `MatchEvacPatients` recebe `requireSafeOutsideRing` do degrau escolhido. No anel seguro, secundário fora do contorno também precisa de `IsEvacDropCellSafe`; no contestado, preserva a aceitação de risco. Sem alterar hospital comum, ocupação ou limite tático a pé.
 - Regressão PASS: mesmas opções de desembarque com inimigo junto da célula externa — secundário recusado no degrau seguro e aceito no contestado. Todos os cenários e contadores anteriores passaram. `bash tools/compilar.sh`: ambas assemblies passaram, Editor fora do Play.
+
+### 2026-11-07 — reserva de pouso para manutenção de aeronaves
+- Aeronave viva no ar, marcada para reparo e sobre instalação aliada controlada que permite pouso e oferece serviço necessário reserva a banda de solo para o serviço do comando. A reserva é consulta pura do estado atual no lado da IA, em `AIController.IsAircraftReservingRepairLanding`, sem mutação de ocupação/FOW/recursos.
+- Apenas a IA evita encerrar movimento sob a aeronave reservada: `AddRepairLandingReservedCells` alimenta `BuildOccupied` e `CanAIUnitEndMoveAtCell` guarda o destino final. Movimento/pouso do humano continuam nas regras normais. Encerramento/atendimento da manutenção ou saída do prédio libera a reserva automaticamente.
+- O shopping da IA considera o produtor reservado no planejamento, sem alterar a regra de compra do jogo/humano. Unidade da IA que já ocupa o solo da produtora recebe ação para sair mesmo sem caixa ou sem todas as fábricas estarem bloqueadas. A aeronave de manutenção não é expulsa para liberar compra.
+- `tools/ai_test/verificar_reserva_pouso_reparo.cs`: PASS fora do Play — movimento/pouso/compra do humano preservados; filtro e guarda de destino da IA bloqueiam; shopping da IA evita o produtor; passagem livre, pouso próprio, saída do ocupante com orçamento zero, proteção da aeronave, liberação da reserva e estado confirmado preservado.
+- `verificar_evac_predio_vago.cs`: PASS de regressão. `bash tools/compilar.sh`: ambas assemblies passaram. Sem observação desta política em partida real.
+
+- Revisão de escopo: retirado o predicado e seus bloqueios de `OccupancyResolver` e retirado o veto de `TurnStateManager.ConstructionShopping`; política restrita à IA. `verificar_reserva_pouso_reparo.cs` e regressão completa de EVAC passaram fora do Play. `bash tools/compilar.sh`: duas assemblies passaram.

@@ -1141,6 +1141,7 @@ public partial class AIController
 
         if (includeConscriptionClosedProducers)
             AddConscriptionClosedProducerCells(set);
+        AddRepairLandingReservedCells(set, excludeUnit);
 
         // Hex de encontro reservado por um transportador: ocupado para todos,
         // menos o passageiro escolhido e o proprio veiculo.

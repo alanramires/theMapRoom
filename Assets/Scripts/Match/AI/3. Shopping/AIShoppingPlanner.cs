@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 // --------------------------------------------------------------------------------------------
@@ -1313,7 +1313,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null || unit.IsDead || unit.IsEmbarked)
                 continue;
-            if (unit.GetHeightLevel() != HeightLevel.Surface)
+            if (unit.GetHeightLevel() != HeightLevel.Surface
+                && !AIController.IsAircraftReservingRepairLanding(unit))
                 continue;
 
             Vector3Int cell = unit.CurrentCellPosition;
