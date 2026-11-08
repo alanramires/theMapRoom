@@ -13,21 +13,21 @@ public partial class AIController
         public readonly Vector3Int Cell;
         public readonly string Kind;
         public readonly int ServiceRadius;
-        public readonly int TacticalPriority;
+        public readonly HashSet<Vector3Int> ServiceCells;
         public readonly UnitManager Transporter;
 
         public AircraftRecoveryAnchor(
             Vector3Int cell,
             string kind,
             int serviceRadius = 0,
-            int tacticalPriority = 0,
+            HashSet<Vector3Int> serviceCells = null,
             UnitManager transporter = null)
         {
             cell.z = 0;
             Cell = cell;
             Kind = kind;
             ServiceRadius = Mathf.Max(0, serviceRadius);
-            TacticalPriority = Mathf.Max(0, tacticalPriority);
+            ServiceCells = serviceCells;
             Transporter = transporter;
         }
     }
@@ -184,56 +184,54 @@ public partial class AIController
     {
         candidate = null;
         float bestScore = float.MinValue;
+        bool bestIsSupplier = false;
         for (int i = 0; i < anchors.Count; i++)
         {
             AircraftRecoveryAnchor anchor = anchors[i];
-            int distance = Mathf.Max(
-                0,
+            int anchorDistance = Mathf.Max(0,
                 AIActionReachCoordinator.CubicDistance(fromCell, anchor.Cell) - anchor.ServiceRadius);
-            if (distance > budget)
+            if (anchorDistance > budget)
                 continue;
 
-            Vector3Int actionCell = anchor.Cell;
-            if (tactical)
+            // Supplier cells were validated once during collection, including
+            // the future landing layer. Operational uses that same evidence.
+            IEnumerable<Vector3Int> cells = tactical
+                ? (IEnumerable<Vector3Int>)tacticalPaths?.Keys
+                : anchor.ServiceCells ?? (IEnumerable<Vector3Int>)new[] { anchor.Cell };
+            if (cells == null)
+                continue;
+            bool isSupplier = anchor.ServiceCells != null;
+            foreach (Vector3Int rawCell in cells)
             {
-                if (tacticalPaths == null)
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (AIActionReachCoordinator.CubicDistance(cell, anchor.Cell) > anchor.ServiceRadius
+                    || (isSupplier && !anchor.ServiceCells.Contains(cell)))
                     continue;
-                bool reachable = false;
-                foreach (Vector3Int rawCell in tacticalPaths.Keys)
+                int distance = isSupplier
+                    ? AIActionReachCoordinator.CubicDistance(fromCell, cell)
+                    : anchorDistance;
+                if (distance > budget)
+                    continue;
+                float score = 10000f - distance * 100f
+                    - CalculateThreatLevel(cell, snapshot.AITeam) * ThreatWeight;
+                // No bonus can override distance or threat. A field supplier
+                // only wins an exact tie, leaving a construction vacancy free.
+                if (score < bestScore
+                    || (score == bestScore && (!isSupplier || bestIsSupplier)))
+                    continue;
+                bestScore = score;
+                bestIsSupplier = isSupplier;
+                candidate = new AIReachDecisionCandidate<AircraftRecoveryAnchor>
                 {
-                    Vector3Int pathCell = rawCell;
-                    pathCell.z = 0;
-                    if (AIActionReachCoordinator.CubicDistance(pathCell, anchor.Cell) > anchor.ServiceRadius)
-                        continue;
-                    actionCell = pathCell;
-                    reachable = true;
-                    break;
-                }
-                if (!reachable)
-                    continue;
+                    Value = anchor,
+                    ActionCell = cell,
+                    TargetCell = anchor.Cell,
+                    Score = score,
+                    Reason = anchor.Kind
+                };
             }
-
-            // Tactical ja precede Operational no ReachCoordinator. Este
-            // bonus desempata apenas entre ancoras do mesmo horizonte: um
-            // supridor de campo que atende agora e preferivel a qualquer
-            // alternativa de recuperacao que tambem caiba nesta rodada.
-            float score = 10000f + (tactical ? anchor.TacticalPriority : 0)
-                - distance * 100f
-                - CalculateThreatLevel(actionCell, snapshot.AITeam) * ThreatWeight;
-            if (score <= bestScore)
-                continue;
-
-            bestScore = score;
-            candidate = new AIReachDecisionCandidate<AircraftRecoveryAnchor>
-            {
-                Value = anchor,
-                ActionCell = actionCell,
-                TargetCell = anchor.Cell,
-                Score = score,
-                Reason = anchor.Kind
-            };
         }
-
         return candidate != null;
     }
 
@@ -257,7 +255,8 @@ public partial class AIController
             if (construction == null
                 || construction.SlotIndex != aiSlot
                 || construction.CurrentCapturePoints < construction.CapturePointsMax
-                || !IsAircraftRepairConstruction(construction))
+                || !IsAircraftRepairConstruction(construction)
+                || !CanSurfaceRepairConstructionServe(construction, aircraft, snapshot.AITeam))
             {
                 continue;
             }
@@ -325,12 +324,25 @@ public partial class AIController
 
                 Vector3Int cell = ally.CurrentCellPosition;
                 cell.z = 0;
-                if (CanSupplierRecoverAircraft(ally, aircraft))
+                if (IsPrimaryLogisticsUnit(ally))
                 {
-                    result.Add(new AircraftRecoveryAnchor(
-                        cell, "supridor", serviceRadius: 1,
-                        tacticalPriority: 5000));
-                    hasPrimaryLandingRecovery = true;
+                    var serviceCells = new HashSet<Vector3Int>();
+                    var neighbors = new List<Vector3Int>(7);
+                    UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, cell, neighbors);
+                    neighbors.Add(cell);
+                    foreach (Vector3Int serviceCell in neighbors)
+                    {
+                        if (CanSupplierRecoverAircraft(ally, aircraft, serviceCell, out string reason))
+                            serviceCells.Add(serviceCell);
+                        else if (showAILogs)
+                            Debug.Log($"{TL("Repair")} supridor #{ally.InstanceId} recusado em {serviceCell}: {reason}");
+                    }
+                    if (serviceCells.Count > 0)
+                    {
+                        result.Add(new AircraftRecoveryAnchor(
+                            cell, "supridor", serviceRadius: 1, serviceCells: serviceCells));
+                        hasPrimaryLandingRecovery = true;
+                    }
                 }
                 if (IsPotentialRepairFusionTarget(aircraft, ally))
                 {
@@ -368,40 +380,45 @@ public partial class AIController
 
     private bool CanSupplierRecoverAircraft(
         UnitManager supplier,
-        UnitManager aircraft)
+        UnitManager aircraft,
+        Vector3Int cell,
+        out string reason)
     {
+        reason = "supridor incompativel";
         if (!IsPrimaryLogisticsUnit(supplier)
-            || supplier == null || aircraft == null
+            || aircraft == null
             || !supplier.TryGetUnitData(out UnitData supplierData)
             || supplierData == null)
-        {
             return false;
-        }
 
-        // Primeiro tenta atender a aeronave na camada atual. Se o supridor
-        // opera Naval/Surface e a aeronave pode pousar na agua sob ela, o
-        // PodeSuprir executara esse pouso antes do atendimento; este e o caso
-        // do Hidroaviao atendido por Navio-Tanque. Nao aceitamos, porem, um
-        // pouso cuja camada final o supplier nao consiga operar.
         if (PodeSuprirSensor.SupportsOperationDomain(
                 supplierData, aircraft.GetDomain(), aircraft.GetHeightLevel()))
         {
-            return true;
+            reason = "atende na camada de voo";
+            return CanAIUnitEndMoveAtCell(aircraft, cell, UnitOccupancyRules.GetUnitsAtCell(boardTilemap, cell, aircraft));
         }
 
-        if (boardTilemap == null || terrainDatabase == null)
-            return false;
-
+        // Same pure per-cell authority as CanLandAtCell; retain its report
+        // to check the supplier against the actual resulting landing layer.
         PodePousarReport landing = PodePousarSensor.Evaluate(
             aircraft, boardTilemap, terrainDatabase,
             SensorMovementMode.MoveuAndando,
             useManualRemainingMovement: false,
-            manualRemainingMovement: 0);
-        return landing != null
-            && landing.status
-            && PodeSuprirSensor.SupportsOperationDomain(
-                supplierData, landing.landingDomain,
-                landing.landingHeight);
+            manualRemainingMovement: 0,
+            atCell: cell);
+        if (landing == null || !landing.status)
+        {
+            reason = landing != null ? landing.explicacao : "pouso sem resultado";
+            return false;
+        }
+        if (!PodeSuprirSensor.SupportsOperationDomain(
+                supplierData, landing.landingDomain, landing.landingHeight))
+        {
+            reason = $"supridor nao atende {landing.landingDomain}/{landing.landingHeight}";
+            return false;
+        }
+        reason = "pouso e camada de atendimento validos";
+        return true;
     }
 
     private bool IsAircraftFuelCriticalForNextUpkeep(
