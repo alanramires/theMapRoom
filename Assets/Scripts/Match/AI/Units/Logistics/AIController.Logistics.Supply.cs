@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -66,21 +66,9 @@ public partial class AIController
         {
             Vector3Int allyCell = ally.CurrentCellPosition;
             allyCell.z = 0;
-            float need = ScoreLogisticsTargetNeed(
-                snapshot, fromCell, ally);
-            int maxFuel = Mathf.Max(1, ally.GetMaxFuel());
-            float fuelPct =
-                ally.CurrentFuel * 100f / maxFuel;
-            float fuelEmergency = fuelPct <= 20f
-                ? 20000f + (20f - fuelPct) * 1000f
-                : 0f;
-            int cubic =
-                AIActionReachCoordinator.CubicDistance(
-                    fromCell, allyCell);
-            return need
-                   + fuelEmergency
-                   - cubic * 45f
-                   - ally.InstanceId * 0.001f;
+            LogisticsNeed need = ResolveLogisticsNeed(snapshot, ally);
+            int cubic = AIActionReachCoordinator.CubicDistance(fromCell, allyCell);
+            return need.WithContext(-cubic * 45f - ally.InstanceId * 0.001f);
         }
 
         bool EvaluateOperational(
@@ -217,7 +205,13 @@ public partial class AIController
                         ? message => Debug.Log(message)
                         : null
                 });
-        return reach.Found ? reach.Decision.Value : null;
+        if (reach.Found && reach.Decision != null)
+        {
+            if (showAILogs)
+                Debug.Log($"{TL("Logistics")} aproximacao alvo=#{reach.Decision.Value.InstanceId} {ResolveLogisticsNeed(snapshot, reach.Decision.Value).Diagnostic}");
+            return reach.Decision.Value;
+        }
+        return null;
     }
 
     private bool CanSupplyLogisticsTargetFromAnyLegalOrigin(
@@ -366,6 +360,7 @@ public partial class AIController
                 bool currentHasCritical = HasCriticalLogisticsTarget(currentTargets);
                 if (currentTargets.Count >= limit || paths == null || paths.Count == 0)
                 {
+                    LogLogisticsSelectedTargets(snapshot, currentTargets);
                     action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, fromCell, currentTargets, paths);
                     reason = currentHasCritical
                         ? $"critico agora count={currentTargets.Count}"
@@ -444,6 +439,7 @@ public partial class AIController
         if (bestTargets == null || bestTargets.Count <= 0)
             return false;
 
+        LogLogisticsSelectedTargets(snapshot, bestTargets);
         action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, bestCell, bestTargets, paths);
         bool now = bestCell == fromCell;
         bool bestHasCritical = HasCriticalLogisticsTarget(bestTargets);
@@ -514,6 +510,7 @@ public partial class AIController
         if (targets.Count <= 0)
             return false;
 
+        LogLogisticsSelectedTargets(snapshot, targets);
         action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, fromCell, targets, paths);
         bool hasCritical = HasCriticalLogisticsTarget(targets);
         bool hasPreventive = HasPreventiveLogisticsTarget(unit, targets);
@@ -541,60 +538,24 @@ public partial class AIController
 
         float threat = CalculateThreatLevel(cell, snapshot.AITeam);
         float dpq = GetTerrainDpqPontos(cell);
-        float pairBonus = targets.Count >= 2 ? 1500f : 0f;
-        float hpNeed = 0f;
-        int criticalCount = 0;
-        int emergencyCriticalCount = 0;
-        int preventiveCount = 0;
+        LogisticsNeed primaryNeed = default;
+        float bestNeed = float.MinValue;
         for (int i = 0; i < targets.Count; i++)
         {
-            if (targets[i] == null)
-                continue;
-
-            int maxHp = Mathf.Max(1, targets[i].GetMaxHP());
-            int missingHp = Mathf.Max(0, maxHp - targets[i].CurrentHP);
-            bool critical = targets[i].IsUnderRepair;
-            hpNeed += missingHp * (critical ? 1400f : 90f);
-            if (critical && targets[i].CurrentHP * 2 <= maxHp)
-            {
-                hpNeed += 7500f;
-                emergencyCriticalCount++;
-            }
-            if (critical)
-            {
-                criticalCount++;
-                hpNeed += ScoreCriticalLogisticsStrategicBonus(snapshot, targets[i]);
-            }
-            else if (IsPreventiveLogisticsTarget(unit, targets[i]))
-            {
-                preventiveCount++;
-                hpNeed += ScorePreventiveLogisticsStrategicBonus(targets[i]);
-            }
+            if (targets[i] == null) continue;
+            LogisticsNeed need = ResolveLogisticsNeed(snapshot, targets[i]);
+            if (need.Score > bestNeed) { bestNeed = need.Score; primaryNeed = need; }
         }
-        float criticalPreventiveComboBonus = criticalCount > 0 && preventiveCount > 0 ? 6500f : 0f;
-        float multiCriticalBonus = criticalCount >= 2 ? 11000f + emergencyCriticalCount * 3500f : 0f;
-
         float rearArea = CalculateLogisticsRearAreaScore(unit, snapshot, cell, anchor);
         int pathCost = cell == fromCell || paths == null ? 0 : GetPathStepCount(paths, cell);
-        float score = targets.Count * 5000f
-            + criticalCount * 9000f
-            + preventiveCount * 1800f
-            + criticalPreventiveComboBonus
-            + multiCriticalBonus
-            + pairBonus
-            + hpNeed
-            + dpq * 80f
-            + rearArea * 0.55f
-            - threat * (baseDefense ? 30f : 110f)
-            - pathCost * 12f
+        float context = targets.Count * 1200f
+            + dpq * 80f + rearArea * 0.55f
+            - threat * (baseDefense ? 30f : 110f) - pathCost * 12f
             - cell.GetHashCode() * 0.000001f;
-
-        if (preferCurrentCell)
-            score += 250f;
+        if (preferCurrentCell) context += 250f;
         if (!baseDefense && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor))
-            score -= 2200f;
-
-        return score;
+            context -= 2200f;
+        return primaryNeed.WithContext(context);
     }
 
     private static bool HasCriticalLogisticsTarget(List<UnitManager> targets)
@@ -655,9 +616,18 @@ public partial class AIController
             if (!seen.Add(target.InstanceId))
                 continue;
             result.Add(target);
+
         }
 
         return result;
+    }
+
+    private void LogLogisticsSelectedTargets(AIWorldSnapshot snapshot, List<UnitManager> targets)
+    {
+        if (!showAILogs || targets == null) return;
+        for (int i = 0; i < targets.Count; i++)
+            if (targets[i] != null)
+                Debug.Log($"{TL("Logistics")} atendimento ordem={i + 1} alvo=#{targets[i].InstanceId} {ResolveLogisticsNeed(snapshot, targets[i]).Diagnostic}");
     }
 
     private string BuildLogisticsSupplyDebug(
@@ -837,8 +807,7 @@ public partial class AIController
                 && IsLogisticsForwardOfMainLine(
                     unit, snapshot, cell, anchor);
 
-            float score = targetNeed
-                + (critical ? 8000f : 0f)
+            float context = (critical ? 8000f : 0f)
                 + 2500f
                 + targets.Count * 1200f
                 + dpq * 80f
@@ -849,7 +818,8 @@ public partial class AIController
                 - candidateTarget.InstanceId * 0.001f;
 
             if (forward)
-                score -= critical ? 900f : 2600f;
+                context -= critical ? 900f : 2600f;
+            float score = ResolveLogisticsNeed(snapshot, candidateTarget).WithContext(context);
 
             if (score > bestScore)
             {
@@ -870,6 +840,7 @@ public partial class AIController
         if (bestTargets == null || bestTargets.Count <= 0)
             return false;
 
+        LogLogisticsSelectedTargets(snapshot, bestTargets);
         action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, bestCell, bestTargets, paths);
         reason = $"via={bestCell} score={bestScore:F0} {bestDetails}";
         return true;
@@ -904,10 +875,10 @@ public partial class AIController
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
         TeamId aiTeam = snapshot != null ? snapshot.AITeam : target.TeamId;
-        return ScoreLogisticsTargetNeed(snapshot, serviceCell, target)
-            + CalculateThreatLevel(targetCell, aiTeam) * 35f
+        return ResolveLogisticsNeed(snapshot, target).WithContext(
+            CalculateThreatLevel(targetCell, aiTeam) * 35f
             - SectorManager.HexDistance(serviceCell, targetCell) * 10f
-            - target.InstanceId * 0.001f;
+            - target.InstanceId * 0.001f);
     }
 
     private List<UnitManager> CollectLogisticsTargetsInServiceRange(
@@ -936,8 +907,8 @@ public partial class AIController
         {
             Vector3Int ac = a.CurrentCellPosition; ac.z = 0;
             Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
-            float sa = ScoreLogisticsTargetNeed(snapshot, ac, a) + CalculateThreatLevel(ac, snapshot.AITeam) * 35f - a.InstanceId * 0.001f;
-            float sb = ScoreLogisticsTargetNeed(snapshot, bc, b) + CalculateThreatLevel(bc, snapshot.AITeam) * 35f - b.InstanceId * 0.001f;
+            float sa = ResolveLogisticsNeed(snapshot, a).WithContext(CalculateThreatLevel(ac, snapshot.AITeam) * 35f - a.InstanceId * 0.001f);
+            float sb = ResolveLogisticsNeed(snapshot, b).WithContext(CalculateThreatLevel(bc, snapshot.AITeam) * 35f - b.InstanceId * 0.001f);
             return sb.CompareTo(sa);
         });
 
@@ -1152,41 +1123,75 @@ public partial class AIController
         return false;
     }
 
-    private float ScoreLogisticsTargetNeed(AIWorldSnapshot snapshot, Vector3Int serviceCell, UnitManager target)
+    private enum LogisticsNeedTier
     {
-        if (target == null)
-            return 0f;
-
-        float valueBonus = target.TryGetUnitData(out UnitData vd) && vd != null ? vd.cost / 100f : 0f;
-
-        if (target.IsUnderRepair)
-        {
-            int criticalMaxHp = Mathf.Max(1, target.GetMaxHP());
-            int criticalMissingHp = Mathf.Max(0, criticalMaxHp - target.CurrentHP);
-            float emergencyBonus = target.CurrentHP * 2 <= criticalMaxHp ? 7500f : 0f;
-            return 10000f
-                + criticalMissingHp * 1800f
-                + emergencyBonus
-                + valueBonus
-                + ScoreCriticalLogisticsStrategicBonus(snapshot, target);
-        }
-
-        float score = valueBonus;
-        int maxHp = Mathf.Max(1, target.GetMaxHP());
-        int maxFuel = Mathf.Max(1, target.GetMaxFuel());
-        score += Mathf.Max(0f, 100f - target.CurrentHP * 100f / maxHp) * 18f;
-        score += Mathf.Max(0f, 100f - target.CurrentFuel * 100f / maxFuel) * 10f;
-        score += ScorePreventiveLogisticsStrategicBonus(target);
-        return score;
+        Preventive = 0,
+        Corrective = 1,
+        CriticalHp = 2,
+        AircraftAutonomy = 3
     }
+
+    private readonly struct LogisticsNeed
+    {
+        public readonly LogisticsNeedTier Tier;
+        public readonly float Severity, Value, Strategic;
+        public LogisticsNeed(LogisticsNeedTier tier, float severity, float value, float strategic)
+        { Tier = tier; Severity = severity; Value = value; Strategic = strategic; }
+        // The bounds make tier ordering strict even with positional bonuses,
+        // multiple patients or modded prices/elite levels.
+        public float Score => (int)Tier * 1000000f
+            + Mathf.Clamp(Severity + Value + Strategic, -100000f, 100000f);
+        public float WithContext(float context) => Score + Mathf.Clamp(context, -10000f, 10000f);
+        public string Diagnostic => $"faixa={Tier} gravidade={Severity:F0} valor={Value:F0} estrategico={Strategic:F0} necessidade={Score:F0}";
+    }
+
+    private LogisticsNeed ResolveLogisticsNeed(AIWorldSnapshot snapshot, UnitManager target)
+    {
+        if (target == null) return default;
+        float hpMissing = Mathf.Clamp01(1f - target.CurrentHP / (float)Mathf.Max(1, target.GetMaxHP()));
+        float fuelMissing = Mathf.Clamp01(1f - target.CurrentFuel / (float)Mathf.Max(1, target.GetMaxFuel()));
+        float ammoMissing = 0f;
+        int ammoCapacity = 0, ammoRemaining = 0;
+        target.TryGetUnitData(out UnitData data);
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = target.GetEmbarkedWeapons();
+        if (data != null && data.embarkedWeapons != null && weapons != null)
+        {
+            for (int i = 0; i < Mathf.Min(data.embarkedWeapons.Count, weapons.Count); i++)
+            {
+                UnitEmbarkedWeapon baseline = data.embarkedWeapons[i];
+                UnitEmbarkedWeapon current = weapons[i];
+                if (baseline == null || current == null || baseline.squadAmmunition <= 0) continue;
+                ammoCapacity += baseline.squadAmmunition;
+                ammoRemaining += Mathf.Clamp(current.squadAmmunition, 0, baseline.squadAmmunition);
+            }
+        }
+        if (ammoCapacity > 0) ammoMissing = 1f - ammoRemaining / (float)ammoCapacity;
+        bool aircraftCritical = target.GetAircraftType() != AircraftType.None
+            && IsAircraftFuelCriticalForNextUpkeep(target, out _, out _, out _);
+        LogisticsNeedTier tier = aircraftCritical ? LogisticsNeedTier.AircraftAutonomy
+            : target.CurrentHP * 2 <= Mathf.Max(1, target.GetMaxHP()) ? LogisticsNeedTier.CriticalHp
+            : target.IsUnderRepair ? LogisticsNeedTier.Corrective : LogisticsNeedTier.Preventive;
+        bool corrective = tier != LogisticsNeedTier.Preventive;
+        float severity = corrective
+            ? hpMissing * 18000f + fuelMissing * 10000f + ammoMissing * 10000f
+            : hpMissing * 1800f + fuelMissing * 1000f;
+        float value = data == null ? 0f : Mathf.Min(9000f,
+            Mathf.Min(6000f, Mathf.Max(0, data.cost) * (corrective ? 0.5f : 0.05f))
+            + Mathf.Min(4500f, Mathf.Max(0, data.eliteLevel) * (corrective ? 1500f : 900f)));
+        float strategic = corrective ? ScoreCriticalLogisticsStrategicBonus(snapshot, target)
+            : ScorePreventiveLogisticsStrategicBonus(target);
+        return new LogisticsNeed(tier, severity, value, strategic);
+    }
+
+    private float ScoreLogisticsTargetNeed(AIWorldSnapshot snapshot, Vector3Int serviceCell, UnitManager target)
+        => ResolveLogisticsNeed(snapshot, target).Score;
 
     private float ScoreCriticalLogisticsStrategicBonus(AIWorldSnapshot snapshot, UnitManager target)
     {
         if (target == null || !target.TryGetUnitData(out UnitData data) || data == null)
             return 0f;
 
-        float score = data.cost / 12f;
-        score += Mathf.Max(0, data.eliteLevel) * 3000f;
+        float score = 0f;
 
         bool fireSupport = HasLogisticsRole(data, UnitRole.FogoIndireto) || data.unitClass == GameUnitClass.Artillery
             || (UnitCombatModalityRules.IsHybrid(target) && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto))
@@ -1221,7 +1226,7 @@ public partial class AIController
         if (target == null || !target.TryGetUnitData(out UnitData data) || data == null)
             return 0f;
 
-        float score = data.cost / 25f + Mathf.Max(0, data.eliteLevel) * 900f;
+        float score = 0f;
         bool fireSupport = HasLogisticsRole(data, UnitRole.FogoIndireto) || data.unitClass == GameUnitClass.Artillery
             || (UnitCombatModalityRules.IsHybrid(target) && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto))
             || data.longRangeStationary;
