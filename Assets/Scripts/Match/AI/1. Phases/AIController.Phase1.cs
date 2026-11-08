@@ -13,6 +13,18 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase1 — iniciando. replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
 
+        // REPARO ANTES DA CURA. O estado de reparo era decidido so no setup da Fase 2, DEPOIS
+        // do Servico do Comando: quem chegava ao turno abaixo do gatilho (soldado a bordo com
+        // 2 HP, gatilho 3) era curado +2, chegava a Fase 2 com 4 e "nao estava ferido" — pulava
+        // a faixa gatilho..recuperacao inteira (sai so com 8). No embarcado isso decidia se o
+        // transporte virava EVAC. Mesma regra (UpdateRepairState), com o HP com que a unidade
+        // chegou; a Fase 2 segue avaliando a saida.
+        TeamObjectivePlan repairPlan = ObjectiveManager.GetPlanForSlot(
+            PlayerSlotId.FromIndex(ResolveAISlotKey(snapshot.AITeam)));
+        foreach (UnitManager u in UnitManager.AllActive)
+            if (u != null && u.SlotIndex == snapshot.AISlotIndex && !u.IsDead)
+                UpdateRepairState(u, repairPlan);
+
         if (replayManager == null)
         {
             Debug.LogWarning($"{TL()} Fase1 — replayManager é null, abortando.");
