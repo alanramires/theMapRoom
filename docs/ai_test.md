@@ -254,3 +254,12 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - Revisão do EVAC conjunto: `repairCells` é construída uma vez na entrada de cada decisão aérea/terrestre/naval e passada a estacionamento, seleção e fallback HQ. O hospital principal já ranqueado é reutilizado; só o secundário exige o ranking próprio. Ranking auxiliar usa `log: false`; `FindRepairConstruction` preserva o diagnóstico normal da escolha.
 - Regressão PASS com contadores: aéreo com dois feridos e fallback HQ fazem 1 `EvacRepairCellsBuilds` e 2 `RepairConstructionRankings`; APC (um banco) faz 1 de cada, sem reconstrução na seleção/estacionamento. Consulta auxiliar não imprime `[Repair] skip`. Uma vaga retém secundário, que assume a entrega seguinte; duas vagas e fallback no anel continuam descarregando dois.
 - `bash tools/compilar.sh`: ambas assemblies passaram. Testes executados fora do Play; sem observação desta revisão em partida real.
+
+### 2026-11-07 — contorno flexível para a dupla de EVAC no HQ
+- Marca T9/slot 1, Chinook #7: Soldados #28 e #31, ambos 4 HP e em reparo no save de referência; a entrega no anel do HQ selecionava só o #28.
+- No fallback do HQ, o principal ancora a entrega dentro do anel. O segundo ferido pode usar terreno livre adjacente fora do contorno exato aceito, desde que uma rota terrestre de um tático dele alcance o ponto do principal. Reutiliza o mapa de rota do passageiro e o matching existente, sem reconstruir repairCells ou sondar LZ remota.
+- Em hospital comum permanece a retenção do secundário sem vaga; a flexibilização não transforma construções externas em terreno livre nem altera regras de ocupação.
+- Regressão `verificar_evac_predio_vago.cs`: PASS com opções reais do sensor, dupla a 4 HP e apenas uma célula no contorno aceito; o segundo desembarca fora dele e pode completar o trecho a pé. Demais casos e contadores preservados.
+- `bash tools/compilar.sh`: ambas assemblies passaram. Validado fora do Play.
+- Revisão da borda externa: `MatchEvacPatients` recebe `requireSafeOutsideRing` do degrau escolhido. No anel seguro, secundário fora do contorno também precisa de `IsEvacDropCellSafe`; no contestado, preserva a aceitação de risco. Sem alterar hospital comum, ocupação ou limite tático a pé.
+- Regressão PASS: mesmas opções de desembarque com inimigo junto da célula externa — secundário recusado no degrau seguro e aceito no contestado. Todos os cenários e contadores anteriores passaram. `bash tools/compilar.sh`: ambas assemblies passaram, Editor fora do Play.

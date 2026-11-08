@@ -391,15 +391,34 @@ public partial class AIController
     private List<PodeDesembarcarOption> MatchEvacPatients(
         UnitManager primary, Vector3Int primaryCell, List<PodeDesembarcarOption> options,
         AIWorldSnapshot snapshot, Dictionary<int, HashSet<Vector3Int>> repairCells,
-        HashSet<Vector3Int> finalRing = null)
+        HashSet<Vector3Int> finalRing = null, bool requireSafeOutsideRing = false)
     {
+        var secondaryWalkRoutes = new Dictionary<int, Dictionary<Vector3Int, int>>();
         bool Resolve(UnitManager passenger, Vector3Int cell, out Vector3Int target, out int routeCost)
         {
             target = cell; routeCost = 0;
             if (!repairCells.ContainsKey(passenger.InstanceId)) return false;
             if (plannedDestinations != null && plannedDestinations.Contains(cell)) return false;
             if (passenger == primary) return cell == primaryCell;
-            if (finalRing != null) return finalRing.Contains(cell);
+            if (finalRing != null)
+            {
+                if (finalRing.Contains(cell)) return true;
+                if (requireSafeOutsideRing && !IsEvacDropCellSafe(cell, snapshot.AITeam))
+                    return false;
+                // The primary anchors the HQ delivery. The second patient may
+                // use adjacent free ground and walk the last tactical leg;
+                // do not require both drop cells to fit the exact same ring.
+                if (ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell) != null)
+                    return false;
+                if (!secondaryWalkRoutes.TryGetValue(passenger.InstanceId, out var walk))
+                {
+                    walk = GetOrBuildDisembarkPassengerRoute(
+                        passenger, primaryCell, Mathf.Max(1, passenger.MaxMovementPoints));
+                    secondaryWalkRoutes[passenger.InstanceId] = walk;
+                }
+                return walk != null && walk.TryGetValue(cell, out int cost)
+                    && cost <= passenger.MaxMovementPoints;
+            }
             if (!IsEvacDropCellSafe(cell, snapshot.AITeam)) return false;
             if (repairCells[passenger.InstanceId].Contains(cell)) return true;
             // No repair vacancy: stay aboard. Ground release belongs only
@@ -557,7 +576,8 @@ public partial class AIController
                     if (option.passengerUnit != patient || !targetRing.Contains(option.disembarkCell)) continue;
                     float threat = GetAirEvacThreat(option.disembarkCell, snapshot.AITeam, threatByCell);
                     float score = ScoreRepairHqFallbackCell(option.disembarkCell, hq, snapshot.AITeam);
-                    var orders = MatchEvacPatients(patient, option.disembarkCell, options, snapshot, repairCells, targetRing);
+                    var orders = MatchEvacPatients(patient, option.disembarkCell, options, snapshot, repairCells, targetRing,
+                        requireSafeOutsideRing: safeRing.Count > 0);
                     if (orders.Count == 0) continue;
                     bool betterRisk = threat < bestDropThreat
                         || (threat == bestDropThreat && (risk.peak < bestPeak

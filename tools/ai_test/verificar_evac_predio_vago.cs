@@ -175,7 +175,42 @@ try{
     if(twoInRing.SensorAction!=SensorActionType.Disembark||twoInRing.SubSteps.Count!=2
         ||twoInRing.SubSteps[0].TargetHex==twoInRing.SubSteps[1].TargetHex)
         throw new System.Exception("Fallback do HQ nao descarregou os dois feridos.");
-    Set(extra,"currentHP",10);Set(extra,"isUnderRepair",false);
+    // The second patient need not fit the primary's exact accepted ring.
+    // Reuse real sensor options, with only one accepted primary cell.
+    var ringOptions=new System.Collections.Generic.List<PodeDesembarcarOption>();
+    PodeDesembarcarSensor.CollectOptionsFromCell(carrier,twoInRing.MoveTo,map,terrain,ringOptions,out _);
+    var primaryStep=twoInRing.SubSteps.Find(step=>step.TargetInstanceId==main.InstanceId.ToString());
+    var secondaryStep=twoInRing.SubSteps.Find(step=>step.TargetInstanceId==extra.InstanceId.ToString());
+    var primaryOption=ringOptions.Find(option=>option.passengerUnit==main&&option.disembarkCell==primaryStep.TargetHex);
+    var secondaryOption=ringOptions.Find(option=>option.passengerUnit==extra&&option.disembarkCell==secondaryStep.TargetHex);
+    if(primaryOption==null||secondaryOption==null)throw new System.Exception("Fixture sem opcoes reais para dupla no HQ.");
+    var oneCellRing=new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>{primaryStep.TargetHex};
+    var pairFacts=new System.Collections.Generic.Dictionary<int,System.Collections.Generic.HashSet<UnityEngine.Vector3Int>>{
+        {main.InstanceId,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()},
+        {extra.InstanceId,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()}};
+    Set(main,"currentHP",4);Set(extra,"currentHP",4);
+    var relaxed=(System.Collections.Generic.List<PodeDesembarcarOption>)typeof(AIController).GetMethod("MatchEvacPatients",flags).Invoke(ai,
+        new object[]{main,primaryStep.TargetHex,new System.Collections.Generic.List<PodeDesembarcarOption>{primaryOption,secondaryOption},snapshot,pairFacts,oneCellRing,true});
+    if(relaxed.Count!=2||oneCellRing.Contains(secondaryOption.disembarkCell))
+        throw new System.Exception("Contorno estrito do anel reteve secundario que pode completar a pe.");
+    // Safe ring: an external spot near an enemy must be rejected.
+    // Contested ring: the same still-materializable option may accept risk.
+    var edgeNeighbors=new System.Collections.Generic.List<UnityEngine.Vector3Int>();
+    UnitMovementPathRules.GetImmediateHexNeighbors(map,secondaryOption.disembarkCell,edgeNeighbors);
+    var edgeCell=edgeNeighbors.Find(cell=>cell!=primaryOption.disembarkCell&&map.HasTile(cell));
+    var edgeEnemy=Unit(800104,soldier,edgeCell,false);
+    Set(edgeEnemy,"slotIndex",ownSlot==0?1:0);Set(edgeEnemy,"teamId",TeamId.Yellow);
+    UnitManager.AllActive.Add(edgeEnemy);snapshot.EnemyUnits.Add(edgeEnemy);
+    var matchMethod=typeof(AIController).GetMethod("MatchEvacPatients",flags);
+    var edgeOptions=new System.Collections.Generic.List<PodeDesembarcarOption>{primaryOption,secondaryOption};
+    var safeEdge=(System.Collections.Generic.List<PodeDesembarcarOption>)matchMethod.Invoke(ai,
+        new object[]{main,primaryStep.TargetHex,edgeOptions,snapshot,pairFacts,oneCellRing,true});
+    var contestedEdge=(System.Collections.Generic.List<PodeDesembarcarOption>)matchMethod.Invoke(ai,
+        new object[]{main,primaryStep.TargetHex,edgeOptions,snapshot,pairFacts,oneCellRing,false});
+    if(safeEdge.Count!=1||safeEdge[0].passengerUnit!=main||contestedEdge.Count!=2)
+        throw new System.Exception("Celula externa ameacada nao distinguiu anel seguro de contestado.");
+    UnitManager.AllActive.Remove(edgeEnemy);snapshot.EnemyUnits.Remove(edgeEnemy);
+    Set(main,"currentHP",1);Set(extra,"currentHP",10);Set(extra,"isUnderRepair",false);
     var danger=Unit(800103,soldier,invasion,false);
     Set(danger,"slotIndex",ownSlot==0?1:0);Set(danger,"teamId",TeamId.Yellow);
     UnitManager.AllActive.Add(danger);snapshot.EnemyUnits.Add(danger);
@@ -246,7 +281,7 @@ try{
         throw new System.Exception("EVAC terrestre reconstruiu repairCells/ranking na mesma decisao: builds="+builds+" ranks="+ranks);
     pairPerf.GetMethod("End").Invoke(null,null);
     if(!main.IsEmbarked||main.CurrentHP!=1)throw new System.Exception("Planejamento alterou passageiro confirmado.");
-    return "PASS: cidade ocupada descartada; entrega direta na fabrica livre a partir de LZ vizinha; alcance curto aproxima mantendo carga; nova ocupacao troca destino; sem hospital nem HQ de referencia mantem carga; conscricao e pressao respeitadas; paciente ja atendido rejeitado; aproximacao sem sondagem distante; fallback descarrega no anel HQ e aproxima quando longe; base invadida entrega no anel contestado; todas as rotas ameacadas ainda entregam; origem ameacada nao espera; caminho com ameaca rejeitado mesmo com destino seguro; uma vaga retem secundario, que assume entrega seguinte; dois hospitais entregam dupla; repairCells unica no aereo, HQ e terrestre; ranking auxiliar silencioso; dupla no anel HQ; saudavel permanece a bordo; passageiro inalterado.";
+    return "PASS: cidade ocupada descartada; entrega direta na fabrica livre a partir de LZ vizinha; alcance curto aproxima mantendo carga; nova ocupacao troca destino; sem hospital nem HQ de referencia mantem carga; conscricao e pressao respeitadas; paciente ja atendido rejeitado; aproximacao sem sondagem distante; fallback descarrega no anel HQ e aproxima quando longe; base invadida entrega no anel contestado; todas as rotas ameacadas ainda entregam; origem ameacada nao espera; caminho com ameaca rejeitado mesmo com destino seguro; uma vaga retem secundario, que assume entrega seguinte; dois hospitais entregam dupla; repairCells unica no aereo, HQ e terrestre; ranking auxiliar silencioso; dupla no anel HQ com secundario fora do contorno e trecho tatico a pe; celula externa com inimigo perto rejeitada no seguro e aceita no contestado; saudavel permanece a bordo; passageiro inalterado.";
 }finally{
     UnityEngine.Application.logMessageReceived-=captureLog;
     foreach(var pair in fogRestore)Set(pair.Key,"debugFogOfWarEnabled",pair.Value);
