@@ -76,6 +76,10 @@ public partial class AIController
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, evacPaths, evacOccupied);
         }
 
+        if (TryBuildAirRallyAssemblyDelivery(unit, passengers, plan, snapshot,
+                fromCell, out PlayerAction rallyDelivery))
+            return rallyDelivery;
+
         PromoteUnservedAirPassenger(unit, passengers, plan, snapshot, assignedSectorTarget);
         UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);
         bool targetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot,
@@ -257,6 +261,104 @@ public partial class AIController
         // Priority 3: move toward target.
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — move para {moveTarget} alvo={primaryTarget} dist={SectorManager.HexDistance(moveTarget, primaryTarget):F0}h passageiro=#{primaryPassenger.InstanceId}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTarget, paths);
+    }
+
+    // Rally assembly is delivery to an area, not an unserved capture task.
+    // Keep today's rally radius; the proposed model-unit core is separate work.
+    private bool TryBuildAirRallyAssemblyDelivery(
+        UnitManager carrier, List<UnitManager> passengers, TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot, Vector3Int from, out PlayerAction action)
+    {
+        action = null;
+        UnitManager primary = ResolvePrimaryPassenger(carrier, passengers, plan);
+        SectorObjective objective = primary != null && plan != null
+            ? ResolveAnyAssignedObjective(primary, plan) : null;
+        if (!IsActiveRallyAssemblyObjective(objective)) return false;
+        if (!TryFindOwnedRallyForSector(objective.Sector, snapshot.AITeam, out ConstructionManager rally))
+        {
+            Debug.Log($"{TL("Transporte")} rally #{carrier.InstanceId}: sem ancora aliada valida em {objective.Sector}; mantem carga, sem inventar alvo no hex atual.");
+            action = BuildMoveBatch(carrier, snapshot.AITeam, from, from);
+            return true;
+        }
+        // A rally not yet controlled is still a capture destination; preserve
+        // that existing flow instead of delivering an assembly into enemy hands.
+        if (rally.SlotIndex != snapshot.AISlotIndex
+            || rally.CurrentCapturePoints < rally.CapturePointsMax) return false;
+        Vector3Int anchor = rally.CurrentCellPosition; anchor.z = 0;
+        var anchors = new Dictionary<int, Vector3Int>();
+        foreach (UnitManager passenger in passengers)
+        {
+            SectorObjective assigned = ResolveAnyAssignedObjective(passenger, plan);
+            if (!IsActiveRallyAssemblyObjective(assigned)
+                || !TryFindOwnedRallyForSector(assigned.Sector, snapshot.AITeam, out ConstructionManager ownRally))
+                continue;
+            if (ownRally.SlotIndex != snapshot.AISlotIndex
+                || ownRally.CurrentCapturePoints < ownRally.CapturePointsMax) continue;
+            Vector3Int cell = ownRally.CurrentCellPosition; cell.z = 0;
+            anchors[passenger.InstanceId] = cell;
+        }
+        var paths = UnitMovementPathRules.CalcularCaminhosValidos(
+            boardTilemap, carrier, Mathf.Max(0, carrier.RemainingMovementPoints), terrainDatabase);
+        if (paths == null || paths.Count == 0)
+        {
+            Debug.Log($"{TL("Transporte")} rally #{carrier.InstanceId}: sem caminhos nesta rodada; ancora={anchor}.");
+            action = BuildMoveBatch(carrier, snapshot.AITeam, from, from);
+            return true;
+        }
+        bool InArea(UnitManager passenger, Vector3Int cell)
+            => passenger != null && anchors.TryGetValue(passenger.InstanceId, out Vector3Int center)
+                && SectorManager.HexDistance(cell, center) <= RallyAssemblyForceRadius;
+        bool Resolve(UnitManager passenger, Vector3Int cell, out Vector3Int target, out int cost)
+        {
+            target = cell; cost = 0;
+            return InArea(passenger, cell);
+        }
+        bool TouchesArea(Vector3Int cell)
+        {
+            foreach (Vector3Int center in anchors.Values)
+                if (SectorManager.HexDistance(cell, center) <= RallyAssemblyForceRadius + 1)
+                    return true;
+            return false;
+        }
+        int rejectedLz = 0, emptyDeliveries = 0;
+        var rejectionReasons = new HashSet<string>();
+        var evaluated = MelhorDesembarqueService.Evaluate(new MelhorDesembarqueRequest
+        {
+            transporter = carrier, map = boardTilemap, terrainDatabase = terrainDatabase,
+            movementBudget = Mathf.Max(0, carrier.RemainingMovementPoints),
+            pathsByDestination = paths,
+            requiredPassengerInstanceId = primary.InstanceId,
+            passengerPriorityByInstanceId = BuildPassengerDeliveryPriority(carrier, passengers),
+            resolvePassengerTarget = Resolve,
+            allowTransporterCell = cell => TouchesArea(cell)
+                && IsConfirmedVisibleOrExploredCellForAI(cell)
+                && CanAirTransportStopAtCell(carrier, cell),
+            allowPassengerDisembarkCell = (passenger, cell) => InArea(passenger, cell)
+                && !HasEnemyUnitAnyLayerAtCell(cell, snapshot.AITeam)
+                && (plannedDestinations == null || !plannedDestinations.Contains(cell)),
+            diagnosticLog = message =>
+            {
+                if (message.Contains("reason=transporter_cell_not_allowed")) rejectedLz++;
+                if (message.Contains("reason=delivered_zero")) emptyDeliveries++;
+                if (message.Contains("REJECT") && !message.Contains("reason=transporter_cell_not_allowed")
+                    && rejectionReasons.Count < 3) rejectionReasons.Add(message);
+            }
+        });
+        if (evaluated.best != null && evaluated.best.spots.Count > 0)
+        {
+            var best = evaluated.best;
+            var selected = best.spots.ConvertAll(spot => spot.option);
+            paths.TryGetValue(best.cell, out List<Vector3Int> path);
+            Debug.Log($"{TL("Transporte")} rally #{carrier.InstanceId} entrega na area de {objective.Sector} ancora={anchor} raio={RallyAssemblyForceRadius}: LZ={best.cell} desembarca={selected.Count} fica={passengers.Count - selected.Count}; sem exigir captura do predio.");
+            action = BuildDesembarcarBatch(carrier, snapshot.AITeam, from, selected, best.cell, path);
+            return true;
+        }
+        var occupied = BuildAirOccupied(carrier);
+        Vector3Int move = FindAirTransportMove(from, anchor, paths, occupied, snapshot.AITeam);
+        Debug.Log($"{TL("Transporte")} rally #{carrier.InstanceId}: sem desembarque legal na area de {objective.Sector} ancora={anchor}; LZs vetadas por area/visibilidade/ocupacao={rejectedLz}, sem combinacao de passageiros pelo sensor/filtros={emptyDeliveries}; motivos={string.Join(" | ", rejectionReasons)}; "
+            + (move == from ? "mantem carga, sem aproximacao valida." : $"aproxima via {move}."));
+        action = BuildMoveBatch(carrier, snapshot.AITeam, from, move, paths);
+        return true;
     }
 
     private bool TryBuildAirCourierAlternativeDropAction(
