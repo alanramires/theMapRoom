@@ -242,7 +242,11 @@ public partial class AIController
                     Debug.Log($"{TL("AirCombat")} {unit.InstanceId} interceptacao operacional "
                         + $"de {airPrey.UnitDisplayName}#{airPrey.InstanceId} via {pursuitCell}; "
                         + $"tiro terciario em {target.UnitDisplayName}#{target.InstanceId} adiado.");
-                    return BuildMoveBatch(unit, snapshot.AITeam, fromCell, pursuitCell, paths);
+                    PlayerAction pursuitAction = BuildMoveBatch(
+                        unit, snapshot.AITeam, fromCell, pursuitCell, paths);
+                    TraceAIReviewParticipant(pursuitAction, airPrey.InstanceId,
+                        "Alvo da interceptacao operacional", "air_operational_pursuit");
+                    return pursuitAction;
                 }
             }
             Vector3Int targetCell = target.CurrentCellPosition;

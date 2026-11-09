@@ -164,7 +164,7 @@ public partial class AIController
     {
         var pairs = new List<AIReviewVisualPair>();
         if (record?.participants == null) return pairs;
-        var color = new Color(0.08f, 0.18f, 0.65f, 1f);
+        var color = new Color(1f, 0.25f, 0.65f, 1f);
         foreach (var participant in record.participants)
         {
             pairs.Add(new AIReviewVisualPair { From = participant.cell, To = participant.cell, Label = "AIReviewParticipant", Color = color });
