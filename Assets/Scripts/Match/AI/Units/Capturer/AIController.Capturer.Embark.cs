@@ -22,7 +22,7 @@ public partial class AIController
     }
 
     // Celula do ponto de rally do setor (anchor usado na contagem de presenca do GoGreen).
-    private bool TryGetRallyAnchorCell(ConstructionSector sector, out Vector3Int anchor)
+    internal bool TryGetRallyAnchorCell(ConstructionSector sector, out Vector3Int anchor)
     {
         anchor = default;
         if (sector == ConstructionSector.None || ConstructionManager.AllActive == null)

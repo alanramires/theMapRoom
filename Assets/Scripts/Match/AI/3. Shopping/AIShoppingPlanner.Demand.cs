@@ -3098,6 +3098,10 @@ public partial class AIShoppingPlanner
             PlayerSlotId.FromIndex(snapshot.AISlotIndex),
             log);
         SectorObjective rallyFireSupportFocus = FindRallyShoppingFocus(deficits);
+        var rallyAccess = new ArtilleryWallContext();
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+            if (building != null && building.BoardTilemap != null)
+            { rallyAccess.Board = building.BoardTilemap; break; }
         foreach (TacticalDeficit deficit in deficits)
         {
             bool rallyFireSupport = IsRallyFireSupportDeficit(deficit);
@@ -3138,6 +3142,15 @@ public partial class AIShoppingPlanner
                     demand.Role = line.Role;
                     ApplyEliteLine(demand, line);
                 }
+            }
+            if (rallyFireSupport || rallyBreakthrough)
+            {
+                Vector3Int rallyCell = deficit.Operation.TargetCell;
+                if (AIController.Instance != null && AIController.Instance.TryGetRallyAnchorCell(
+                        deficit.Operation.LinkedObjective.Sector, out Vector3Int authoredRally))
+                    rallyCell = authoredRally;
+                if (!ConfigureRallyShoppingAccess(snapshot, demand, rallyCell, rallyAccess, log))
+                    continue;
             }
             MergeRoleDemand(demands, demand, addCounts: true);
         }
@@ -3612,6 +3625,51 @@ public partial class AIShoppingPlanner
                 || deficit.Kind == AINeedKind.Artillery);
     }
 
+    private static bool ConfigureRallyShoppingAccess(AIWorldSnapshot snapshot,
+        AIShoppingDemand demand, Vector3Int rallyCell, ArtilleryWallContext access, bool log)
+    {
+        access.Targets[0].Clear();
+        rallyCell.z = 0;
+        access.Targets[0].Add(rallyCell);
+        Dictionary<string, HashSet<int>> Collect()
+        {
+            var offers = new Dictionary<string, HashSet<int>>();
+            foreach (ConstructionManager producer in snapshot.MyBuildings)
+            {
+                if (producer == null || !producer.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                    || producer.OfferedUnits == null) continue;
+                foreach (UnitData data in producer.OfferedUnits)
+                {
+                    if (data == null || data.cost <= 0 || !IsEliteChainAvailable(data, snapshot)
+                        || !IsRolePurchaseAllowed(data, snapshot.Stance, false)
+                        || !DoesUnitMeetShoppingDemand(data, demand)
+                        || !access.Reaches(data, producer.CurrentCellPosition, 0)) continue;
+                    if (!offers.TryGetValue(data.id, out var producers))
+                        offers[data.id] = producers = new HashSet<int>();
+                    producers.Add(producer.InstanceId);
+                }
+            }
+            return offers;
+        }
+        var eligible = Collect();
+        if (eligible.Count == 0 && demand.RequireRallyBreakthrough)
+        {
+            // The assault family can form in the air; a disconnected tank
+            // cannot fulfill this rally just because its producer is idle.
+            demand.RequireRallyBreakthrough = false;
+            demand.Role = UnitRole.AtaqueAereo;
+            demand.RequiredFamily = UnitRoleFamily.Assalto;
+            demand.Domain = Domain.Air;
+            demand.Reason += " (sem ruptura terrestre ofertada com acesso; assalto aereo)";
+            eligible = Collect();
+        }
+        demand.RallyResponseOffers = eligible;
+        if (log)
+            Debug.Log($"[AI Shopping Rally] alvo={rallyCell} {FormatDemandCapability(demand)} "
+                + (eligible.Count > 0 ? $"ofertas com acesso={eligible.Count}" : "sem oferta com acesso; nao compra peca encalhada"));
+        return eligible.Count > 0;
+    }
+
     private static bool IsRallyBreakthroughDeficit(TacticalDeficit deficit)
     {
         return deficit.Operation != null
@@ -3763,6 +3821,7 @@ public partial class AIShoppingPlanner
             if (currentRally != incomingRally)
                 continue;
             if (current.ArtilleryWallGroup != incoming.ArtilleryWallGroup) continue;
+            if (current.RallyResponseOffers != null || incoming.RallyResponseOffers != null) continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
                 || current.RequiredFamily != incoming.RequiredFamily
                 || current.Domain != incoming.Domain
@@ -5132,6 +5191,10 @@ public partial class AIShoppingPlanner
     private static bool MatchesWallOffer(AIShoppingDemand demand, UnitData unit,
         ConstructionManager producer, bool coverage = false)
     {
+        if (demand.RallyResponseOffers != null
+            && (unit == null || producer == null
+                || !demand.RallyResponseOffers.TryGetValue(unit.id, out var rallyProducers)
+                || !rallyProducers.Contains(producer.InstanceId))) return false;
         if (demand.ArtilleryWallGroup == 0) return true;
         var offers = coverage ? demand.WallCoverageOffers : demand.WallResponseOffers;
         return unit != null && producer != null && offers != null
