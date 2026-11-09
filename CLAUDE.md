@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Como trabalhamos — leia antes de qualquer coisa
+
+1. **Antes de codar ou revisar, leia as "Regras de trabalho" no fim de `docs/resumo.md`**
+   (em especial "Antes de escrever regra nova — procure a que já existe"). Elas moram só lá;
+   não copie para cá.
+2. **O Codex (outra IA) implementa; o Claude revisa.** Cada diff do Codex é lido contra as
+   Regras de trabalho **antes do commit**. Achou defeito, monte o bloco de correção para o
+   Codex (abrindo com "Escrito para: o Codex…"), com a função dona da pergunta nomeada.
+   Commit do Codex que entrou sem revisão é revisado no fechamento do dia.
+3. **Doutrina ainda não decidida passa pela skill `pergunte-me`** antes de virar bloco de
+   correção ou código: o autor decide, o Claude traz os fatos.
+4. Responda em pt-br.
+
 ## Mandatory transactional-action invariant
 
 **Nothing in the game is definitive until the player commits the action.** Every board action starts in `CursorState.Neutral` and ends in `CursorState.Neutral`. Intermediate movement, animation, menus and sensor states are provisional and cancelable. They must not permanently refresh FOW, reveal units/terrain, update detection or AI intelligence, consume resources, mutate confirmed occupancy/revisions, or mark a unit as acted. After explicit commitment, return to `Neutral` and only then recalculate the confirmed board.

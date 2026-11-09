@@ -5,6 +5,15 @@ description: Entrevista em rodadas para fechar uma decisão de doutrina ou de de
 
 # Pergunte-me
 
+<!--
+A short explanation of this skill:
+It's mainly a decision-making interview before coding. The AI first checks the
+existing code, architecture, and documented rules to see what already answers the
+problem. Then it asks the author focused questions about anything still undecided,
+including edge cases and trade-offs. The goal is to agree on the intended behavior
+before implementation, while reusing existing logic and preserving what already works.
+-->
+
 Entrevista para chegar a um **entendimento comum** sobre uma regra antes de qualquer código. O
 autor é um desenvolvedor solo decidindo a doutrina de um jogo: as decisões são dele, os fatos são
 seus. Adaptado de `grilling`, de Matt Pocock (github.com/mattpocock/skills, licença MIT).
