@@ -229,6 +229,22 @@ public partial class AIController
                 visibleEnemies,
                 out Vector3Int attackCell, out UnitManager target, out string attackReason))
         {
+            // A tertiary ground shot must not interrupt an interceptor's
+            // reachable air mission. Tactical air attacks still win above.
+            if (TryResolveInterceptorOperationalPursuit(
+                    unit, target, fromCell, visibleEnemies, out UnitManager airPrey))
+            {
+                Vector3Int pursuitCell = FindAirCombatAdvanceMove(
+                    fromCell, airPrey.CurrentCellPosition, paths, occupied,
+                    snapshot.AITeam, takeoffMoveOptions);
+                if (pursuitCell != fromCell)
+                {
+                    Debug.Log($"{TL("AirCombat")} {unit.InstanceId} interceptacao operacional "
+                        + $"de {airPrey.UnitDisplayName}#{airPrey.InstanceId} via {pursuitCell}; "
+                        + $"tiro terciario em {target.UnitDisplayName}#{target.InstanceId} adiado.");
+                    return BuildMoveBatch(unit, snapshot.AITeam, fromCell, pursuitCell, paths);
+                }
+            }
             Vector3Int targetCell = target.CurrentCellPosition;
             targetCell.z = 0;
             Debug.Log($"{TL("AirCombat")} {unit.InstanceId} rogue ataca via {attackCell} -> {target.UnitDisplayName}#{target.InstanceId} ({attackReason})");
@@ -1252,6 +1268,30 @@ public partial class AIController
                 return true;
         }
         return false;
+    }
+
+    private bool TryResolveInterceptorOperationalPursuit(
+        UnitManager unit, UnitManager tacticalTarget, Vector3Int fromCell,
+        List<UnitManager> visibleEnemies, out UnitManager airPrey)
+    {
+        airPrey = null;
+        if (unit == null || tacticalTarget == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data?.roles == null || data.roles.Count == 0
+            || !UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.Interceptador)
+            || !tacticalTarget.TryGetUnitData(out UnitData targetData)
+            || targetData.domain == Domain.Air
+            || ResolveAirCombatTargetPreference(unit, tacticalTarget) != BazookaTargetPriority.Tertiary)
+            return false;
+
+        // Reuse the operational combat envelope; only actual airborne prey
+        // compatible with a loaded weapon and primary/secondary preference.
+        var prey = visibleEnemies?.FindAll(enemy => enemy != null
+            && !enemy.IsDead && !enemy.IsEmbarked
+            && enemy.GetDomain() == Domain.Air
+            && ResolveAirCombatTargetPreference(unit, enemy) != BazookaTargetPriority.Tertiary
+            && CanAnyWeaponHitLayer(unit, enemy.GetDomain(), enemy.GetHeightLevel()));
+        return TryResolveOperationalHuntTarget(unit, fromCell, prey, out airPrey);
     }
 
     private bool TryResolveOperationalHuntTarget(
