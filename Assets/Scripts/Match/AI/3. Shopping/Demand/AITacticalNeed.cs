@@ -137,6 +137,11 @@ public class AIShoppingDemand
     public int MaxEliteLevel = int.MaxValue;
     public float MinRallyArtilleryWeight;
     public bool RequireRallyBreakthrough;
+    // Decision-local wall response: 0 normal demand, 1 ground support, 2 AA.
+    // Producer sets preserve actual ground access even with identical catalogs.
+    public int ArtilleryWallGroup;
+    public Dictionary<string, HashSet<int>> WallResponseOffers;
+    public Dictionary<string, HashSet<int>> WallCoverageOffers;
     // Contra-pressao cujo alvo esta quase todo FORA da nossa terra (outra ilha): resposta
     // terrestre nao alcanca. So liga quando ha resposta nao-terrestre ofertada.
     public bool ExcludeLandResponse;

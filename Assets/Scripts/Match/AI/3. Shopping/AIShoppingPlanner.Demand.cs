@@ -1598,6 +1598,8 @@ public partial class AIShoppingPlanner
                 + (cart.ExpansionCapturerTarget > 0
                     ? $" expansãoCap={cart.ExpansionCapturerFulfilled}/{cart.ExpansionCapturerTarget}"
                     : ""));
+            for (int i = 0; i < demands.Count; i++)
+                demands[i].Count = cart.RemainingDemand[i];
             foreach (RoleShoppingCandidate item in cart.Items)
             {
                 int index = IndexOf(item.Building.OfferedUnits, item.Unit);
@@ -1607,7 +1609,8 @@ public partial class AIShoppingPlanner
                     UnitToBuy = item.Unit,
                     SelectedIndex = index,
                 });
-                item.Demand.Count--;
+                // Final demand counts also include shared wall coverage from
+                // purchases made for composition or elite progression.
                 remaining -= item.Unit.cost;
                 usedBuildings.Add(item.Building);
                 Vector3Int productionCell = item.Building.CurrentCellPosition;
@@ -1773,6 +1776,7 @@ public partial class AIShoppingPlanner
                             || !IsRolePurchaseAllowed(unit, snapshot.Stance,
                                 IsEmergencyShoppingDemand(demand))
                             || !DoesUnitMeetShoppingDemand(unit, demand)
+                            || !MatchesWallOffer(demand, unit, building)
                             || ShouldYieldGenericFireSupportToAntiInfantry(
                                 unit, demand, counterPressure))
                             continue;
@@ -1789,7 +1793,7 @@ public partial class AIShoppingPlanner
                                 counterPressure, macroLosing, concentrateSpend),
                         };
                         RoleShoppingCart expanded = state.Clone();
-                        AddCandidateToRoleShoppingCart(expanded, candidate);
+                        AddCandidateToRoleShoppingCart(expanded, candidate, demands);
                         next.Add(expanded);
                     }
                 }
@@ -1807,7 +1811,7 @@ public partial class AIShoppingPlanner
     }
 
     private static void AddCandidateToRoleShoppingCart(
-        RoleShoppingCart cart, RoleShoppingCandidate candidate)
+        RoleShoppingCart cart, RoleShoppingCandidate candidate, List<AIShoppingDemand> demands)
     {
         int demandIndex = candidate.DemandIndex;
         bool firstCoverage = !cart.CoveredDemand[demandIndex];
@@ -1835,6 +1839,28 @@ public partial class AIShoppingPlanner
             cart.CoveredDemand[demandIndex] = true;
             cart.DistinctCovered++;
             cart.CoveragePriorityScore += priorityValue;
+        }
+        // A composition/elite purchase may also fill ONE wall-response slot.
+        // Never count the same hull against both buckets of a mixed wall.
+        if (candidate.Demand.ArtilleryWallGroup == 0)
+        {
+            int chosen = -1;
+            for (int i = 0; i < demands.Count; i++)
+                if (demands[i].ArtilleryWallGroup != 0 && cart.RemainingDemand[i] > 0
+                    && MatchesWallOffer(demands[i], candidate.Unit, candidate.Building, coverage: true)
+                    && (chosen < 0 || cart.RemainingDemand[i] > cart.RemainingDemand[chosen])) chosen = i;
+            if (chosen >= 0)
+            {
+                cart.RemainingDemand[chosen]--;
+                cart.FulfilledCount++;
+                int value = Mathf.Max(1, 100 - demands[chosen].Priority);
+                cart.FulfillmentPriorityScore += value;
+                if (!cart.CoveredDemand[chosen])
+                {
+                    cart.CoveredDemand[chosen] = true; cart.DistinctCovered++;
+                    cart.CoveragePriorityScore += value;
+                }
+            }
         }
     }
 
@@ -2204,7 +2230,8 @@ public partial class AIShoppingPlanner
                     || !IsEliteChainAvailable(unit, snapshot)
                     || !IsRolePurchaseAllowed(unit, snapshot.Stance,
                         IsEmergencyShoppingDemand(demand))
-                    || !DoesUnitMeetShoppingDemand(unit, demand))
+                    || !DoesUnitMeetShoppingDemand(unit, demand)
+                    || !MatchesWallOffer(demand, unit, building))
                     continue;
                 if (best == null || unit.cost < best.cost)
                     best = unit;
@@ -2785,7 +2812,8 @@ public partial class AIShoppingPlanner
                     || unit.militaryForce == MilitaryForce.Navy
                     || !IsEliteChainAvailable(unit, snapshot)
                     || !IsRolePurchaseAllowed(unit, snapshot.Stance, IsEmergencyShoppingDemand(target))
-                    || !DoesUnitMeetShoppingDemand(unit, target))
+                    || !DoesUnitMeetShoppingDemand(unit, target)
+                    || !MatchesWallOffer(target, unit, building))
                     continue;
                 if (bestUnit == null || unit.cost < bestUnit.cost)
                 {
@@ -2850,7 +2878,8 @@ public partial class AIShoppingPlanner
                     || !IsRolePurchaseAllowed(unit, snapshot.Stance,
                         IsEmergencyShoppingDemand(demand))
                     || !IsEliteChainAvailable(unit, snapshot)
-                    || !DoesUnitMeetShoppingDemand(unit, demand))
+                    || !DoesUnitMeetShoppingDemand(unit, demand)
+                    || !MatchesWallOffer(demand, unit, building))
                     continue;
 
                 float fit = ScoreCounterFit(unit, pressure);
@@ -2913,7 +2942,8 @@ public partial class AIShoppingPlanner
                 if (!IsRolePurchaseAllowed(unit, snapshot.Stance,
                         IsEmergencyShoppingDemand(demand))
                     || !IsEliteChainAvailable(unit, snapshot)
-                    || !DoesUnitMeetShoppingDemand(unit, demand))
+                    || !DoesUnitMeetShoppingDemand(unit, demand)
+                    || !MatchesWallOffer(demand, unit, building))
                     continue;
                 if (unit.cost < cheapest)
                     cheapest = unit.cost;
@@ -3394,26 +3424,8 @@ public partial class AIShoppingPlanner
             }
         }
 
-        // PAREDE -> BOMBARDEIRO, pela PRESA (autor, 2026-11-07: "as aeronaves do cara voam na
-        // sua praia, voce compra baterias anti-aerea, ele fica de olho... qdo voce tiver muitas,
-        // ele compra bombardeiro"). Antes contava PAPEL (CanSatisfy FogoIndireto, que pegava a AA
-        // por acidente) e parava no primeiro elite aereo: a parede de 6 baterias recebia o mesmo
-        // UM bombardeiro que a de 3. Agora conta a CLASSE Artillery (artilharia, AAA e SAM) e a
-        // demanda pede quem a tem em primario. Escala: um bombardeiro por 3 pecas da parede,
-        // ate BreakthroughBomberCap.
-        int enemyWall = CountEnemyClass(snapshot, GameUnitClass.Artillery);
-        int wantedBombers = Mathf.Min(BreakthroughBomberCap, enemyWall / 3);
-        int ownBombers = CountOwnedAirAttack(snapshot, eliteOnly: true);
-        if (wantedBombers > ownBombers)
-        {
-            AIShoppingDemand bomber = NewRoleDemand(UnitRole.AtaqueAereo, wantedBombers - ownBombers, 12,
-                "breakthrough", $"parede (classe Artillery)={enemyWall}; bombardeiros={ownBombers}/{wantedBombers}", false);
-            bomber.Domain = Domain.Air;
-            bomber.MinEliteLevel = 1;
-            bomber.TargetClass = GameUnitClass.Artillery;
-            bomber.MinTargetPriority = BazookaTargetPriority.Primary;
-            MergeRoleDemand(demands, bomber, false);
-        }
+        foreach (AIShoppingDemand wallDemand in BuildArtilleryWallDemands(snapshot, log))
+            MergeRoleDemand(demands, wallDemand, false);
 
         // Vigilancia aerea so quando ha O QUE ACHAR: com o terreno revelado, ver o ceu de longe
         // nao acrescenta quase nada — o que o radar ganha e DETECTAR furtivo. Entao pede:
@@ -3750,6 +3762,7 @@ public partial class AIShoppingPlanner
                 && incoming.Origin.Contains("rally-assembly");
             if (currentRally != incomingRally)
                 continue;
+            if (current.ArtilleryWallGroup != incoming.ArtilleryWallGroup) continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
                 || current.RequiredFamily != incoming.RequiredFamily
                 || current.Domain != incoming.Domain
@@ -3781,6 +3794,9 @@ public partial class AIShoppingPlanner
     private static bool DoesUnitMeetShoppingDemand(UnitData unit, AIShoppingDemand demand)
     {
         if (unit == null || demand == null || unit.roles == null || unit.roles.Count == 0)
+            return false;
+        if (demand.ArtilleryWallGroup != 0
+            && (demand.WallResponseOffers == null || !demand.WallResponseOffers.ContainsKey(unit.id)))
             return false;
         if (!string.IsNullOrEmpty(demand.RequiredUnitId)
             && !string.Equals(unit.id, demand.RequiredUnitId,
@@ -5043,20 +5059,216 @@ public partial class AIShoppingPlanner
         return false;
     }
 
-    // Teto do breakthrough: a parede de 9 ja pede 3; dali em diante e o counter que responde.
-    private const int BreakthroughBomberCap = 3;
-
-    private static int CountEnemyClass(AIWorldSnapshot snapshot, GameUnitClass unitClass)
+    // Response to support walls is separate from capture disruption. Everything
+    // here is decision-local: no board mutations or process-global reach cache.
+    private sealed class ArtilleryWallContext
     {
-        int count = 0;
-        if (snapshot?.EnemyUnits == null)
-            return 0;
-        foreach (UnitManager unit in snapshot.EnemyUnits)
-            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data) && data != null
-                && data.unitClass == unitClass)
-                count++;
-        return count;
+        public UnityEngine.Tilemaps.Tilemap Board;
+        public readonly List<Vector3Int>[] Targets = { new List<Vector3Int>(), new List<Vector3Int>() };
+        public readonly Dictionary<(UnitData, Vector3Int), Dictionary<Vector3Int, int>> LandRoutes = new();
+        public readonly Dictionary<string, HashSet<int>>[] CoverageOffers = {
+            new Dictionary<string, HashSet<int>>(), new Dictionary<string, HashSet<int>>() };
+        public readonly List<(UnitData Unit, ConstructionManager Producer)>[] Offers = {
+            new List<(UnitData, ConstructionManager)>(), new List<(UnitData, ConstructionManager)>() };
+
+        public bool Reaches(UnitData unit, Vector3Int origin, int group)
+        {
+            if (unit.domain == Domain.Air) return Targets[group].Count > 0;
+            if (unit.domain != Domain.Land) return false;
+            foreach (Vector3Int target in Targets[group])
+            {
+                var key = (unit, target);
+                if (!LandRoutes.TryGetValue(key, out var route))
+                {
+                    SectorManager.TryBuildLandMovementDistanceToTargetMap(Board, target, unit, out route);
+                    LandRoutes[key] = route;
+                }
+                if (route != null && route.ContainsKey(origin)) return true;
+            }
+            return false;
+        }
     }
+
+    private static int ResolveArtilleryWallGroup(UnitData data)
+    {
+        if (data?.roles == null || data.roles.Count == 0) return -1;
+        UnitRole main = data.roles[0];
+        // AntiaereoCombatente also satisfies fire support: classify upward first.
+        if (UnitRoleCompatibility.MatchesLabel(main, UnitRole.Antiaereo)
+            || main == UnitRole.AntiaereoCombatente) return 1;
+        if (UnitRoleCompatibility.MatchesLabel(main, UnitRole.FogoIndireto)
+            || main == UnitRole.ArtilheiroCombatente) return 0;
+        if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto) return 0;
+        return -1;
+    }
+
+    // Quarter-points avoid floating rounding at the three-point threshold.
+    // Invasion preserves one response per artillery piece; assault pressure
+    // remains supplementary at its normal weight.
+    private static int ResolveWallPressure(UnitData data, bool invading)
+    {
+        bool artillery = data.roles[0] == UnitRole.ArtilheiroCombatente
+            || data.roles[0] == UnitRole.AntiaereoCombatente
+            || UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.FogoIndireto)
+            || UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.Antiaereo);
+        int level = Mathf.Clamp(data.eliteLevel, 0, 2);
+        if (artillery) return invading ? 12 : level == 2 ? 12 : level == 1 ? 6 : 4;
+        return level == 2 ? 6 : level == 1 ? 3 : 2;
+    }
+
+    private static bool IsArtilleryWallResponse(UnitData data)
+    {
+        if (data?.roles == null || data.roles.Count == 0
+            || !HasWeaponCategory(data, WeaponCategory.AntiTanque)
+            || data.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Artillery) < BazookaTargetPriority.Secondary)
+            return false;
+        if (data.domain == Domain.Land)
+            return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto;
+        return data.domain == Domain.Air
+            && UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.AtaqueAereo)
+            && !UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.DisruptorDeCaptura);
+    }
+
+    private static bool MatchesWallOffer(AIShoppingDemand demand, UnitData unit,
+        ConstructionManager producer, bool coverage = false)
+    {
+        if (demand.ArtilleryWallGroup == 0) return true;
+        var offers = coverage ? demand.WallCoverageOffers : demand.WallResponseOffers;
+        return unit != null && producer != null && offers != null
+            && offers.TryGetValue(unit.id, out var producers) && producers.Contains(producer.InstanceId);
+    }
+
+    private static List<AIShoppingDemand> BuildArtilleryWallDemands(AIWorldSnapshot snapshot, bool log)
+    {
+        var result = new List<AIShoppingDemand>();
+        if (snapshot?.EnemyUnits == null || snapshot.MyBuildings == null) return result;
+        var wall = new ArtilleryWallContext();
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+            if (building != null && building.BoardTilemap != null) { wall.Board = building.BoardTilemap; break; }
+        var pressure = new int[2];
+        var enemyIds = new HashSet<int>();
+        foreach (UnitManager enemy in snapshot.EnemyUnits)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.GetDomain() != Domain.Land
+                || !enemyIds.Add(enemy.InstanceId)
+                || !enemy.TryGetUnitData(out UnitData data)) continue;
+            int group = ResolveArtilleryWallGroup(data);
+            if (group < 0) continue;
+            Vector3Int cell = enemy.CurrentCellPosition; cell.z = 0;
+            wall.Targets[group].Add(cell);
+            pressure[group] += ResolveWallPressure(data, snapshot.IsInvading);
+        }
+        int total = pressure[0] + pressure[1];
+        int desired = snapshot.IsInvading ? total / 12 : Mathf.Min(3, total / 12);
+        if (desired == 0) return result;
+
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null) continue;
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (!IsArtilleryWallResponse(unit) || unit.cost <= 0
+                    || !IsRolePurchaseAllowed(unit, snapshot.Stance, false)
+                    || !IsEliteChainAvailable(unit, snapshot)) continue;
+                for (int group = 0; group < 2; group++)
+                {
+                    if (!wall.Reaches(unit, building.CurrentCellPosition, group)) continue;
+                    wall.Offers[group].Add((unit, building));
+                    if (!wall.CoverageOffers[group].TryGetValue(unit.id, out var producers))
+                        wall.CoverageOffers[group][unit.id] = producers = new HashSet<int>();
+                    producers.Add(building.InstanceId);
+                }
+            }
+        }
+
+        var preferredOffers = new List<(UnitData Unit, ConstructionManager Producer)>[2];
+        var preferredCosts = new int[2];
+        for (int group = 0; group < 2; group++)
+        {
+            Domain preferred = group == 0 ? Domain.Air : Domain.Land;
+            var chosen = wall.Offers[group].FindAll(o => o.Unit.domain == preferred);
+            bool converted = chosen.Count == 0;
+            if (converted) chosen = wall.Offers[group];
+            bool hasPrimary = chosen.Exists(o => o.Unit.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Artillery)
+                == BazookaTargetPriority.Primary);
+            if (hasPrimary) chosen = chosen.FindAll(o => o.Unit.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Artillery)
+                == BazookaTargetPriority.Primary);
+            preferredOffers[group] = chosen;
+            preferredCosts[group] = int.MaxValue;
+            foreach (var offer in chosen) preferredCosts[group] = Mathf.Min(preferredCosts[group], offer.Unit.cost);
+            if (log && wall.Targets[group].Count > 0)
+                Debug.Log($"[AI Shopping Wall] {(group == 0 ? "suporte/assalto terrestre" : "antiaereos")}={wall.Targets[group].Count} "
+                    + $"pressao={pressure[group] / 4f:0.##} preferida={preferred} {(chosen.Count == 0 ? "sem resposta ofertada com acesso" : converted ? "convertida por oferta/acesso" : "preferida disponivel; caixa nao muda a escolha")}");
+        }
+
+        // Each existing piece contributes to one bucket only. First use its
+        // preferred matchup, then spend surplus coverage on the other bucket.
+        var owned = new List<(UnitManager Manager, UnitData Data)>();
+        var ownIds = new HashSet<int>();
+        if (snapshot.MyUnits != null)
+            foreach (UnitManager own in snapshot.MyUnits)
+                if (own != null && !own.IsDead && !own.IsEmbarked && ownIds.Add(own.InstanceId)
+                    && own.TryGetUnitData(out UnitData data) && IsArtilleryWallResponse(data))
+                    owned.Add((own, data));
+        var initialCoverage = new int[2];
+        foreach (var own in owned)
+        {
+            int preferred = own.Data.domain == Domain.Air ? 0 : 1;
+            int group = wall.Reaches(own.Data, own.Manager.CurrentCellPosition, preferred) ? preferred : 1 - preferred;
+            if (wall.Reaches(own.Data, own.Manager.CurrentCellPosition, group)) initialCoverage[group]++;
+        }
+        int[] quota = { desired * pressure[0] / total, desired * pressure[1] / total };
+        if (quota[0] + quota[1] < desired)
+        {
+            int remainder0 = desired * pressure[0] % total;
+            int remainder1 = desired * pressure[1] % total;
+            int group = remainder0 > remainder1 ? 0 : 1;
+            if (remainder0 == remainder1)
+            {
+                float cover0 = initialCoverage[0] / (float)Mathf.Max(1, pressure[0]);
+                float cover1 = initialCoverage[1] / (float)Mathf.Max(1, pressure[1]);
+                group = cover0 < cover1 ? 0 : cover1 < cover0 ? 1 : preferredCosts[0] < preferredCosts[1] ? 0 : 1;
+            }
+            quota[group]++;
+        }
+        var remaining = (int[])quota.Clone();
+        var assigned = new HashSet<int>();
+        for (int pass = 0; pass < 2; pass++)
+            foreach (var own in owned)
+            {
+                if (assigned.Contains(own.Manager.InstanceId)) continue;
+                int preferred = own.Data.domain == Domain.Air ? 0 : 1;
+                int group = pass == 0 ? preferred : 1 - preferred;
+                if (remaining[group] <= 0 || !wall.Reaches(own.Data, own.Manager.CurrentCellPosition, group)) continue;
+                remaining[group]--; assigned.Add(own.Manager.InstanceId);
+            }
+        for (int group = 0; group < 2; group++)
+        {
+            var offers = preferredOffers[group];
+            if (remaining[group] <= 0 || offers.Count == 0) continue;
+            UnitData first = offers[0].Unit;
+            var demand = NewRoleDemand(first.domain == Domain.Air ? UnitRole.AtaqueAereo : UnitRole.Assalto,
+                remaining[group], 12, "breakthrough",
+                $"parede {(group == 0 ? "suporte/assalto terrestre" : "antiaerea")}={wall.Targets[group].Count} "
+                + $"pressao={pressure[group] / 4f:0.##} cobertura={quota[group] - remaining[group]}/{quota[group]} escala={(snapshot.IsInvading ? "1:1 artilharia + pressao de assalto" : "3 pontos/resposta, teto 3")}", false);
+            demand.Domain = first.domain;
+            demand.TargetClass = GameUnitClass.Artillery;
+            demand.MinTargetPriority = first.ResolveAiTargetPriorityForTargetClass(GameUnitClass.Artillery);
+            demand.ArtilleryWallGroup = group + 1;
+            demand.WallResponseOffers = new Dictionary<string, HashSet<int>>();
+            demand.WallCoverageOffers = wall.CoverageOffers[group];
+            foreach (var offer in offers)
+            {
+                if (!demand.WallResponseOffers.TryGetValue(offer.Unit.id, out var producers))
+                    demand.WallResponseOffers[offer.Unit.id] = producers = new HashSet<int>();
+                producers.Add(offer.Producer.InstanceId);
+            }
+            result.Add(demand);
+        }
+        return result;
+    }
+
 
     private static int CountEnemyDomain(AIWorldSnapshot snapshot, Domain domain)
     {
@@ -5073,17 +5285,6 @@ public partial class AIShoppingPlanner
         foreach (UnitManager unit in snapshot.EnemyUnits)
             if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
                 && UnitRoleCompatibility.CanSatisfy(data, role))
-                count++;
-        return count;
-    }
-
-    private static int CountOwnedAirAttack(AIWorldSnapshot snapshot, bool eliteOnly)
-    {
-        int count = 0;
-        foreach (UnitManager unit in snapshot.MyUnits)
-            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
-                && data.domain == Domain.Air && UnitRoleCompatibility.CanSatisfy(data, UnitRole.AtaqueAereo)
-                && (!eliteOnly || data.eliteLevel > 0))
                 count++;
         return count;
     }

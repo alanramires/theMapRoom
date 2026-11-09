@@ -329,3 +329,16 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - `tools/ai_test/verificar_desembarque_rally_aereo.cs`: PASS fora do Play — rally aliado ocupado entrega dois soldados no entorno; uma vaga entrega um; sem solo legal apenas aproxima/espera; outra missão não é desviada; GoGreen/captura/rally incompleto não interceptados; planejamento sem confirmar desembarque, HP, posição ou HasActed.
 - Regressão `verificar_evac_predio_vago.cs`: PASS. `bash tools/compilar.sh`: ambas assemblies passaram. Ainda não reproduzido em partida real nesta revisão.
 - Validacao em Play pelo autor: o Chinook desembarcou os dois soldados na area do rally; caso da marca resolvido.
+
+
+### 2026-11-09 — shopping: resposta híbrida à parede de artilharia
+- `BuildArtilleryWallDemands` separa suporte terrestre e antiaéreos pelo papel principal, sem duplicar InstanceId. Prefere AtaqueAereo contra suporte e Assalto contra AA, com conversão por oferta/acesso real, não por caixa. Apache principal DisruptorDeCaptura fica fora. Resposta primária ofertada precede secundária no domínio escolhido.
+- Escala normal: uma resposta por três peças totais, teto global três, distribuída proporcionalmente; invasão: 1:1 sem teto. Unidades existentes com acesso e compras de composição descontam cobertura, sem usar a mesma peça nos dois grupos. Ofertas preservam o produtor com acesso, usando o mapa de movimento terrestre existente do SectorManager.
+- `tools/ai_test/verificar_demanda_parede_artilharia.cs`: PASS em cena temporária fora do Play. Cobre 2 AAA + 1 obus, parede mista maior, teto, invasão, preferência primária/secundária, conversão nos dois sentidos, Apache excluído, preferência mantida com caixa insuficiente, cobertura existente e do carrinho, tanque ilhado e dois produtores do mesmo tanque com acessos distintos. Repintura de terreno da fixture invalida explicitamente o cache do SectorManager.
+- `bash tools/compilar.sh`: ambas assemblies passaram; `git diff --check` dos arquivos alterados passou. Nenhuma compra, movimento ou gasto confirmado. Fixture isola a progressão (`eliteFrom = null`); política de compromisso/poupança existente não foi reescrita nem validada ponta a ponta em partida nesta revisão. Custo em mapas grandes ainda precisa de observação.
+
+
+### 2026-11-09 — pressão ponderada de artilharia e Assalto
+- Extensão da demanda híbrida: artilharia 0/1/2+ vale 1/1,5/3 pontos; Assalto terrestre vale metade (0,5/0,75/1,5). Três pontos geram uma resposta, teto normal três. Classificação usa o papel existente, com artilharia/AA antes de Assalto e identidade única. Antiaéreos permanecem separados, preferindo Assalto; suporte e Assalto inimigos preferem ataque aéreo.
+- Invasão mantém uma resposta por artilharia, sem multiplicador de elite; pressão suplementar de Assalto conserva os pesos normais. Oferta, acesso, poupança e desconto de cobertura continuam pelo caminho existente. Logs/motivos passam a mostrar os pontos.
+- `verificar_demanda_parede_artilharia.cs`: regressão estendida fora do Play para pesos, uma artilharia elite 2, duas elite 1, dois Assaltos elite 2, seis básicos, quatro elite 1, identidade duplicada e ArtilheiroCombatente sem dupla contagem. Sem compras confirmadas; falta observar em partida.
