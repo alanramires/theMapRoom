@@ -164,7 +164,7 @@ public partial class AIController
     {
         var pairs = new List<AIReviewVisualPair>();
         if (record?.participants == null) return pairs;
-        var color = new Color(0.2f, 0.85f, 1f, 1f);
+        var color = new Color(0.08f, 0.18f, 0.65f, 1f);
         foreach (var participant in record.participants)
         {
             pairs.Add(new AIReviewVisualPair { From = participant.cell, To = participant.cell, Label = "AIReviewParticipant", Color = color });
@@ -1061,7 +1061,7 @@ public partial class AIController
         Vector3Int destination = action.HasMoveTo ? action.MoveTo : origin;
         destination.z = 0;
         if (origin != destination)
-            pairs.Add(new AIReviewVisualPair { From = origin, To = destination, Label = "Mover", Color = new Color(0.2f, 0.85f, 1f, 1f) });
+            pairs.Add(new AIReviewVisualPair { From = origin, To = destination, Label = "Mover", Color = new Color(0.08f, 0.18f, 0.65f, 1f) });
 
         if (action.SensorAction == SensorActionType.None) return pairs;
         Color color = action.SensorAction == SensorActionType.Attack ? new Color(1f, 0.3f, 0.25f, 1f)
@@ -1295,7 +1295,7 @@ public partial class AIController
             DrawAIReviewParticipants(record, textStyle);
             DrawAIReviewAlternatives(record, textStyle);
             GUILayout.Label("COMANDOS PREVISTOS\n" + record.commands, textStyle);
-            GUILayout.Label("Quadrado branco = unidade que vai agir. Linhas: ciano = movimento; vermelho = ataque; roxo = transporte; amarelo = outras interacoes. Anel = acao no proprio hex.", textStyle);
+            GUILayout.Label("Quadrado branco = unidade que vai agir. Linhas: azul escuro = movimento; vermelho = ataque; roxo = transporte; amarelo = outras interacoes. Anel = acao no proprio hex.", textStyle);
             if (!string.IsNullOrEmpty(record.result)) GUILayout.Label("RESULTADO\n" + record.result, textStyle);
         }
         if (record?.nearestSave != null)
