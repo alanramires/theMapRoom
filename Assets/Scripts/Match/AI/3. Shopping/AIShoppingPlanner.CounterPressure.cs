@@ -282,6 +282,15 @@ public partial class AIShoppingPlanner
         }
     }
 
+    // A secondary weapon does not justify buying a fighter for a ground
+    // mission. Anti-disruptor also matches the interceptor label.
+    private static bool IsCounterResponseRoleAllowed(UnitData unit, WeaponCategory category)
+    {
+        return unit != null && (category == WeaponCategory.AntiAerea
+            || unit.roles == null || unit.roles.Count == 0
+            || !UnitRoleCompatibility.MatchesLabel(unit.roles[0], UnitRole.Interceptador));
+    }
+
     private static UnitData FindBestRosterCounter(
         AIRosterKnowledge roster,
         CounterPressureInspection pressure,
@@ -299,7 +308,8 @@ public partial class AIShoppingPlanner
         foreach (AIRosterProfile profile in roster.Profiles)
         {
             UnitData unit = profile.Unit;
-            if (unit == null || !profile.HasWeaponCategory(category)
+            if (unit == null || !IsCounterResponseRoleAllowed(unit, category)
+                || !profile.HasWeaponCategory(category)
                 || unit.eliteLevel < minElite || unit.eliteLevel > maxElite
                 || (availableNow && !profile.AvailableNow))
                 continue;
@@ -1156,7 +1166,8 @@ public partial class AIShoppingPlanner
             if (b == null || b.OfferedUnits == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
             foreach (UnitData u in b.OfferedUnits)
-                if (u != null && u.domain != Domain.Land && HasWeaponCategory(u, category))
+                if (u != null && u.domain != Domain.Land && IsCounterResponseRoleAllowed(u, category)
+                    && HasWeaponCategory(u, category))
                     return true;
         }
         return false;
@@ -1236,6 +1247,9 @@ public partial class AIShoppingPlanner
         // counters. Esse bonus pertence somente ao matchup explicitamente pedido.
         if (unit == null || pressure == null || !requiredCategory.HasValue
             || unit.embarkedWeapons == null)
+            return 0f;
+
+        if (!IsCounterResponseRoleAllowed(unit, requiredCategory.Value))
             return 0f;
 
         bool hasRequiredWeapon = false;

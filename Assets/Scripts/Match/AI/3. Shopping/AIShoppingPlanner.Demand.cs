@@ -2003,6 +2003,9 @@ public partial class AIShoppingPlanner
             else if (unit.eliteLevel != existing.eliteLevel
                 || UnitRoleCompatibility.ResolveCompositionRole(unit) != existing.role)
                 invalidReason = "dados da unidade mudaram";
+            else if (existing.counterEscalation
+                && !IsCounterResponseRoleAllowed(unit, existing.counterCategory))
+                invalidReason = "papel da unidade nao atende a categoria de counter (interceptador responde ao ar)";
             else if (IsCommitmentOutsideCutOffEliteLine(snapshot, demands, unit, existing))
                 invalidReason = "fora da linha do elite (ilha sem ligacao: a ficha nao declara DisruptorDeCaptura)";
             bool valid = invalidReason == null;
@@ -3887,7 +3890,8 @@ public partial class AIShoppingPlanner
             && UnitRoleCompatibility.ResolveFamily(unit) != demand.RequiredFamily.Value)
             return false;
         if (demand.RequiredWeaponCategory.HasValue
-            && !HasWeaponCategory(unit, demand.RequiredWeaponCategory.Value))
+            && (!IsCounterResponseRoleAllowed(unit, demand.RequiredWeaponCategory.Value)
+                || !HasWeaponCategory(unit, demand.RequiredWeaponCategory.Value)))
             return false;
         if (demand.MinRallyArtilleryWeight > 0f
             && GetShoppingRallyArtilleryWeight(unit) < demand.MinRallyArtilleryWeight)
