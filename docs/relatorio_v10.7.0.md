@@ -109,6 +109,17 @@ depois da revisão da Aeronáutica.
 `8669794`: comentário da skill `pergunte-me` explica o processo em inglês, e `CLAUDE.md` registra
 o fluxo de colaboração. A entrevista fecha doutrina antes de código; não substitui investigação.
 
+## 8. Otimização WebGL e serialização do Editor
+
+O autor confirmou o ajuste de `Assets/img/icones/Transportando - Evac.png.meta`: override
+WebGL ligado, tamanho máximo 512 e formato serializado 50, em vez do padrão sem override.
+É configuração de importação para WebGL, em commit próprio, não churn de gameplay. Não foi
+feito build WebGL neste fechamento; a qualidade visual precisa ser observada no build.
+
+O atlas dinâmico da VT323 foi regenerado pelo Editor (textura, glifos e retângulos do atlas).
+Entra separado como churn, sem mudança intencional de design. Batalha foi salva pelo autor;
+a conferência final não encontrou diff da cena nem cena suja no Editor, que estava fora do Play.
+
 ## Reuso e validação
 
 Revisão contra “procure a que já existe”: entrega usa MelhorDesembarque/PodeDesembarcar; acesso
