@@ -31,8 +31,8 @@ public partial class AIController
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
         plannedEwacsEscorts.Clear();
-        rebelCaptureTargetReservations.Clear();
-        pendingRebelCaptureTargets.Clear();
+        planlessCaptureTargetReservations.Clear();
+        pendingPlanlessCaptureTargets.Clear();
         pendingAIDesignatedMissions.Clear();
         transportPickupBeacons.Clear();
         pickupMeetingReservations.Clear();
@@ -338,7 +338,7 @@ public partial class AIController
                 transportPickupBeacons.Remove(unit.InstanceId);
                 pickupMeetingReservations.Remove(unit.InstanceId);
                 tacticalPickupManifestBeacons.Remove(unit.InstanceId);
-                rebelCaptureTargetReservations.Remove(
+                planlessCaptureTargetReservations.Remove(
                     blockedDestination);
 
                 bool blockerCanYieldFirst =
@@ -381,7 +381,7 @@ public partial class AIController
             bool batchSucceeded = lastAIBatchSucceeded;
             if (batchSucceeded)
             {
-                CommitPendingRebelCaptureTarget(unit);
+                CommitPendingPlanlessCaptureTarget(unit);
                 CommitPendingAIDesignatedMission(unit);
                 if (action.HasMoveTo
                     && action.MoveTo != action.MoveFrom)
@@ -394,7 +394,7 @@ public partial class AIController
             }
             else
             {
-                pendingRebelCaptureTargets.Remove(
+                pendingPlanlessCaptureTargets.Remove(
                     unit.InstanceId);
                 pendingAIDesignatedMissions.Remove(
                     unit.InstanceId);

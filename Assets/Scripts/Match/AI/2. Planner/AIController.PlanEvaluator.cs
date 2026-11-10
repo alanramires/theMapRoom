@@ -100,7 +100,7 @@ public partial class AIController
                 CapturerRideOperationalTurns,
                 plan: null);
             currentAxisMap = null;
-            Debug.Log($"{TL("Plan")} slot={aiSlot.Value} rebelde runtime: BuildObjectivePlan ignorado; distribuicao sera unidade-a-unidade por distancia.");
+            Debug.Log($"{TL("Plan")} slot={aiSlot.Value} sem plano runtime: BuildObjectivePlan ignorado; distribuicao sera unidade-a-unidade por distancia.");
             return;
         }
 

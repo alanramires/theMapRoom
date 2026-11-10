@@ -733,17 +733,16 @@ public partial class AIController
             }
         }
 
-        // Facção sem QG: sem setor atribuido, o alvo e o capturavel mais proximo — mesmo
-        // criterio do rebelde a pe e do courier terrestre/aereo. Sem isto o navio cairia no
-        // QG inimigo abaixo, o mesmo funil que a rebelde nao deve seguir.
+        // Sem vaga, a carga continua sendo dona do destino. Se a resolucao
+        // acima nao materializou entrega, nao emprestar o QG inimigo ao navio.
         if (passengers.Count > 0 && AreAllPassengersPlanless(passengers, plan))
         {
             Vector3Int shipCell = unit.CurrentCellPosition; shipCell.z = 0;
             UnitManager passenger = ResolvePrimaryPassenger(unit, passengers, plan);
-            ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, shipCell);
-            if (rebelTarget != null)
+            ConstructionManager planlessTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, shipCell);
+            if (planlessTarget != null)
             {
-                Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
+                Vector3Int rc = planlessTarget.CurrentCellPosition; rc.z = 0;
                 return rc;
             }
             return shipCell; // sem alvo a vista: nao marcha para o QG inimigo
@@ -1139,26 +1138,26 @@ public partial class AIController
     {
         var orders = new List<PodeDesembarcarOption>();
         if (options == null) return orders;
-        if (options.Find(option => option?.transporterUnit != null)?.transporterUnit is UnitManager planlessTransporter
-            && AreAllPassengersPlanless(CollectPassengers(planlessTransporter), plan))
+        if (options.Find(option => option?.transporterUnit != null)?.transporterUnit is UnitManager cargoTransporter
+            && AreAllPassengersPlanless(CollectPassengers(cargoTransporter), plan))
         {
-            List<PodeDesembarcarOption> rebelOrders =
-                SelectRebelDisembarkOrdersByDistinctTargets(
+            List<PodeDesembarcarOption> planlessOrders =
+                SelectPlanlessDisembarkOrdersByDistinctTargets(
                 options, snapshot);
-            UnitManager rebelTransporter = options.Find(
+            UnitManager planlessTransporter = options.Find(
                 option => option?.transporterUnit != null)?.transporterUnit;
-            List<UnitManager> rebelPassengers =
-                CollectPassengers(rebelTransporter);
-            if (ShouldRejectPartialRebelOrRogueSelection(
-                    rebelTransporter,
-                    rebelOrders,
-                    rebelPassengers,
+            List<UnitManager> planlessPassengers =
+                CollectPassengers(planlessTransporter);
+            if (ShouldRejectPartialPlanlessSelection(
+                    planlessTransporter,
+                    planlessOrders,
+                    planlessPassengers,
                     plan,
                     snapshot,
                     Vector3Int.zero,
-                    "Naval fallback rebelde"))
+                    "Naval fallback sem plano"))
                 return orders;
-            return rebelOrders;
+            return planlessOrders;
         }
 
         var passengers = new HashSet<UnitManager>();
@@ -1208,7 +1207,7 @@ public partial class AIController
         UnitManager transporter = options.Find(
             option => option?.transporterUnit != null)?.transporterUnit;
         List<UnitManager> carriedPassengers = CollectPassengers(transporter);
-        if (ShouldRejectPartialRebelOrRogueSelection(
+        if (ShouldRejectPartialPlanlessSelection(
                 transporter,
                 orders,
                 carriedPassengers,

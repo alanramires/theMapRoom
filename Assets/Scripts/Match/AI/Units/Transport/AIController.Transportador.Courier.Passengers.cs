@@ -279,11 +279,9 @@ public partial class AIController
             return true;
         }
 
-        // Facção sem QG: o passageiro nao tem slot de plano, entao o fluxo normal cairia no
-        // funil rogue-para-o-QG-inimigo. O rebelde a pe ja captura por PROXIMIDADE (ver
-        // AIController.Rebel); o mesmo criterio vale quando ele e carga, senao APC/Chinook/
-        // navio entregariam a tropa no lugar errado. Reusa o mesmo buscador — o transporte
-        // so precisa saber PARA ONDE levar.
+        // Sem vaga, a missao declarada do passageiro manda; para capturador
+        // rogue sem endereco, reusa o buscador do proprio papel. Nunca herda
+        // automaticamente o setor ou QG do transportador.
         if (!IsPassengerInPlanSlot(passenger, plan))
         {
             // A MISSAO DO PASSAGEIRO MANDA — E O VERBO NAO IMPORTA.
@@ -300,7 +298,7 @@ public partial class AIController
             //
             // Sem missao declarada o courier ainda inventa um alvo (o capturavel
             // proximo abaixo), e e por isso que a missao precisa nascer antes dos
-            // atalhos do capturador. Ver AIController.Rebel.
+            // atalhos do capturador. Ver AIController.Planless.
             if (passenger.AIHasDesignatedMission)
             {
                 Vector3Int missionCell = passenger.AIDesignatedMissionTargetCell;
@@ -315,11 +313,11 @@ public partial class AIController
 
             if (IsRogueCapturerPassenger(passenger, plan))
             {
-                ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, fallbackCell);
-                if (rebelTarget != null)
+                ConstructionManager planlessTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, fallbackCell);
+                if (planlessTarget != null)
                 {
-                    Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
-                    Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} rebelde → capturavel proximo {rc}");
+                    Vector3Int rc = planlessTarget.CurrentCellPosition; rc.z = 0;
+                    Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} sem plano → capturavel proximo {rc}");
                     resolvedTarget = rc;
                     return true;
                 }
@@ -391,7 +389,7 @@ public partial class AIController
 
         // Rogue de uma IA com HQ mantém o vetor macro rumo ao HQ e escolhe
         // apenas capturas próximas desse corredor. Não usa a expansão radial
-        // do rebelde nem herda automaticamente o setor do transportador.
+        // do rogue nem herda automaticamente o setor do transportador.
         if (!passengerHasPlanSlot
             && IsRogueCapturerPassenger(passenger, plan)
             && TryResolveRogueCorridorCaptureTarget(

@@ -269,12 +269,12 @@ public partial class AIController : MonoBehaviour
     // Objetivos de captura escolhidos nesta passada pela faccao sem QG. Nao se
     // confunde com plannedDestinations: aquele conjunto reserva a celula onde a
     // unidade terminara o movimento; este reserva o predio distante para que a
-    // proxima unidade rebelde varra a bolha seguinte.
-    private readonly HashSet<Vector3Int> rebelCaptureTargetReservations = new HashSet<Vector3Int>();
+    // proxima unidade rogue varra a bolha seguinte.
+    private readonly HashSet<Vector3Int> planlessCaptureTargetReservations = new HashSet<Vector3Int>();
     // Intencoes calculadas nesta decisao. So viram estado persistente da
     // unidade depois que o batch retorna comprometido com sucesso.
     private readonly Dictionary<int, ConstructionManager>
-        pendingRebelCaptureTargets =
+        pendingPlanlessCaptureTargets =
             new Dictionary<int, ConstructionManager>();
     private readonly struct PendingAIDesignatedMission
     {

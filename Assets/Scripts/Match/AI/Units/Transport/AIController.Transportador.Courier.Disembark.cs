@@ -53,23 +53,23 @@ public partial class AIController
     {
         if (AreAllPassengersPlanless(passengers, plan))
         {
-            List<PodeDesembarcarOption> rebelSelected =
-                SelectRebelDisembarkOrdersByDistinctTargets(
+            List<PodeDesembarcarOption> planlessSelected =
+                SelectPlanlessDisembarkOrdersByDistinctTargets(
                 options, snapshot);
-            UnitManager rebelTransporter = options != null
+            UnitManager planlessTransporter = options != null
                 ? options.Find(option => option?.transporterUnit != null)
                     ?.transporterUnit
                 : null;
-            if (ShouldRejectPartialRebelOrRogueSelection(
-                    rebelTransporter,
-                    rebelSelected,
+            if (ShouldRejectPartialPlanlessSelection(
+                    planlessTransporter,
+                    planlessSelected,
                     passengers,
                     plan,
                     snapshot,
                     Vector3Int.zero,
-                    "fallback rebelde"))
+                    "fallback sem plano"))
                 return new List<PodeDesembarcarOption>();
-            return rebelSelected;
+            return planlessSelected;
         }
 
         var selected = new List<PodeDesembarcarOption>();
@@ -105,7 +105,7 @@ public partial class AIController
             ? options.Find(option => option?.transporterUnit != null)
                 ?.transporterUnit
             : null;
-        if (ShouldRejectPartialRebelOrRogueSelection(
+        if (ShouldRejectPartialPlanlessSelection(
                 transporter,
                 selected,
                 passengers,
@@ -117,10 +117,10 @@ public partial class AIController
         return selected;
     }
 
-    // Rebelde nao tem plano/eixo: cada passageiro desembarcado precisa justificar
+    // Rogue nao tem plano/eixo: cada passageiro desembarcado precisa justificar
     // uma oportunidade de captura DISTINTA. Passageiro sem outro predio proximo
     // continua a bordo, evitando descer e reembarcar no turno seguinte.
-    private List<PodeDesembarcarOption> SelectRebelDisembarkOrdersByDistinctTargets(
+    private List<PodeDesembarcarOption> SelectPlanlessDisembarkOrdersByDistinctTargets(
         List<PodeDesembarcarOption> options,
         AIWorldSnapshot snapshot,
         int unusedLegacyRange = 0)
@@ -171,7 +171,7 @@ public partial class AIController
             foreach (ConstructionManager building in ConstructionManager.AllActive)
             {
                 if (building == null || claimedTargets.Contains(building)
-                    || !IsRebelCapturable(passenger, building)
+                    || !IsPlanlessCapturable(passenger, building)
                     || HasBlockingSurfaceUnitAtCell(building.CurrentCellPosition))
                     continue;
 
@@ -205,7 +205,7 @@ public partial class AIController
                     Vector3Int targetCell =
                         claimedTarget.CurrentCellPosition;
                     targetCell.z = 0;
-                    if (!IsRebelCapturable(passenger, claimedTarget)
+                    if (!IsPlanlessCapturable(passenger, claimedTarget)
                         || !IsCaptureTargetUnderConfirmedPressure(
                             targetCell, snapshot))
                         continue;
@@ -231,7 +231,7 @@ public partial class AIController
 
                 if (bestOption == null || bestTarget == null)
                 {
-                    Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} permanece a bordo: " +
+                    Debug.Log($"{TL("Transporte")} sem plano #{passenger.InstanceId} permanece a bordo: " +
                               $"nenhum segundo capturavel distinto em range {safeRange} " +
                               $"e objetivo primario sem pressao.");
                     continue;
@@ -242,7 +242,7 @@ public partial class AIController
                     bestOption.disembarkCell;
                 supportDropCell.z = 0;
                 claimedDropCells.Add(supportDropCell);
-                Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} desembarca como reforco: " +
+                Debug.Log($"{TL("Transporte")} sem plano #{passenger.InstanceId} desembarca como reforco: " +
                           $"spot={bestOption.disembarkCell} alvo={bestTarget.InstanceId}@{bestTarget.CurrentCellPosition} " +
                           $"cost={bestCost} objetivoQuente=True.");
                 continue;
@@ -253,7 +253,7 @@ public partial class AIController
             Vector3Int selectedDropCell = bestOption.disembarkCell;
             selectedDropCell.z = 0;
             claimedDropCells.Add(selectedDropCell);
-            Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} desembarque dedicado: " +
+            Debug.Log($"{TL("Transporte")} sem plano #{passenger.InstanceId} desembarque dedicado: " +
                       $"spot={bestOption.disembarkCell} alvo={bestTarget.InstanceId}@{bestTarget.CurrentCellPosition} " +
                       $"cost={bestCost}.");
         }

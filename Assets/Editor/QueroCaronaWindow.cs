@@ -8,7 +8,7 @@ public sealed class QueroCaronaWindow : EditorWindow
     [SerializeField] private UnitManager unit;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private QueroCaronaContext context =
-        QueroCaronaContext.RogueOuRebelde;
+        QueroCaronaContext.SemPlano;
     [SerializeField] private ConstructionSector plannedSector =
         ConstructionSector.None;
     [SerializeField] private int operationalTurns = 2;

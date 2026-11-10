@@ -3,32 +3,13 @@ using UnityEngine;
 
 public partial class AIController
 {
-    // -------------------------------------------------------------------------
-    // Facção sem QG (rebeldes/dissidentes) — ROTEADOR.
-    //
-    // Existem duas coisas no jogo: unidade COM plano e unidade SEM plano. A IA
-    // com QG usa as duas (tem setores, planos, eixos); a IA sem QG so tem
-    // unidades sem plano — sem setor, sem eixo, alvo por proximidade.
-    //
-    // "Sem plano" NAO e sinonimo de rebelde: a IA com QG tambem produz unidade
-    // sem plano (rogue). O que a faccao sem QG tem de particular e que TODAS as
-    // dela sao assim, e que a ancora do avanco nao pode ser o proprio QG.
-    //
-    // Por isso este arquivo nao decide nada: rebelde e um CONJUNTO DE
-    // PARAMETROS sobre o controlador que ja existe, nao um controlador
-    // paralelo. Ele ja foi um espelho do capturador — 454 linhas com busca de
-    // alvo, aproximacao e portao de deslocamento proprios — e cada regra nova
-    // do jogo precisava ser escrita duas vezes. A segunda sempre atrasava: a
-    // flag prioritizeDpqAtBattle da ficha era ignorada, o alcance a pe usava
-    // MP x 2 num bolso so, e a carona era decidida antes de consultar o
-    // servico. Ver docs/refactor/ai_sem_plano.md.
-    //
-    // O que sobrou aqui sao auxiliares que nunca foram de rebelde nenhum e tem
-    // chamadores gerais (transporte, desembarque, HQBreaker); eles mudam de
-    // casa depois, sem pressa e sem risco.
-    // -------------------------------------------------------------------------
+    // Capturadores sem vaga usam o mesmo caminho rogue em qualquer faccao.
+    // Sem QG, todas as unidades sao sem plano; com QG, este roteador atende
+    // somente quem nao recebeu slot. Missao e preparada antes dos atalhos e
+    // confirmada apenas depois do batch. Os auxiliares abaixo consultam os
+    // sensores e o matching comuns, inclusive para transporte/desembarque.
 
-    private PlayerAction TryDecideRebelAction(
+    private PlayerAction TryDecidePlanlessCapturerAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan)
@@ -44,7 +25,7 @@ public partial class AIController
         // MISSAO ANTES DOS ATALHOS.
         //
         // Ate 2026-08-06 o alvo so era gravado dentro do caminho rogue (o unico
-        // lugar que preenche pendingRebelCaptureTargets). Quem saia por um atalho
+        // lugar que preenche pendingPlanlessCaptureTargets). Quem saia por um atalho
         // — captura oportunista, embarque, handoff, swap — agia SEM DECLARAR
         // DESTINO. No teste do tabuleiro de treino o soldado capturou uma garagem
         // pelo Oportunista, embarcou no turno seguinte com Mission Intent = None,
@@ -55,14 +36,14 @@ public partial class AIController
         // alcanca a pe e que ele pede carona — e e nesse turno que o transportador
         // precisa da missao. O caminho rogue regrava com o criterio dele (a pe)
         // quando chega a rodar, e o commit valida antes de escrever.
-        if (!pendingRebelCaptureTargets.ContainsKey(unit.InstanceId))
+        if (!pendingPlanlessCaptureTargets.ContainsKey(unit.InstanceId))
         {
             Vector3Int missionFrom = unit.CurrentCellPosition;
             missionFrom.z = 0;
             ConstructionManager missionTarget =
                 FindNearestPlanlessCaptureTarget(unit, snapshot, missionFrom);
             if (missionTarget != null)
-                pendingRebelCaptureTargets[unit.InstanceId] = missionTarget;
+                pendingPlanlessCaptureTargets[unit.InstanceId] = missionTarget;
         }
 
         // Sem vaga, o plano coletivo nao vira uma missao emprestada: o
@@ -114,7 +95,7 @@ public partial class AIController
                     map = boardTilemap,
                     terrainDatabase = terrainDatabase,
                     context =
-                        QueroCaronaContext.RogueOuRebelde,
+                        QueroCaronaContext.SemPlano,
                     plannedSector =
                         ConstructionSector.None,
                     operationalTurns =
@@ -140,14 +121,14 @@ public partial class AIController
                 continue;
             if (construction.TeamId == snapshot.AITeam)
                 continue;
-            if (!IsRebelCapturable(unit, construction))
+            if (!IsPlanlessCapturable(unit, construction))
                 continue;
 
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
 
             // Ja ha aliado que realmente ocupa a camada de captura aqui
-            // (persiste entre turnos), ou outro rebelde reservou este objetivo
+            // (persiste entre turnos), ou outro rogue reservou este objetivo
             // nesta passada? Uma aeronave na mesma coordenada nao reivindica
             // o predio para uma infantaria terrestre.
             bool claimedByAlliedCapturer =
@@ -166,7 +147,7 @@ public partial class AIController
                 && collectiveClaim.Capturer != unit;
             if (claimedByAlliedCapturer ||
                 claimedByOtherCollectiveCapturer ||
-                rebelCaptureTargetReservations.Contains(cell))
+                planlessCaptureTargetReservations.Contains(cell))
                 continue;
 
             // "Alcancavel": esta no componente de movimento proprio. Predio do
@@ -217,7 +198,7 @@ public partial class AIController
                 && bestDist < designatedDistance)
             {
                 Debug.Log(
-                    $"{TL("Rebelde")} {unit.InstanceId} substitui " +
+                    $"{TL("SemPlano")} {unit.InstanceId} substitui " +
                     $"DesignatedCaptureTarget #{designated.InstanceId} " +
                     $"por oportunidade imediata #{best.InstanceId} em " +
                     $"{bestCell} custo={immediateCost}<={immediateBudget}.");
@@ -226,7 +207,7 @@ public partial class AIController
         }
 
         Debug.Log(
-            $"{TL("Rebelde")} {unit.InstanceId} mantem " +
+            $"{TL("SemPlano")} {unit.InstanceId} mantem " +
             $"DesignatedCaptureTarget " +
             $"#{designated.InstanceId} em " +
             $"{designated.CurrentCellPosition}.");
@@ -268,7 +249,7 @@ public partial class AIController
             {
                 continue;
             }
-            if (!IsRebelCapturable(unit, construction))
+            if (!IsPlanlessCapturable(unit, construction))
                 return false;
             if (UnitOccupancyRules
                 .HasBlockingOccupantForUnitAtCell(
@@ -287,21 +268,21 @@ public partial class AIController
         return false;
     }
 
-    private void CommitPendingRebelCaptureTarget(
+    private void CommitPendingPlanlessCaptureTarget(
         UnitManager unit)
     {
         if (unit == null
-            || !pendingRebelCaptureTargets.TryGetValue(
+            || !pendingPlanlessCaptureTargets.TryGetValue(
                 unit.InstanceId,
                 out ConstructionManager target))
         {
             return;
         }
 
-        pendingRebelCaptureTargets.Remove(unit.InstanceId);
+        pendingPlanlessCaptureTargets.Remove(unit.InstanceId);
         if (target == null
             || unit.IsDead
-            || !IsRebelCapturable(unit, target))
+            || !IsPlanlessCapturable(unit, target))
         {
             if (unit.AIHasDesignatedCaptureTarget)
                 unit.ClearAIDesignatedCaptureTarget();
@@ -320,7 +301,7 @@ public partial class AIController
             // a captura virar missao isto nao podia acontecer, porque os dois
             // viviam em campos separados e nunca precisavam concordar.
             Debug.Log(
-                $"{TL("Rebelde")} {unit.InstanceId} NAO grava captura " +
+                $"{TL("SemPlano")} {unit.InstanceId} NAO grava captura " +
                 $"#{target.InstanceId}: ja tem missao " +
                 $"{unit.AIDesignatedMissionIntent}.");
             return;
@@ -332,16 +313,10 @@ public partial class AIController
             $"({(kept ? "mantida" : "adquirida")}).");
     }
 
-    // Capturavel para a rebelde: predio nao-aliado que o motor deixa este time tomar.
-    // A regra de elegibilidade (rebelde ignora pre-requisito de progressao) vive no
-    // MatchController; aqui so a consultamos.
     /// <summary>
-    /// Esta construcao e alvo de captura legitimo para ESTA unidade?
-    ///
-    /// NAO TEM NADA DE REBELDE. O nome e fossil de quando este arquivo era um
-    /// controlador paralelo; hoje os nove chamadores sao o rogue do capturador,
-    /// o MelhorDesembarque (4), o Courier (2) e uso interno. O Transportador
-    /// Naval chega a guardar o resultado numa variavel chamada `rebelTarget`.
+    /// Alvo de captura legitimo para esta unidade na pergunta de planejamento.
+    /// Regras de faccao (como pre-requisito para time sem QG) pertencem ao
+    /// MatchController e ao sensor oficial, nunca a este auxiliar.
     ///
     /// O corpo passou a delegar ao PodeCapturarSensor. O que saiu daqui:
     ///
@@ -360,7 +335,7 @@ public partial class AIController
     /// cruzado por quem decide agir) e o embarque (o passageiro ainda esta no
     /// veiculo justamente porque queremos saber onde larga-lo).
     /// </summary>
-    private bool IsRebelCapturable(UnitManager unit, ConstructionManager construction)
+    private bool IsPlanlessCapturable(UnitManager unit, ConstructionManager construction)
     {
         if (unit == null || construction == null)
             return false;

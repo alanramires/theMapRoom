@@ -102,10 +102,10 @@ public partial class AIController
             if (!TryResolvePlanlessCapturerAnchor(
                     unit, snapshot, out Vector3Int anchorCell))
             {
-                // Faccao sem plano (rebelde) sem nada para capturar parte para a
+                // Capturador sem plano sem nada para capturar parte para a
                 // briga: a ancora vira o inimigo visivel mais proximo. A IA com QG
                 // (plan != null) nao entra aqui — o rogue dela segue o fluxo normal.
-                if (plan != null || !TryResolveRebelHuntAnchor(unit, snapshot, out anchorCell))
+                if (plan != null || !TryResolvePlanlessHuntAnchor(unit, snapshot, out anchorCell))
                     return null;
                 hunting = true;
             }

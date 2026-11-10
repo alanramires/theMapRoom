@@ -1193,7 +1193,7 @@ public partial class AIController
     /// <summary>
     /// Pouso de emergencia preempta a agenda do passageiro. O sensor continua
     /// sendo a fonte de verdade das celulas legais, mas reserva uma celula
-    /// distinta para cada carga que puder sair. Assim a politica rebelde de
+    /// distinta para cada carga que puder sair. Assim a politica rogue de
     /// "aguardar LZ conjunta" nao mantem pessoas dentro de uma aeronave que
     /// vai pousar por falta de autonomia.
     /// </summary>

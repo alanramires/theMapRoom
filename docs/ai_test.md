@@ -438,3 +438,12 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - Regressao: `verificar_interceptador_presa_operacional.cs`, `verificar_interceptador_ancora_exposta.cs`, `verificar_desembarque_rally_aereo.cs`, `verificar_evac_predio_vago.cs`, `verificar_swap_captura_oportunista.cs`: PASS fora do Play. Duas assemblies compiladas. Reparo sem linha e espera sem HQ conferidos no codigo, sem caso dedicado em Play. Navegacao/desembarque reais e combate continuam pendentes de partida.
 - Derivacao `ConstructionManager.IsHeadQuarterlessTeam`, presets e gates de prontidao do rally nao alterados. Nenhum servico novo. Nomes antigos conservados neste diff; C10 separada.
 - Docs de doutrina para `consolidar-doutrina`, quando o autor chamar: `docs/AI Behavior/Assalto.md` S1/S9; `docs/AI Behavior/Capturador.md` R1 e §10; `contrato_missao_captura.md` (sem QG, todos sao rogues). Nao reescritos aqui.
+
+
+### 2026-11-10 — C10: nomes sem plano em commit separado
+
+- Comportamento C1–C9 separado em `3d8cdff`. Agora `AIController.Rebel.cs` virou `AIController.Planless.cs` via AssetDatabase, com GUID `385747219f331484c8f69568cb82ff00` preservado; metadado acompanha o movimento.
+- Auxiliares/colecoes passaram a Planless: `TryDecidePlanlessCapturerAction`, `IsPlanlessCapturable`, `pendingPlanlessCaptureTargets`, `planlessCaptureTargetReservations`, commit pendente, busca de caca e seletores de desembarque. Locais, comentarios, logs e fixture usam os mesmos nomes. Categoria de log `Rebelde` passou a `SemPlano`; origem da fila virou `ride-queue` (sem consumidor por texto). `QueroCaronaContext.SemPlano` substitui `RogueOuRebelde` conservando valor ordinal 1; chamadores e janelas de Editor atualizados. Nenhuma reescrita de save ou ficha.
+- Nenhuma porta comportamental da IA chama mais `IsSlotRebel`; derivacao e apresentacao da faccao no MatchController/Inspector continuam intactas. A consulta de ausencia de QG do shopping continua factual e dinamica.
+- Depois da renomeacao: fixture C ampliada, shopping B, presa operacional do interceptador e desembarque rally aereo: PASS fora do Play. Duas assemblies compiladas; diff sem erro de whitespace. Os cinco fixtures de regressao da C1–C9 tambem haviam passado antes da troca de nomes. Nao houve partida em Play.
+- Encerrada a fatia C, sem iniciar outra frente. Consolidacao dos docs de doutrina continua para a skill quando o autor chamar.

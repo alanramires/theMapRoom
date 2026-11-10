@@ -88,7 +88,7 @@ public partial class AIController
         if (snapshot != null && snapshot.IsInvading)
             return true;
 
-        // Ver IsTransportInvasionCourierCellAllowed: de nada adianta o APC rebelde avançar se a
+        // Ver IsTransportInvasionCourierCellAllowed: de nada adianta o APC rogue avançar se a
         // carga fica presa dentro dele por falta de screen.
         if (snapshot != null && transporter != null
             && AreAllPassengersPlanless(CollectPassengers(transporter),

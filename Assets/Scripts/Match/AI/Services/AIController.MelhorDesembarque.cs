@@ -387,7 +387,7 @@ public partial class AIController
             transporter, passengers, plan, snapshot, targets);
         bool usesFreeCargoFlow = UsesFreeCargoDisembarkFlow(
             passengers, plan, snapshot, targets);
-        // Um grupo rebelde/rogue de duas cargas usa a semantica integral da
+        // Um grupo rogue de duas cargas usa a semantica integral da
         // ferramenta Melhor Desembarque: primeiro maximiza passageiros
         // entregues e depois minimiza a soma das rotas. O antigo
         // TransportDropOffRange era uma regra de entrega pingada e eliminava
@@ -753,7 +753,7 @@ public partial class AIController
                              ConstructionManager.AllActive)
                     {
                         if (building == null
-                            || !IsRebelCapturable(passenger, building)
+                            || !IsPlanlessCapturable(passenger, building)
                             || HasBlockingSurfaceUnitAtCell(
                                 building.CurrentCellPosition))
                             continue;
@@ -933,7 +933,7 @@ public partial class AIController
 
             // Carga planejada navega em funcao do passageiro prioritario, nao
             // do predio geometricamente mais perto entre todos os passageiros.
-            // Rogue/rebelde nao possui eixo formal e cai no ranking cubico
+            // Rogue nao possui eixo formal e cai no ranking cubico
             // abaixo.
             UnitManager strategicPrimary =
                 ResolvePrimaryPassenger(
@@ -1223,7 +1223,7 @@ public partial class AIController
         return rogueTargets >= 2 ? rogueTargets : 1;
     }
 
-    private bool ShouldRejectPartialRebelOrRogueSelection(
+    private bool ShouldRejectPartialPlanlessSelection(
         UnitManager transporter,
         List<PodeDesembarcarOption> selected,
         List<UnitManager> passengers,
@@ -1323,7 +1323,7 @@ public partial class AIController
                 }
 
                 // Rogue dentro de uma IA com HQ continua sem eixo/slot formal.
-                // Para desembarque ele é irmão da IA rebelde: escolhe o
+                // Para desembarque ele é irmão da IA rogue: escolhe o
                 // capturável livre mais próximo e não herda o setor/HQ do
                 // transportador. O HashSet compartilhado distribui dois
                 // rogues entre dois prédios distintos.
@@ -1449,7 +1449,7 @@ public partial class AIController
                 if (claimed.Contains(designatedTarget))
                 {
                     Debug.LogWarning(
-                        $"{TL("Transporte")} alvo conjunto rebelde: " +
+                        $"{TL("Transporte")} alvo conjunto sem plano: " +
                         $"passageiro #{passenger.InstanceId} preserva " +
                         $"DesignatedCaptureTarget " +
                         $"#{designatedTarget.InstanceId}@{designatedCell}, " +
@@ -1461,7 +1461,7 @@ public partial class AIController
                 claimed.Add(designatedTarget);
                 targets[passenger.InstanceId] = designatedCell;
                 Debug.Log(
-                    $"{TL("Transporte")} alvo conjunto rebelde: " +
+                    $"{TL("Transporte")} alvo conjunto sem plano: " +
                     $"passageiro #{passenger.InstanceId} preserva " +
                     $"DesignatedCaptureTarget " +
                     $"#{designatedTarget.InstanceId}@{designatedCell}.");
@@ -1474,7 +1474,7 @@ public partial class AIController
             {
                 if (building == null
                     || claimed.Contains(building)
-                    || !IsRebelCapturable(passenger, building)
+                    || !IsPlanlessCapturable(passenger, building)
                     || HasBlockingSurfaceUnitAtCell(building.CurrentCellPosition))
                     continue;
 
@@ -1514,7 +1514,7 @@ public partial class AIController
                         out Vector3Int supportTarget))
                 {
                     targets[passenger.InstanceId] = supportTarget;
-                    Debug.Log($"{TL("Transporte")} alvo conjunto rebelde: " +
+                    Debug.Log($"{TL("Transporte")} alvo conjunto sem plano: " +
                               $"passageiro #{passenger.InstanceId} reforca " +
                               $"objetivo quente {supportTarget}; sem segundo " +
                               $"capturavel util.");
@@ -1525,7 +1525,7 @@ public partial class AIController
             Vector3Int bestTarget = best.CurrentCellPosition;
             bestTarget.z = 0;
             targets[passenger.InstanceId] = bestTarget;
-            Debug.Log($"{TL("Transporte")} alvo conjunto rebelde: " +
+            Debug.Log($"{TL("Transporte")} alvo conjunto sem plano: " +
                       $"passageiro #{passenger.InstanceId} -> " +
                       $"{best.InstanceId}@{bestTarget} " +
                       $"distTransportador={bestDistance:F0}h.");
@@ -1601,7 +1601,7 @@ public partial class AIController
             }
 
             if (building == null
-                || !IsRebelCapturable(passenger, building)
+                || !IsPlanlessCapturable(passenger, building)
                 || !IsCaptureTargetUnderConfirmedPressure(
                     claimedCell, snapshot))
                 continue;
@@ -1669,7 +1669,7 @@ public partial class AIController
             if (building == null
                 || !building.IsCapturable
                 || building.CapturePointsMax <= 0
-                || !IsRebelCapturable(passenger, building)
+                || !IsPlanlessCapturable(passenger, building)
                 || HasBlockingSurfaceUnitAtCell(building.CurrentCellPosition))
                 continue;
 

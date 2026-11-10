@@ -110,7 +110,7 @@ public static class QueroCaronaAereaService
                 unit = aircraft,
                 map = request.map,
                 terrainDatabase = request.terrainDatabase,
-                context = QueroCaronaContext.RogueOuRebelde,
+                context = QueroCaronaContext.SemPlano,
                 operationalTurns = Mathf.Max(1, request.operationalTurns),
                 emulateUnderRepairFromUnitData =
                     request.emulateUnderRepairFromUnitData

@@ -64,11 +64,11 @@ try{
         var plan=new TeamObjectivePlan{SlotIndex=ownSlot,Team=TeamId.Blue,RogueUnitIds=new System.Collections.Generic.List<int>{cap.InstanceId}};
         Set(objectives,"plans",new System.Collections.Generic.List<TeamObjectivePlan>{plan});
         var snapshot=new AIWorldSnapshot{AITeam=TeamId.Blue,AISlotIndex=ownSlot,TurnNumber=3,Stance=AIStance.Tactical,MyHQ=ownHq,EnemyHQ=enemyHq,MyUnits=new System.Collections.Generic.List<UnitManager>{cap,apc},EnemyUnits=new System.Collections.Generic.List<UnitManager>(),MyBuildings=new System.Collections.Generic.List<ConstructionManager>{ownHq},NeutralBuildings=new System.Collections.Generic.List<ConstructionManager>{target},EnemyBuildings=new System.Collections.Generic.List<ConstructionManager>{enemyHq}};
-        var action=(PlayerAction)Call("TryDecideRebelAction",cap,snapshot,plan);
-        var pending=(System.Collections.Generic.Dictionary<int,ConstructionManager>)typeof(AIController).GetField("pendingRebelCaptureTargets",flags).GetValue(ai);
+        var action=(PlayerAction)Call("TryDecidePlanlessCapturerAction",cap,snapshot,plan);
+        var pending=(System.Collections.Generic.Dictionary<int,ConstructionManager>)typeof(AIController).GetField("pendingPlanlessCaptureTargets",flags).GetValue(ai);
         Check(action!=null&&pending.ContainsKey(cap.InstanceId),"Capturador com QG e sem vaga nao declarou missao antes da captura oportunista.");
         Check(!cap.AIHasDesignatedMission&&!cap.HasActed,"Previa confirmou missao/acao antes do batch.");
-        Call("CommitPendingRebelCaptureTarget",cap);Check(cap.AIHasDesignatedCaptureTarget&&cap.AIDesignatedCaptureTargetCell==target.CurrentCellPosition,"Commit simulado nao publicou missao do rogue com QG.");
+        Call("CommitPendingPlanlessCaptureTarget",cap);Check(cap.AIHasDesignatedCaptureTarget&&cap.AIDesignatedCaptureTargetCell==target.CurrentCellPosition,"Commit simulado nao publicou missao do rogue com QG.");
         Set(cap,"isEmbarked",true);Set(cap,"embarkedTransporter",apc);Set(apc,"transportedUnitSlots",new System.Collections.Generic.List<UnitTransportSeatRuntime>{new UnitTransportSeatRuntime{embarkedUnit=cap}});
         object[] deliveryArgs={cap,plan,snapshot,enemyHq.CurrentCellPosition,apc.CurrentCellPosition,null};
         Check((bool)Call("TryResolveCourierPassengerTarget",deliveryArgs)&&(UnityEngine.Vector3Int)deliveryArgs[5]==target.CurrentCellPosition,"APC trocou missao do passageiro pelo QG/setor do transporte.");

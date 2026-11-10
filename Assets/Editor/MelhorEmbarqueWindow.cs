@@ -899,7 +899,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 terrainDatabase = terrainDatabase,
                 context = hasPlan
                     ? QueroCaronaContext.ComPlano
-                    : QueroCaronaContext.RogueOuRebelde,
+                    : QueroCaronaContext.SemPlano,
                 plannedSector = sector,
                 operationalTurns = operationalTurns,
                 emulateUnderRepairFromUnitData =

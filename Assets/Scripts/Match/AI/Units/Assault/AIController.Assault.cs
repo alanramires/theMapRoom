@@ -425,7 +425,7 @@ public partial class AIController
     {
         QueroCaronaContext context = assigned != null
             ? QueroCaronaContext.ComPlano
-            : QueroCaronaContext.RogueOuRebelde;
+            : QueroCaronaContext.SemPlano;
         QueroCaronaResult result = QueroCaronaService.Evaluate(
             new QueroCaronaRequest
             {

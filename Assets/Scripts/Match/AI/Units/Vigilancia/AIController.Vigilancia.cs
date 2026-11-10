@@ -971,7 +971,7 @@ public partial class AIController
                     map = boardTilemap,
                     terrainDatabase = terrainDatabase,
                     context =
-                        QueroCaronaContext.RogueOuRebelde,
+                        QueroCaronaContext.SemPlano,
                     useExplicitTarget = true,
                     explicitTarget = target,
                     explicitTargetLabel =

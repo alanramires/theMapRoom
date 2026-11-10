@@ -3798,7 +3798,7 @@ public partial class AIShoppingPlanner
     /// compra para cima. E o mesmo sinal que o QueroCarona/RideWait ja usa para
     /// ordenar coleta — aqui ele so atravessa para o shopping.
     ///
-    /// Hoje so o caminho rebelde chama isto. A IA com plano tem os seus dois
+    /// Sem QG esta porta le a fila sem exigir slot formal. A IA com plano tem os seus dois
     /// sistemas de demanda de transporte (ambos gateados por slot de plano); ligar
     /// este terceiro sinal la exige reconcilia-los primeiro, e isso e frente
     /// propria — ver project_dual_transport_demand.
@@ -3831,13 +3831,13 @@ public partial class AIShoppingPlanner
             return;
         }
 
-        // Prioridade sobe com a espera. Base abaixo do capturador (30): o rebelde
+        // Prioridade sobe com a espera. Base abaixo do capturador (30): o rogue
         // ainda prefere mais capturador com a primeira nota. Passou de tres turnos
         // na fila, a carona vira o gargalo e passa na frente.
         int priority = oldestWait >= 3 ? 34 : 26;
 
         EnsureRoleDemand(demands, UnitRole.Transportador, gap, priority,
-            "rebel-ride-queue",
+            "ride-queue",
             $"fila de carona: {waiting} esperando, {transporters} em campo, "
             + $"espera mais antiga {oldestWait} turno(s)");
 

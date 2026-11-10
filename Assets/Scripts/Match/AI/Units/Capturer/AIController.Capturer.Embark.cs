@@ -581,7 +581,7 @@ public partial class AIController
             terrainDatabase = terrainDatabase,
             context = assigned != null
                 ? QueroCaronaContext.ComPlano
-                : QueroCaronaContext.RogueOuRebelde,
+                : QueroCaronaContext.SemPlano,
             plannedSector = assigned != null
                 ? assigned.Sector
                 : ConstructionSector.None,

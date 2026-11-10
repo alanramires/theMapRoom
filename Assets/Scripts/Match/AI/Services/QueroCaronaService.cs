@@ -6,7 +6,7 @@ using UnityEngine.Tilemaps;
 public enum QueroCaronaContext
 {
     ComPlano,
-    RogueOuRebelde
+    SemPlano
 }
 
 public enum QueroCaronaReach
@@ -570,7 +570,7 @@ public static class QueroCaronaService
             result.captureClaimOwnerUnitId =
                 lastCaptureClaimOwnerId;
             result.reason =
-                $"{ResolveUnitKind(result)} rogue/rebelde sem prédio " +
+                $"{ResolveUnitKind(result)} rogue/sem plano sem prédio " +
                 "capturável livre alcançável em Tactical ou Operational" +
                 FormatCaptureClaimSuffix(
                     captureClaimBlocks,
@@ -832,7 +832,7 @@ public static class QueroCaronaService
     }
 
     /// <summary>
-    /// Versao do rogue/rebelde, que nao tem UM objetivo: a pergunta vira
+    /// Versao do rogue, que nao tem UM objetivo: a pergunta vira
     /// "existe ALGUM capturavel dentro do meu componente?". Nenhum = ilhado.
     /// </summary>
     /// <summary>
@@ -1156,7 +1156,7 @@ public static class QueroCaronaService
                 }
 
                 // Com plano, prédios fora do setor não participam da
-                // resposta. Rogue/rebelde continua cobrindo todos.
+                // resposta. Rogue continua cobrindo todos.
                 if (request.context == QueroCaronaContext.ComPlano
                     && request.plannedSector
                         != ConstructionSector.None

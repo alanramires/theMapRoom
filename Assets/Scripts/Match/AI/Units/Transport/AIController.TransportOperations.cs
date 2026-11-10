@@ -582,7 +582,7 @@ public partial class AIController
     /// <summary>
     /// Depois de varrer pedidos reais de EVAC/Pickup, um transportador vazio
     /// nao fica esperando quem respondeu "Nao quero carona". Unidades normais
-    /// regressam para a area da propria producao/HQ; rebeldes ja consumiram a
+    /// regressam para a area da propria producao/HQ; rogues ja consumiram a
     /// varredura Strategic e aguardam, sem inventar uma carona local.
     /// </summary>
     private PlayerAction TryBuildEmptyTransportFallbackAction(
@@ -619,7 +619,7 @@ public partial class AIController
         {
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} sem pedido " +
                 "materializavel apos Tactical/Operational/Strategic; " +
-                "rebelde aguarda nova oportunidade.");
+                "sem plano aguarda nova oportunidade.");
             return BuildMoveBatch(
                 unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
@@ -1672,7 +1672,7 @@ public partial class AIController
                     unit = passenger,
                     map = boardTilemap,
                     terrainDatabase = terrainDatabase,
-                    context = QueroCaronaContext.RogueOuRebelde,
+                    context = QueroCaronaContext.SemPlano,
                     useExplicitTarget = true,
                     explicitTarget = cargoAnchor,
                     explicitTargetLabel =
@@ -1704,7 +1704,7 @@ public partial class AIController
                         unit = passenger,
                         map = boardTilemap,
                         terrainDatabase = terrainDatabase,
-                        context = QueroCaronaContext.RogueOuRebelde,
+                        context = QueroCaronaContext.SemPlano,
                         operationalTurns = Mathf.Max(
                             1, operationalTurns),
                         emulateUnderRepairFromUnitData = true,
@@ -1730,7 +1730,7 @@ public partial class AIController
                 terrainDatabase = terrainDatabase,
                 context = assigned != null
                     ? QueroCaronaContext.ComPlano
-                    : QueroCaronaContext.RogueOuRebelde,
+                    : QueroCaronaContext.SemPlano,
                 plannedSector = assigned != null
                     ? assigned.Sector
                     : ConstructionSector.None,

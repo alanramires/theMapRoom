@@ -12,7 +12,7 @@ public partial class AIController
     ///
     /// Era essa unica linha — `target = snapshot.EnemyHQ...` — que fazia todo
     /// capturador de uma faccao sem QG marchar para a base inimiga, e foi por
-    /// causa dela que nasceu um controlador paralelo inteiro (AIController.Rebel)
+    /// causa dela que nasceu um controlador paralelo inteiro (AIController.Planless)
     /// em vez de um parametro. Ver docs/refactor/ai_sem_plano.md.
     /// </summary>
     private PlayerAction DecideRogueCapturerAction(
@@ -293,7 +293,7 @@ public partial class AIController
     /// para onde a unidade quer ir.
     /// </summary>
     /// <summary>
-    /// Rebelde sem capturavel: CACA. A ancora e o inimigo visivel mais proximo, e o
+    /// Rogue sem capturavel: CACA. A ancora e o inimigo visivel mais proximo, e o
     /// mesmo DecideRogueCapturerAction (ataque do lugar, move+ataca, marcha) leva a
     /// unidade ate ele. Fog-honesto: so conta inimigo que este slot enxerga agora;
     /// sem ninguem visivel, fica onde esta (null no chamador, como antes).
@@ -301,7 +301,7 @@ public partial class AIController
     /// Prefere alvo fora do ar: um soldado marchando atras de helicoptero nunca
     /// alcanca. Aeronave so vira ancora quando nao ha mais nada visivel.
     /// </summary>
-    private bool TryResolveRebelHuntAnchor(
+    private bool TryResolvePlanlessHuntAnchor(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         out Vector3Int anchorCell)
@@ -380,7 +380,7 @@ public partial class AIController
                     != CaptureOpportunityUnmatchedReason
                         .NoReachableOpportunity)
         {
-            pendingRebelCaptureTargets[unit.InstanceId] = null;
+            pendingPlanlessCaptureTargets[unit.InstanceId] = null;
             if (unmatched.MagneticTarget != null)
             {
                 anchorCell = unmatched.MagneticTarget.CurrentCellPosition;
@@ -404,7 +404,7 @@ public partial class AIController
         }
         if (target == null)
         {
-            pendingRebelCaptureTargets[unit.InstanceId] = null;
+            pendingPlanlessCaptureTargets[unit.InstanceId] = null;
             Debug.Log(
                 $"{TL("SemPlano")} {unit.InstanceId} sem capturável alcançável " +
                 "a pé — cai no fluxo normal (carona ou HexEvaluator).");
@@ -413,8 +413,8 @@ public partial class AIController
 
         anchorCell = target.CurrentCellPosition;
         anchorCell.z = 0;
-        pendingRebelCaptureTargets[unit.InstanceId] = target;
-        rebelCaptureTargetReservations.Add(anchorCell);
+        pendingPlanlessCaptureTargets[unit.InstanceId] = target;
+        planlessCaptureTargetReservations.Add(anchorCell);
         Debug.Log(
             $"{TL("SemPlano")} {unit.InstanceId} âncora = capturável " +
             $"{anchorCell} (mais próximo alcançável a pé).");

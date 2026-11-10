@@ -592,7 +592,7 @@ public partial class AIController
         }
 
         // Pass 4: universal selector shared with the other transporters. It
-        // handles pending rogue/rebel targets, occupied objectives and real
+        // handles pending rogue targets, occupied objectives and real
         // walking cost; the older air selector only adds Air-sector preference.
         if (bestCandidate == null)
         {

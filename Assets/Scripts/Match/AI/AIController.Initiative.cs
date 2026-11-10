@@ -1005,7 +1005,7 @@ public partial class AIController
     /// Encontra a ordem de captura ainda nao agida que precisa desta celula.
     /// Ocupacao nao e filtro: a pergunta e justamente se o bloqueador deve
     /// sair. A validade da captura continua vindo do PodeCapturarSensor por
-    /// meio de IsRebelCapturable.
+    /// meio de IsPlanlessCapturable.
     /// </summary>
     private bool TryResolveUnactedCaptureMissionAtCell(
         Vector3Int cell,
@@ -1039,7 +1039,7 @@ public partial class AIController
                 || data == null
                 || !UnitRoleCompatibility.CanSatisfy(
                     data, UnitRole.Capturador)
-                || !IsRebelCapturable(candidate, atCell))
+                || !IsPlanlessCapturable(candidate, atCell))
             {
                 continue;
             }

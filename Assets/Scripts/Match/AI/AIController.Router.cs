@@ -152,8 +152,8 @@ public partial class AIController
 
         // Capturador sem vaga declara destino antes dos atalhos e usa o
         // mesmo controlador sem plano, com ou sem QG.
-        PlayerAction rebelAction = TryDecideRebelAction(unit, snapshot, plan);
-        if (rebelAction != null) return rebelAction;
+        PlayerAction planlessAction = TryDecidePlanlessCapturerAction(unit, snapshot, plan);
+        if (planlessAction != null) return planlessAction;
 
         if (plan != null)
 
@@ -550,7 +550,7 @@ public partial class AIController
         string bestDecision = "";
 
         // Flag da ficha e contrato, nao sugestao. Este caminho — usado pelo
-        // ataque oportunista do rebelde e pelo modo hospital — era o unico que
+        // ataque oportunista do rogue e pelo modo hospital — era o unico que
         // escolhia celula de ataque sem olhar DPQ, enquanto Assalto,
         // Capturador, Defensor, Explorador, Perseguidor e HQBreaker ja
         // honravam. Mesmo peso dos outros: 2000 com a flag, 40 sem, para que a
