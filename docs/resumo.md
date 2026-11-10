@@ -1,25 +1,39 @@
-﻿# Resumo — onde estamos e o que vem
+# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-08, **depois** da tag `v10.6.0`.
+Ponto de retomada. Atualizado em 2026-11-09, **depois** da tag `v10.7.0`.
 Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.6.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O primeiro MVP estável segue no
-ar (v9.2.0). Relatórios: [`relatorio_v10.6.0.md`](relatorio_v10.6.0.md),
-[`relatorio_v10.5.0.md`](relatorio_v10.5.0.md), [`relatorio_v10.4.0.md`](relatorio_v10.4.0.md).
+`v10.7.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.7.0.md`](relatorio_v10.7.0.md),
+[`relatorio_v10.6.0.md`](relatorio_v10.6.0.md), [`relatorio_v10.5.0.md`](relatorio_v10.5.0.md).
 
-**A descoberta da v10.6.0: só aceite o que a etapa seguinte aceitaria.** Seis defeitos das marcas
-T10 tinham a mesma forma — uma etapa aceitava promessa que a seguinte recusaria: âncora de fusão
-onde a fusão não acontece (`IsRepairFusionSiteSafe`, agora uma pergunta só); supridor validado no
-hex atual, não na célula onde pousaria (`CanSupplierRecoverAircraft` com célula); hospital aceito
-sem caminho que o aproximasse (→ anel do HQ); substituto do swap "reservando" o segundo prédio
-(`committedCapturer`). E a régua do supridor virou **"o que eu perco se não atender agora?"**:
-4 faixas estritas (`ResolveLogisticsNeed`: autonomia aérea > HP crítico > corretivo > preventivo)
-e, dentro da faixa, **prazo Tático antes do Operacional** (visto em Play). A aeronave ferida que
-espera pouso na produtora reserva a célula — **só na camada da IA**. Skill `pergunte-me` nova.
+**A descoberta da v10.7.0: ter arma não é ter missão; ter ficha não é chegar ao alvo.**
+O counter comprava Caça A pela metralhadora. O rally comprava Tanque B ilhado. Corrigido o
+rally, o tanque reapareceu por outra porta: pré-requisito do Tanque A, com ficha exata pulando
+a exclusão de ilha. A seleção da elite agora respeita a régua de isolamento antes de pedir a
+cadeia; interceptadores não nascem como contramedida terrestre. **Esses dois últimos ajustes
+só passaram em fixtures fora do Play**; ler a próxima marca antes de declarar resolvido.
+
+Parede ponderada: artilharia níveis 0/1/2+ vale 1/1,5/3 pontos; Assalto terrestre metade;
+três pontos por resposta, teto normal três. Suporte/Assalto pede ar; AA pede Assalto, com
+conversão por oferta/acesso, não por falta de caixa. Invasão conserva 1:1 por artilharia mais
+pressão suplementar de Assalto. Core já conta família (Apache incluído); parâmetros do AI
+Manager não foram reescritos. Compra especial do rally filtra a produtora até a âncora real.
+
+**Vistos em Play:** Chinook entregou os dois passageiros na área do rally; Caça B #73 adiou o
+tiro terciário no SAM e avançou para o **Chinook #18**, não o Bombardeiro; registro do shopping
+converteu o rally para Bombardeiro e recusou artilharia sem acesso. Marcas/linhas de envolvidos
+ficaram rosa e movimento azul escuro (compilados, confirmação visual pendente). Diagnóstico
+arquitetural em [`arquitetura/arquitetura_atual.md`](arquitetura/arquitetura_atual.md), sem
+terceira refatoração; terminar a Aeronáutica primeiro. Montinho completo continua proposta.
+
+Da v10.6.0 permanece a régua do supridor: autonomia aérea > HP crítico > corretivo > preventivo,
+com prazo Tático antes do Operacional dentro da faixa. Régua/prazo vistos em Play; demais
+casos de reparo, reserva e EVAC conservam seus débitos de validação abaixo.
 
 **A descoberta da v10.5.0: ferido não é carga.** O transporte que leva ferido está num resgate,
 e o ferido tem destino próprio — o do **reparo**. O EVAC aéreo (Codex, revisado antes de cada
@@ -118,7 +132,7 @@ devolveu ao mapa:
 - **Shopping:** veículo nasce na fábrica com estrada.
 
 O mapa de teste agora é o **Peixe Pequeno** (Q3, ilhas de metrópoles, ar + exército sem ligação
-por terra). A Batalha aponta para ele. **Nada do Shopping novo foi visto rodando lá.**
+por terra). A Batalha aponta para ele. **As marcas da v10.7.0 mostram o shopping rodando; cada correção tem validação própria no relatório.**
 
 **A descoberta da v9.6.0: o jogo grava o pensamento da IA, o autor marca, o agente lê.**
 A tela **AI Step** ([`ai_step.md`](ai_step.md)) para a IA antes de cada execução e
@@ -384,6 +398,25 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v10.7.0 deixou — fechar a Aeronáutica em partida
+
+1. **Ver a próxima compra:** Caça A/B fora do counter terrestre; cadeia Tanque B → A não
+   contorna isolamento. `AIShoppingPlanner.CounterPressure.cs` e `.Demand.cs`; quatro fixtures
+   passaram após o último ajuste, mas falta a compra real. Não confundir outra origem com
+   regressão do rally: ler `origem=` e a escolha da elite.
+2. **Shopping híbrido/ponderado:** testar mistura, cobertura e invasão final no mapa real;
+   medir custo de mapas do SectorManager com muitos perfis/alvos. Poupança não foi reescrita;
+   migração de compromisso antigo não foi testada ponta a ponta no ledger da partida.
+3. **Rally:** entrega dos dois passageiros vista; compra com acesso vista no registro. A proposta
+   completa de `docs/rally/rally_proposta.md`, reforços e liberação de montinhos continua parcial.
+   Não trocar os gates de prontidão por uma regra nova durante o fechamento.
+4. **AI Step:** conferir envolvidos rosa, vínculo e foco da presa operacional; `TraceAIReviewParticipant`
+   já é usado. A perseguição do Caça B foi vista; não significa que perseguia o Bombardeiro.
+5. **Arquitetura:** mapa atual publicado, sem refatoração executada. A terceira só depois da
+   revisão da Aeronáutica; procurar primeiro os predicados/serviços que já existem.
+6. **Doutrina:** lista completa de débitos, incluindo os herdados, no relatório v10.7.0.
+
 
 ### O que a v10.6.0 deixou — ver rodando
 
@@ -884,6 +917,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **arma secundária vira missão de compra** | o Caça A foi comprado contra infantaria. `IsCounterResponseRoleAllowed` separa contramedida de compra e tiro oportunista; interceptadores respondem a ar |
+| **ficha exata pula a ilha** | `RequiredUnitId` não torna a contramedida alcançável. `FindBestEliteCounter` aplica `CounterOffLandShare`/`OffersNonLandCounter` antes da cadeia; a exclusão também vale para o pré-requisito |
+| **mesmo tanque, origem diferente** | a correção do rally funcionou e o Tanque B reapareceu pelo counter-prerequisite. Conferir `origem=`, compromisso e cadeia antes de culpar o ramo corrigido |
+| **ar primeiro só no Tático** | a presa no Operacional não entra no scan de tiro imediato. `TryResolveOperationalHuntTarget` e avanço existente permitem ao caça adiar o tiro terrestre terciário; não mudar o Disruptor |
 | **aceitar o que a etapa seguinte recusa** | a âncora de fusão, o supridor da recuperação aérea e a LZ do hospital aceitavam alvos que a execução recusava (ameaça, pouso na célula, caminho sem avanço) — e a unidade ficava presa no ramo, sem cair no fallback. A primeira etapa pergunta **ao predicado da segunda**, na célula onde a ação vai acontecer |
 | **estado avaliado depois de quem o muda** | o reparo era decidido na Fase 2, depois de o Serviço do Comando curar: quem chegava abaixo do gatilho saía curado e "sem ferimento". Estado que reage a um evento (dano, cura) tem de ser lido **antes** do passo que o altera |
 | **"a IA parou depois do load"** | primeiro F12 (AI Resume). Com `startOnPause: 1` todo Play novo nasce pausado; o `ai replan` destrava por reiniciar o estágio, não por consertar |
@@ -1111,3 +1148,10 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
     `IsRepairFusionSiteSafe`; pouso do supridor → `PodePousarSensor.Evaluate(atCell:)` via
     `CanSupplierRecoverAircraft`; prazo de suprimento → envelope + `PodeSuprir` por origem, nunca
     distância. Cópia parecida do critério "na escolha" é o defeito.
+
+11. **A elegibilidade acompanha a cadeia inteira da compra.** No counter, usar
+    `IsCounterResponseRoleAllowed` para a missão e `CounterOffLandShare`/`OffersNonLandCounter`
+    para isolamento **antes** de `FindBestEliteCounter` escolher a elite; `RequiredUnitId` e
+    seu pré-requisito não são exceções. No rally, usar `TryGetRallyAnchorCell` e o acesso do
+    `SectorManager` por ficha/produtora. Regra correta só no carrinho deixa o planejador
+    continuar prometendo uma peça que não atende o destino.
