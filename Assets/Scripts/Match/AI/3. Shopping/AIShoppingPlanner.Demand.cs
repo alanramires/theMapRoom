@@ -1348,7 +1348,7 @@ public partial class AIShoppingPlanner
                     && d.IsPreventiveAirControl)
                 : null;
         // Reusa o que a demanda acabou de montar (mesmo snapshot): antes refazia roster e counter
-        // uma segunda vez aqui. O rebelde volta cedo e nao monta: cai no calculo.
+        // uma segunda vez aqui. Todas as faccoes publicam estes fatos na montagem.
         AIRosterKnowledge shoppingRoster = s_lastBuiltRoster ?? BuildRosterKnowledge(snapshot, log: false);
         CounterPressureInspection counterPressure = s_lastBuiltCounter ?? BuildCounterPressure(snapshot, shoppingRoster);
 #if UNITY_EDITOR
@@ -1385,7 +1385,7 @@ public partial class AIShoppingPlanner
         int conscriptionTax = 0;
         var conscriptionTaxShares = new Dictionary<ConstructionManager, int>();
         bool conscriptionActive = false;
-        if (AIController.Instance != null && AIController.Instance.ConscriptionDoctrine)
+        if (HasShoppingBase(snapshot) && AIController.Instance != null && AIController.Instance.ConscriptionDoctrine)
             conscriptionActive = !ResolveMassacrePhase(snapshot, AIController.Instance);
         if (conscriptionActive)
         {
@@ -1430,7 +1430,7 @@ public partial class AIShoppingPlanner
         // força), corpo vem antes do elite. Enche cada produtor livre com o corpo mais BARATO (massa),
         // e o elite comprometido só entra no ÚLTIMO produtor se ainda couber no caixa depois da massa —
         // o resto vira reserva. Normal/Easy seguem o fluxo validado (retrato de hoje), intocados.
-        if (AIController.Instance != null
+        if (HasShoppingBase(snapshot) && AIController.Instance != null
             && AIController.Instance.ConscriptionWhenLosing
             && macroLosing)
         {
@@ -2007,6 +2007,15 @@ public partial class AIShoppingPlanner
     {
         AIElitePurchaseCommitment existing =
             AIIntelLedger.GetElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        if (!HasShoppingBase(snapshot))
+        {
+            if (existing != null)
+            {
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] cancela compromisso elite: time sem QG");
+                AIIntelLedger.ClearElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+            }
+            return null;
+        }
         if (existing != null)
         {
             UnitData unit = FindOfferedUnitById(snapshot, existing.unitId, out _,
@@ -2154,14 +2163,7 @@ public partial class AIShoppingPlanner
             demand.RequiredUnitId = commitment.unitId;
         }
         demands.Add(demand);
-        demands.Sort((a, b) =>
-        {
-            int urgent = b.Urgent.CompareTo(a.Urgent);
-            if (urgent != 0) return urgent;
-            int priority = a.Priority.CompareTo(b.Priority);
-            if (priority != 0) return priority;
-            return ((int)a.Role).CompareTo((int)b.Role);
-        });
+        demands.Sort(CompareShoppingDemandPriority);
     }
 
     private static AIShoppingDemand FindDemandForEliteCommitment(
@@ -2608,7 +2610,7 @@ public partial class AIShoppingPlanner
         out AIShoppingDemand target)
     {
         target = null;
-        if (Instance == null || demands == null || remaining <= 0)
+        if (!HasShoppingBase(snapshot) || Instance == null || demands == null || remaining <= 0)
             return 0;
         int maxTurns = AIController.Instance != null ? AIController.Instance.EliteSaveTurns : 1;
         if (maxTurns <= 0)
@@ -2713,7 +2715,7 @@ public partial class AIShoppingPlanner
     {
         target = null;
         buyNow = false;
-        if (snapshot == null || demands == null || remaining <= 0)
+        if (!HasShoppingBase(snapshot) || demands == null || remaining <= 0)
             return 0;
         if (AIController.Instance == null || !AIController.Instance.AbreComBlindado)
             return 0;
@@ -3084,38 +3086,6 @@ public partial class AIShoppingPlanner
 
     private static List<AIShoppingDemand> BuildRoleShoppingDemands(AIWorldSnapshot snapshot, bool log = true)
     {
-        // Faccao sem QG (rebelde): doutrina de insurgencia. Sem pacote de composicao 2/2/1, sem
-        // elite, sem ar/intel/transporte/counter — o rebelde so sabe CAPTURAR, entao gasta o caixa
-        // em MAIS capturadores. Nao pode reusar a formula de composicao: ela e razao (packages*2 -
-        // capturers), que zera assim que ha capturador demais — exatamente o que trava o rebelde.
-        // A demanda aqui e generosa e fixa; a cadencia real vem do produtor renegado (~1 compra/turno).
-        // Ver AIController.Rebel / project_faccao_sem_qg.
-        if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
-        {
-            var rebelDemands = new List<AIShoppingDemand>();
-            EnsureRoleDemand(rebelDemands, UnitRole.Capturador, 6, 30,
-                "rebel-insurgency", "doutrina rebelde: so capturador (sem composicao/elite/ar)");
-
-            // ...MENOS transporte, e transporte NAO e constante: e a FILA DE CARONA.
-            //
-            // A versao anterior desta funcao devolvia so a linha acima. O efeito era
-            // um rebelde dono de uma garagem de APC, com caixa cheio, com um
-            // capturador na fila de carona gritando BeyondOperational — e carrinho
-            // vazio, todo turno. A demanda existia, medida, e nao chegava aqui.
-            //
-            // Aqui ela chega. E a fila e a fonte certa por tres razoes:
-            //   - nasce da UNIDADE, nao do plano (o rebelde nao tem plano)
-            //   - ja carrega score, motivo e antiguidade, e sobrevive ao save
-            //   - ESVAZIA sozinha quando o transporte chega. Constante nao faz isso.
-            AppendRideQueueTransportDemand(rebelDemands, snapshot, log);
-
-            if (log)
-                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
-                    + "doutrina rebelde: Capturador + transporte derivado da fila de carona "
-                    + "— sem pacote 2/2/1 / elite / ar");
-            return rebelDemands;
-        }
-
         var demands = new List<AIShoppingDemand>();
         AIRosterKnowledge roster = BuildRosterKnowledge(snapshot, log);
         CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, roster);
@@ -3124,6 +3094,23 @@ public partial class AIShoppingPlanner
             s_lastBuiltRoster = roster;
             s_lastBuiltCounter = counterPressure;
         }
+        // Sem QG nao ha composicao de base nem operacao para equipar. As
+        // perguntas reativas continuam usando os mesmos donos: claims, fila e counter.
+        if (!HasShoppingBase(snapshot))
+        {
+            int uncovered = CountUncoveredCaptureOpportunities(snapshot);
+            EnsureRoleDemand(demands, UnitRole.Capturador, uncovered, 30,
+                "capture-opportunity", $"capturaveis alcancaveis sem destinatario={uncovered}");
+            AppendRideQueueTransportDemand(demands, snapshot, log);
+            AddCounterPressureDemands(snapshot, demands, counterPressure, roster, log);
+            demands.Sort(CompareShoppingDemandPriority);
+            if (log)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                    + $"sem QG: oportunidades livres={uncovered}; fila e ameaca visivel; "
+                    + "sem pacote/progressao/reserva/vigilancia/rally/escolta de operacao");
+            return demands;
+        }
+
         List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(
             PlayerSlotId.FromIndex(snapshot.AISlotIndex),
             log);
@@ -3555,15 +3542,51 @@ public partial class AIShoppingPlanner
 
         ApplyHardModeArmorFirst(snapshot, demands);
 
-        demands.Sort((a, b) =>
-        {
-            int urgent = b.Urgent.CompareTo(a.Urgent);
-            if (urgent != 0) return urgent;
-            int priority = a.Priority.CompareTo(b.Priority);
-            if (priority != 0) return priority;
-            return ((int)a.Role).CompareTo((int)b.Role);
-        });
+        demands.Sort(CompareShoppingDemandPriority);
         return demands;
+    }
+
+    private static bool HasShoppingBase(AIWorldSnapshot snapshot)
+        => snapshot != null && !ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam);
+
+    private static int CompareShoppingDemandPriority(AIShoppingDemand a, AIShoppingDemand b)
+    {
+        int urgent = b.Urgent.CompareTo(a.Urgent);
+        if (urgent != 0) return urgent;
+        int priority = a.Priority.CompareTo(b.Priority);
+        return priority != 0 ? priority : ((int)a.Role).CompareTo((int)b.Role);
+    }
+
+    private static int CountUncoveredCaptureOpportunities(AIWorldSnapshot snapshot)
+    {
+        var candidates = new List<ConstructionManager>();
+        if (snapshot.NeutralBuildings != null) candidates.AddRange(snapshot.NeutralBuildings);
+        if (snapshot.EnemyBuildings != null) candidates.AddRange(snapshot.EnemyBuildings);
+        // A mesma consulta de acesso por ficha/produtora ja usada pelo rally.
+        // Aqui so importa o componente conectado, nao a direcao/custo da marcha.
+        // Ancora na produtora: uma varredura por ficha/origem, nao por predio do mapa.
+        var access = new ArtilleryWallContext();
+        bool CanReachAndCapture(ConstructionManager target)
+        {
+            if (!target.TryResolveConstructionData(out ConstructionData targetData)) return false;
+            foreach (ConstructionManager producer in snapshot.MyBuildings)
+            {
+                if (producer == null || !producer.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                    || producer.OfferedUnits == null || producer.BoardTilemap == null) continue;
+                access.Board = producer.BoardTilemap;
+                access.Targets[0].Clear();
+                access.Targets[0].Add(producer.CurrentCellPosition);
+                foreach (UnitData data in producer.OfferedUnits)
+                    if (data != null && UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador
+                        && IsEliteChainAvailable(data, snapshot)
+                        && IsRolePurchaseAllowed(data, snapshot.Stance, false)
+                        && PodeCapturarSensor.HasCaptureKeyFor(data, targetData)
+                        && access.Reaches(data, target.CurrentCellPosition, 0)) return true;
+            }
+            return false;
+        }
+        return CaptureOpportunityClaimService.CountUnclaimedOpportunities(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex), candidates, CanReachAndCapture);
     }
 
     // Hard/Blitz: enquanto não há NENHUM blindado de assalto elite em campo, o primeiro elite
@@ -3785,29 +3808,18 @@ public partial class AIShoppingPlanner
     {
         if (demands == null || snapshot?.MyUnits == null) return;
 
-        int waiting = 0;
-        int transporters = 0;
+        // A fila e a mesma leitura do shopping operacional e do painel de
+        // transporte, inclusive para passageiro sem plano. Nao recontar flags
+        // de espera: elas podem carregar o retrato de uma decisao anterior.
+        PressaoCaronaLeitura queue = PressaoCaronaService.Read(
+            AIController.Instance, snapshot.AISlotIndex);
+        int waiting = queue.Pedidos.Count;
+        int transporters = queue.Buses.Count;
         int oldestWait = 0;
-
-        for (int i = 0; i < snapshot.MyUnits.Count; i++)
-        {
-            UnitManager unit = snapshot.MyUnits[i];
-            if (unit == null || unit.IsDead) continue;
-            if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
-
-            // Transportador em campo conta como frota, inclusive o que esta a
-            // caminho de uma coleta. Embarcado nao conta: ele e carga de outro.
-            if (data.isTransporter && !unit.IsEmbarked)
-            {
-                transporters++;
-                continue;
-            }
-
-            if (!unit.AIIsWaitingForRide) continue;
-            waiting++;
-            oldestWait = Mathf.Max(
-                oldestWait, unit.ResolveAIRideWaitTurns(snapshot.TurnNumber));
-        }
+        foreach (PressaoCaronaPedido pedido in queue.Pedidos)
+            if (pedido.Unit != null)
+                oldestWait = Mathf.Max(oldestWait,
+                    pedido.Unit.ResolveAIRideWaitTurns(snapshot.TurnNumber));
 
         int gap = waiting - transporters;
         if (gap <= 0)

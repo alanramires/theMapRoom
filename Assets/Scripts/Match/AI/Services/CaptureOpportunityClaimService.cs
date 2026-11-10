@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -555,6 +555,43 @@ public static class CaptureOpportunityClaimService
         }
         snapshot = published.Snapshot;
         return true;
+    }
+
+    /// <summary>
+    /// Oportunidades ainda sem destinatario no matching publicado. O shopping
+    /// fornece apenas a elegibilidade/acesso da ficha que pode nascer; nao
+    /// refaz o solve nem transforma a compra em reivindicacao confirmada.
+    /// </summary>
+    public static int CountUnclaimedOpportunities(
+        PlayerSlotId slot,
+        IEnumerable<ConstructionManager> constructions,
+        Func<ConstructionManager, bool> canReachAndCapture)
+    {
+        if (constructions == null || canReachAndCapture == null)
+            return 0;
+        TryGetPublishedForSlot(slot, out CaptureOpportunityClaimSnapshot published);
+        // A missao continua a bordo (e para os formais), mesmo quando a unidade
+        // nao participa do matching residual. Nao comprar outro para o mesmo endereco.
+        var assigned = new HashSet<int>();
+        foreach (UnitManager unit in UnitManager.AllActive)
+            if (unit != null && !unit.IsDead && unit.SlotIndex == slot.Value
+                && unit.AIHasDesignatedCaptureTarget)
+                assigned.Add(unit.AIDesignatedCaptureTargetInstanceId);
+        var counted = new HashSet<int>();
+        foreach (ConstructionManager construction in constructions)
+        {
+            if (construction == null || !construction.IsCapturable
+                || PlayerSlotRelations.AreAllies(slot.Value, construction.SlotIndex)
+                || counted.Contains(construction.InstanceId)
+                || assigned.Contains(construction.InstanceId))
+                continue;
+            if (published != null && published.TryGetClaim(construction, out CaptureOpportunityClaim claim)
+                && claim.Capturer != null && !claim.Capturer.IsDead)
+                continue;
+            if (canReachAndCapture(construction))
+                counted.Add(construction.InstanceId);
+        }
+        return counted.Count;
     }
 
     public static void ClearPublishedForSlot(PlayerSlotId slot)

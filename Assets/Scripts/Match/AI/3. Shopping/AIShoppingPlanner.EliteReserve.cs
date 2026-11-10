@@ -6,7 +6,7 @@ public partial class AIShoppingPlanner
 {
     private static UnitData FindEliteAssaultReserveTarget(AIWorldSnapshot snapshot, int minEliteLevel = 1)
     {
-        if (snapshot == null || snapshot.MyBuildings == null) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null) return null;
 
         HashSet<UnitData> inField = BuildFieldUnitDataSet(snapshot);
         UnitData best = null;
@@ -40,7 +40,7 @@ public partial class AIShoppingPlanner
 
     private static UnitData FindEliteInterceptorReserveTarget(AIWorldSnapshot snapshot)
     {
-        if (snapshot?.MyBuildings == null || !HasEnemyAviationForAirControl(snapshot)) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null || !HasEnemyAviationForAirControl(snapshot)) return null;
         var field = BuildFieldUnitDataSet(snapshot);
         foreach (UnitData data in field)
             if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Interceptador
@@ -113,7 +113,7 @@ public partial class AIShoppingPlanner
         bool requireChain = true,
         bool antiAirOnly = false)
     {
-        if (snapshot == null || snapshot.MyBuildings == null) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null) return null;
 
         HashSet<UnitData> inField = requireChain ? BuildFieldUnitDataSet(snapshot) : null;
         UnitData bestPreferred = null;
@@ -163,7 +163,7 @@ public partial class AIShoppingPlanner
 
     private static UnitData FindAffordableSupremeDefensiveFireSupportTarget(AIWorldSnapshot snapshot, int budget)
     {
-        if (snapshot == null || snapshot.MyBuildings == null) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null) return null;
 
         UnitData best = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
@@ -190,7 +190,7 @@ public partial class AIShoppingPlanner
 
     private static UnitData FindAffordableArmorFallbackFireSupportTarget(AIWorldSnapshot snapshot, int budget)
     {
-        if (snapshot == null || snapshot.MyBuildings == null) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null) return null;
 
         UnitData best = null;
         int bestPriority = int.MaxValue;
@@ -225,7 +225,7 @@ public partial class AIShoppingPlanner
 
     private static UnitData FindAffordableDefensiveBaseAssaultTankTarget(AIWorldSnapshot snapshot, int budget)
     {
-        if (snapshot == null || snapshot.MyBuildings == null) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null) return null;
 
         UnitData best = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
@@ -267,7 +267,7 @@ public partial class AIShoppingPlanner
 
     private static UnitData FindEliteDefensiveTankReserveTarget(AIWorldSnapshot snapshot)
     {
-        if (snapshot == null || snapshot.MyBuildings == null) return null;
+        if (!HasShoppingBase(snapshot) || snapshot.MyBuildings == null) return null;
 
         UnitData best = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
