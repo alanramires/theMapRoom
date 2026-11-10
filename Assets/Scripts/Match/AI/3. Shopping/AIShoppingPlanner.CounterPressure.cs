@@ -298,7 +298,8 @@ public partial class AIShoppingPlanner
         GameUnitClass? targetClass,
         bool availableNow,
         int minElite,
-        int maxElite)
+        int maxElite,
+        bool excludeLandResponse = false)
     {
         if (roster == null)
             return null;
@@ -308,7 +309,8 @@ public partial class AIShoppingPlanner
         foreach (AIRosterProfile profile in roster.Profiles)
         {
             UnitData unit = profile.Unit;
-            if (unit == null || !IsCounterResponseRoleAllowed(unit, category)
+            if (unit == null || (excludeLandResponse && unit.domain == Domain.Land)
+                || !IsCounterResponseRoleAllowed(unit, category)
                 || !profile.HasWeaponCategory(category)
                 || unit.eliteLevel < minElite || unit.eliteLevel > maxElite
                 || (availableNow && !profile.AvailableNow))
@@ -1126,7 +1128,6 @@ public partial class AIShoppingPlanner
         // demanda. Sem resposta aerea/naval no roster, a terrestre segue sendo a melhor que ha.
         float offShare = CounterOffLandShare(pressure, category, targetClass);
         if (offShare >= CounterOffLandExcludeShare
-            && string.IsNullOrEmpty(counterDemand.RequiredUnitId) // peca exata ja escolhida: nao anula
             && OffersNonLandCounter(snapshot, category))
         {
             counterDemand.ExcludeLandResponse = true;
@@ -1210,7 +1211,9 @@ public partial class AIShoppingPlanner
         return FindBestRosterCounter(
             roster, pressure, category, targetClass,
             availableNow: requireAvailableChain,
-            minElite: 1, maxElite: int.MaxValue);
+            minElite: 1, maxElite: int.MaxValue,
+            excludeLandResponse: CounterOffLandShare(pressure, category, targetClass)
+                >= CounterOffLandExcludeShare && OffersNonLandCounter(snapshot, category));
     }
 
     private static float ScoreCounterFit(UnitData unit, CounterPressureInspection pressure)

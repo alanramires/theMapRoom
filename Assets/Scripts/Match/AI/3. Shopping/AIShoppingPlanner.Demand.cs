@@ -2006,6 +2006,12 @@ public partial class AIShoppingPlanner
             else if (existing.counterEscalation
                 && !IsCounterResponseRoleAllowed(unit, existing.counterCategory))
                 invalidReason = "papel da unidade nao atende a categoria de counter (interceptador responde ao ar)";
+            else if (existing.counterEscalation && unit.domain == Domain.Land
+                && demands.Exists(d => d != null && d.Count > 0 && d.ExcludeLandResponse
+                    && d.RequiredWeaponCategory == existing.counterCategory
+                    && (!d.TargetClass.HasValue || !existing.counterHasTargetClass
+                        || d.TargetClass.Value == existing.counterTargetClass)))
+                invalidReason = "counter terrestre sem acesso a pressao em outra ilha";
             else if (IsCommitmentOutsideCutOffEliteLine(snapshot, demands, unit, existing))
                 invalidReason = "fora da linha do elite (ilha sem ligacao: a ficha nao declara DisruptorDeCaptura)";
             bool valid = invalidReason == null;
