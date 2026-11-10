@@ -615,11 +615,7 @@ public partial class AIController
         if (rearFollowAction != null)
             return rearFollowAction;
 
-        bool isRebel = matchController != null
-            && matchController.IsSlotRebel(
-                PlayerSlotId.FromIndex(
-                    ResolveAISlotKey(snapshot.AITeam)));
-        if (isRebel)
+        if (snapshot.MyHQ == null)
         {
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} sem pedido " +
                 "materializavel apos Tactical/Operational/Strategic; " +

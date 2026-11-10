@@ -51,7 +51,7 @@ public partial class AIController
         TeamObjectivePlan plan,
         AIWorldSnapshot snapshot)
     {
-        if (IsRuntimeRebelSnapshot(snapshot))
+        if (AreAllPassengersPlanless(passengers, plan))
         {
             List<PodeDesembarcarOption> rebelSelected =
                 SelectRebelDisembarkOrdersByDistinctTargets(
@@ -115,13 +115,6 @@ public partial class AIController
                 "fallback courier"))
             selected.Clear();
         return selected;
-    }
-
-    private bool IsRuntimeRebelSnapshot(AIWorldSnapshot snapshot)
-    {
-        return snapshot != null
-            && matchController != null
-            && matchController.IsSlotRebel(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
     }
 
     // Rebelde nao tem plano/eixo: cada passageiro desembarcado precisa justificar

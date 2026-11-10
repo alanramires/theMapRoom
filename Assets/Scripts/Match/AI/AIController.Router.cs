@@ -150,9 +150,8 @@ public partial class AIController
         // Hospital, EVAC, Supply, Pickup e Courier ja foram consultados pelo
         // TransportOperationsService no inicio do roteador.
 
-        // Facção sem QG: captura por proximidade, antes do planner. O plano normal assume
-        // um eixo a partir do proprio QG — a rebelde nao tem, e sem este curto-circuito
-        // todo capturador dela vira rogue e marcha para o QG inimigo. Ver AIController.Rebel.
+        // Capturador sem vaga declara destino antes dos atalhos e usa o
+        // mesmo controlador sem plano, com ou sem QG.
         PlayerAction rebelAction = TryDecideRebelAction(unit, snapshot, plan);
         if (rebelAction != null) return rebelAction;
 
@@ -235,6 +234,14 @@ public partial class AIController
                 if (fireSupportAction != null) return fireSupportAction;
             }
 
+        }
+
+        // O assalto rogue ja existe no papel; ausencia de plano nao o
+        // exclui do roteador. Os papeis com plano preservam a ordem acima.
+        if (plan == null)
+        {
+            PlayerAction planlessAssault = TryDecideAssaultAction(unit, snapshot, plan);
+            if (planlessAssault != null) return planlessAssault;
         }
 
         PlayerAction surveillanceAction =

@@ -418,3 +418,23 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 - Reservas/compromisso de elite e bootstrap blindado perguntam o mesmo fato da base. Compromisso antigo sem QG e cancelado no fluxo normal do shopping. Conscricao/imposto e recrutamento forcado de massa tambem nao contornam as demandas reativas sem base. Os seletores legados de reserva/base foram protegidos pelo mesmo fato; nao ha preset por faccao. Cancelamento de compromisso e conscricao conferidos no codigo, sem exercitar o ledger real da partida na fixture.
 - `verificar_shopping_sem_qg.cs`: PASS fora do Play. Dois predios livres alcancaveis pedem dois capturadores; claim publicado reduz para um e passageiro embarcado conserva esse desconto; predio em outra ilha e mercado Disabled nao geram captura; Tanque A inimigo visivel gera counter AntiTanque; sem pacote/progressao/vigilancia/rally/operacao ou alvo de reserva; promover a produtora a QG religa composicao. Usa catalogos reais de combate em cena isolada e restaura publicacoes/singletons. Nao confirma compra nem acao.
 - Regressao A/A6, controle preventivo do Caca A e counter/pre-requisito ilhado: PASS fora do Play. Ambas assemblies compiladas por `bash tools/compilar.sh`; diff sem erro de whitespace. Sem validacao em partida. A/A6 comitadas em `56980fe`; B fica para revisao. C e renomeacoes nao iniciadas.
+
+
+### 2026-11-10 — C1–C9: portas por missao, nao por faccao
+
+| Porta anterior | Fato agora consultado | Caminho existente reutilizado |
+|---|---|---|
+| Planner `IsSlotRebel` | `snapshot.MyHQ == null` | limpa objetivos/eixo e publica matching sem plano |
+| Ar `isRebel` | papel/ausencia de vaga | interdita/nega escolta, caca operacional, capitao; interceptador conserva sua cadeia aerea |
+| Assalto atras de `plan != null` | unidade pode exercer Assalto, com plano ou sem | mesmo `TryDecideAssaultAction`/breaker; capitao com objetivo usa escolta/vanguarda dele, sem objetivo usa seu capturavel planless |
+| Reparo por faccao | `hasRepairLine` | a mesma `TryMontarLinhaDeCombate`; sem linha nao exige seguranca de setor, demais gates preservados |
+| Courier/invasao | todos os embarcados sem vaga (`IsPassengerInPlanSlot`) | mesma entrega, dispensando GoGreen/ponte/screen para carga alheia a operacao; mistura conserva gates |
+| Destino por faccao | passageiro sem vaga e sua missao | Mission Intent primeiro; capturador rogue usa buscador planless; outros papeis mantem seus magneticos |
+| Desembarque por faccao | todos os passageiros sem vaga | mesmos seletores por alvos distintos e entrega conjunta, inclusive naval; removido `IsRuntimeRebelSnapshot` |
+| Transporte vazio por faccao | `snapshot.MyHQ == null` | espera existente sem inventar uma casa |
+| Capturador por faccao | unidade sem vaga no plano | declara pending antes dos atalhos; mesmo controlador com plano nulo; commit so apos batch bem-sucedido |
+
+- `verificar_politicas_sem_plano.cs`: PASS fora do Play. Capturador rogue de time com QG declara antes da captura oportunista; previa nao grava missao/HasActed e commit simulado publica endereco; APC o atende e passa GoGreen/screen; carga mista nao passa. Dupla planless usa fluxo livre e requer entrega conjunta; mistura conserva tratamento formal. Apache sem QG interdita Chinook carregado; roteador inclui tanque sem plano e aproxima do capitao sem objetivo. Planner esvazia plano/eixo pelo snapshot mesmo com QG existente no registro. Nenhum batch executado.
+- Regressao: `verificar_interceptador_presa_operacional.cs`, `verificar_interceptador_ancora_exposta.cs`, `verificar_desembarque_rally_aereo.cs`, `verificar_evac_predio_vago.cs`, `verificar_swap_captura_oportunista.cs`: PASS fora do Play. Duas assemblies compiladas. Reparo sem linha e espera sem HQ conferidos no codigo, sem caso dedicado em Play. Navegacao/desembarque reais e combate continuam pendentes de partida.
+- Derivacao `ConstructionManager.IsHeadQuarterlessTeam`, presets e gates de prontidao do rally nao alterados. Nenhum servico novo. Nomes antigos conservados neste diff; C10 separada.
+- Docs de doutrina para `consolidar-doutrina`, quando o autor chamar: `docs/AI Behavior/Assalto.md` S1/S9; `docs/AI Behavior/Capturador.md` R1 e §10; `contrato_missao_captura.md` (sem QG, todos sao rogues). Nao reescritos aqui.

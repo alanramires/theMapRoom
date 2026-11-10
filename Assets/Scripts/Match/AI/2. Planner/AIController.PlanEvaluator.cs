@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 // --------------------------------------------------------------------------------------------
@@ -87,7 +87,7 @@ public partial class AIController
     {
         TeamId aiTeam = snapshot.AITeam;
         PlayerSlotId aiSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
-        if (matchController != null && matchController.IsSlotRebel(aiSlot))
+        if (snapshot.MyHQ == null)
         {
             TeamObjectivePlan previousPlan = ObjectiveManager.GetOrCreatePlanForSlot(aiSlot, aiTeam);
             foreach (SectorObjective objective in previousPlan.Objectives)

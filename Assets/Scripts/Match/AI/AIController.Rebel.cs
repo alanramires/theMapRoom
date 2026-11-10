@@ -35,13 +35,8 @@ public partial class AIController
     {
         if (unit == null || snapshot == null)
             return null;
-        PlayerSlotId rebelSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
-        if (matchController == null || !matchController.IsSlotRebel(rebelSlot))
+        if (IsPassengerInPlanSlot(unit, plan))
             return null;
-
-        // Transporte e logistica rebeldes seguem seus proprios caminhos (o
-        // aereo/naval ja resolvem entrega por conta). Aqui tratamos apenas quem
-        // CAPTURA — que e a razao de existir da faccao.
         if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null
             || !UnitRoleCompatibility.CanSatisfy(unitData, UnitRole.Capturador))
             return null;
@@ -70,14 +65,8 @@ public partial class AIController
                 pendingRebelCaptureTargets[unit.InstanceId] = missionTarget;
         }
 
-        // ROTEADOR, e so isso. Passa plano NULO de proposito: faccao sem QG nao
-        // tem plano, e "sem plano" e um modo do capturador — nao outra IA.
-        //
-        // Com isso a rebelde herda, sem uma linha escrita para ela: DPQ da
-        // ficha, alcance pelo envelope, fila da carona, reserva 1:1, handoff,
-        // swap e as guardas de celula (nao parar em producao propria nem no
-        // capturavel de outro). Antes cada uma dessas regras precisava ser
-        // reescrita aqui, e a copia sempre atrasava.
+        // Sem vaga, o plano coletivo nao vira uma missao emprestada: o
+        // capturador usa o caminho rogue e suas politicas compartilhadas.
         return TryDecideCapturerAction(unit, snapshot, plan: null);
     }
 

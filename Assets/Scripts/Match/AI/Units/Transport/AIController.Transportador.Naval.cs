@@ -736,10 +736,11 @@ public partial class AIController
         // Facção sem QG: sem setor atribuido, o alvo e o capturavel mais proximo — mesmo
         // criterio do rebelde a pe e do courier terrestre/aereo. Sem isto o navio cairia no
         // QG inimigo abaixo, o mesmo funil que a rebelde nao deve seguir.
-        if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        if (passengers.Count > 0 && AreAllPassengersPlanless(passengers, plan))
         {
             Vector3Int shipCell = unit.CurrentCellPosition; shipCell.z = 0;
-            ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(unit, snapshot, shipCell);
+            UnitManager passenger = ResolvePrimaryPassenger(unit, passengers, plan);
+            ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, shipCell);
             if (rebelTarget != null)
             {
                 Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
@@ -1138,7 +1139,8 @@ public partial class AIController
     {
         var orders = new List<PodeDesembarcarOption>();
         if (options == null) return orders;
-        if (IsRuntimeRebelSnapshot(snapshot))
+        if (options.Find(option => option?.transporterUnit != null)?.transporterUnit is UnitManager planlessTransporter
+            && AreAllPassengersPlanless(CollectPassengers(planlessTransporter), plan))
         {
             List<PodeDesembarcarOption> rebelOrders =
                 SelectRebelDisembarkOrdersByDistinctTargets(

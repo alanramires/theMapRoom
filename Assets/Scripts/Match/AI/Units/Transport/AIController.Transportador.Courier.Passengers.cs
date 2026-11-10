@@ -174,6 +174,14 @@ public partial class AIController
         return false;
     }
 
+    private static bool AreAllPassengersPlanless(List<UnitManager> passengers, TeamObjectivePlan plan)
+    {
+        if (passengers == null || passengers.Count == 0) return false;
+        foreach (UnitManager passenger in passengers)
+            if (passenger == null || IsPassengerInPlanSlot(passenger, plan)) return false;
+        return true;
+    }
+
     // For each passenger, picks the best delivery cell, preferring immediate capture chances
     // that do not pull the courier away from its current delivery route.
 
@@ -276,7 +284,7 @@ public partial class AIController
         // AIController.Rebel); o mesmo criterio vale quando ele e carga, senao APC/Chinook/
         // navio entregariam a tropa no lugar errado. Reusa o mesmo buscador — o transporte
         // so precisa saber PARA ONDE levar.
-        if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        if (!IsPassengerInPlanSlot(passenger, plan))
         {
             // A MISSAO DO PASSAGEIRO MANDA — E O VERBO NAO IMPORTA.
             //
@@ -305,17 +313,20 @@ public partial class AIController
                 return true;
             }
 
-            ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, fallbackCell);
-            if (rebelTarget != null)
+            if (IsRogueCapturerPassenger(passenger, plan))
             {
-                Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
-                Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} rebelde → capturavel proximo {rc}");
-                resolvedTarget = rc;
-                return true;
+                ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, fallbackCell);
+                if (rebelTarget != null)
+                {
+                    Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
+                    Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} rebelde → capturavel proximo {rc}");
+                    resolvedTarget = rc;
+                    return true;
+                }
+                // Sem capturavel a vista: nao inventa alvo. Deixa o transporte decidir esperar
+                // em vez de marchar para o QG inimigo por falta de opcao.
+                return false;
             }
-            // Sem capturavel a vista: nao inventa alvo. Deixa o transporte decidir esperar
-            // em vez de marchar para o QG inimigo por falta de opcao.
-            return false;
         }
 
         if (IsFireSupportUnit(passenger))

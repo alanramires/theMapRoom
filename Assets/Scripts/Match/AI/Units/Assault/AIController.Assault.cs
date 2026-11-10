@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -672,7 +672,7 @@ public partial class AIController
         TeamObjectivePlan plan,
         bool allowTransport = true)
     {
-        if (unit == null || snapshot == null || plan == null)
+        if (unit == null || snapshot == null)
             return null;
         if (!unit.TryGetUnitData(out UnitData data) || data == null
             || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Assalto))
@@ -1743,6 +1743,7 @@ public partial class AIController
 
     private static SectorObjective ResolveAssignedAssaultObjective(UnitManager unit, TeamObjectivePlan plan)
     {
+        if (unit == null || plan?.Objectives == null) return null;
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Role == UnitRole.Assalto && slot.Filled && slot.AssignedUnitId == unit.InstanceId)

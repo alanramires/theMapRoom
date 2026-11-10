@@ -1175,7 +1175,7 @@ public partial class AIController
             || targets.Count == 0)
             return false;
 
-        if (IsRuntimeRebelSnapshot(snapshot))
+        if (AreAllPassengersPlanless(passengers, plan))
             return true;
 
         bool hasTargetedPassenger = false;
@@ -1207,7 +1207,7 @@ public partial class AIController
             || targets.Count < 2)
             return 1;
 
-        if (IsRuntimeRebelSnapshot(snapshot))
+        if (AreAllPassengersPlanless(passengers, plan))
             return Mathf.Min(passengers.Count, targets.Count);
 
         int rogueTargets = 0;
@@ -1294,7 +1294,7 @@ public partial class AIController
         if (transporter == null || passengers == null || snapshot == null)
             return false;
 
-        if (!IsRuntimeRebelSnapshot(snapshot))
+        if (!AreAllPassengersPlanless(passengers, plan))
         {
             var claimedTargetCells = new HashSet<Vector3Int>();
             List<UnitManager> orderedPassengers =

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -66,21 +66,19 @@ public partial class AIController
             {
                 pressureTarget = capturerAnchor;
                 followsCapturerCaptain = true;
-                if (ConstructionManager.IsHeadQuarterlessTeam(
-                        snapshot.AITeam))
+                SectorObjective captainObjective = ResolveAssignedObjective(capturerMagnet, plan);
+                if (captainObjective != null)
                 {
-                    ConstructionManager captainTarget =
-                        FindNearestPlanlessCaptureTarget(
-                            capturerMagnet,
-                            snapshot,
-                            capturerAnchor);
-                    if (captainTarget != null)
-                    {
-                        Vector3Int declaredCell =
-                            captainTarget.CurrentCellPosition;
-                        declaredCell.z = 0;
-                        captainCaptureCell = declaredCell;
-                    }
+                    Debug.Log($"{TL("Assalto")} {unit.InstanceId} rogue segue vanguarda do objetivo {captainObjective.Sector} do capitao #{capturerMagnet.InstanceId}");
+                    return DecideAssignedAssaultEscortAction(unit, snapshot, captainObjective);
+                }
+                ConstructionManager captainTarget = FindNearestPlanlessCaptureTarget(
+                    capturerMagnet, snapshot, capturerAnchor);
+                if (captainTarget != null)
+                {
+                    Vector3Int declaredCell = captainTarget.CurrentCellPosition;
+                    declaredCell.z = 0;
+                    captainCaptureCell = declaredCell;
                 }
                 Debug.Log(
                     $"{TL("Assalto")} {unit.InstanceId} rogue segue " +
@@ -380,7 +378,7 @@ public partial class AIController
     {
         rallyCell = Vector3Int.zero;
         reason = "";
-        if (currentAxisMap == null || currentAxisMap.AxisCount == 0)
+        if (plan == null || currentAxisMap == null || currentAxisMap.AxisCount == 0)
             return false;
         if (PlanHasActiveEnemyBaseObjective(plan, snapshot.AITeam))
             return false; // invasao ativa: deixa pressionar o QG

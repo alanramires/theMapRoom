@@ -846,30 +846,11 @@ public partial class AIController
             }
         }
 
-        // CACA ANTES DO CAPITAO, DENTRO DO OPERACIONAL. O capitao e o magnetico de
-        // quem nao tem o que fazer; com inimigo visivel na banda Operacional de
-        // combate DESTE aparelho, orbitar o capitao e desperdicar o turno — os
-        // Apaches rebeldes voavam ate os proprios soldados e esqueciam de cacar.
-        // A banda e da unidade (envelope), nao um numero de hexes.
-        // So a faccao rebelde: na IA com QG a patrulha do capitao e doutrina validada.
-        bool isRebel = snapshot != null && matchController != null
-            && matchController.IsSlotRebel(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-        if (hasCaptain
-            && isRebel
-            && TryResolveOperationalHuntTarget(unit, fromCell, visibleEnemies, out UnitManager huntTarget))
-        {
-            tier = $"Operational:Hunt#{huntTarget.InstanceId}";
-            Vector3Int huntCell = huntTarget.CurrentCellPosition;
-            huntCell.z = 0;
-            return huntCell;
-        }
-
         // INTERDICAO DE CAPTURA — "Voce nao vai fazer dinheiro nao!" (autor, 2026-11-06).
         // O espelho do capturador ("antes do tiro vem o dinheiro"): ataque aereo SEM vaga
         // no plano nao orbita o capitao, vai atras de quem faz dinheiro para o inimigo.
         // Com vaga, a escolta do capitao segue valendo (missao secundaria do autor).
-        if (!isRebel
-            && IsCaptureInterdictionUnit(unit)
+        if (IsCaptureInterdictionUnit(unit)
             && TryResolveCaptureInterdictionAnchor(
                 unit, snapshot, fromCell, visibleEnemies,
                 out Vector3Int interdictionCell, out string interdictionTier))
@@ -882,14 +863,24 @@ public partial class AIController
         // Apache nega o poder de captura; ele nega a ESCOLTA do poder de captura (assalto e
         // fogo de suporte inimigos), e sem escolta vai no capturador. Quem: AtaqueAereo de
         // essencia com DisruptorDeCaptura como papel secundario, sem vaga no plano.
-        if (!isRebel
-            && IsEscortDenialUnit(unit)
+        if (IsEscortDenialUnit(unit)
             && TryResolveEscortDenialAnchor(
                 unit, fromCell, visibleEnemies,
                 out Vector3Int escortCell, out string escortTier))
         {
             tier = escortTier;
             return escortCell;
+        }
+
+        // Interdicao/negacao de escolta vem antes da presa operacional;
+        // sem presa, o capitao continua sendo o magnetico do ataque aereo.
+        if (!isInterceptor && IsOffensiveAirCombatUnit(unit)
+            && TryResolveOperationalHuntTarget(unit, fromCell, visibleEnemies, out UnitManager huntTarget))
+        {
+            tier = $"Operational:Hunt#{huntTarget.InstanceId}";
+            Vector3Int huntCell = huntTarget.CurrentCellPosition;
+            huntCell.z = 0;
+            return huntCell;
         }
 
         if (hasCaptain)

@@ -603,19 +603,13 @@ public partial class AIController
         // precisa voltar ao HQ. Sem linha (ou na linha), vale a régua antiga de raio fixo.
         // Elite segura o reparo avançado por conta própria; aeronave e navio têm a sua lógica.
         LinhaDeCombate repairLine = null;
-        bool useRepairLine = lineSnapshot != null
-            && !eliteRelaxSafety
-            && unit != null
-            && unit.GetAircraftType() == AircraftType.None
-            && unit.GetDomain() != Domain.Naval
+        bool hasRepairLine = lineSnapshot != null && unit != null
             && TryMontarLinhaDeCombate(unit, lineSnapshot, out repairLine);
-        // Rebelde nao possui uma retaguarda territorial consolidada. O setor
-        // marcado como inseguro nao pode impedir que ela use uma instalacao
-        // aliada de reparo; os demais gates (dono, captura completa, ocupacao,
-        // ameaca visivel e compatibilidade do servico) continuam valendo.
-        bool rebelIgnoresSectorSafety = matchController != null
-            && matchController.IsSlotRebel(
-                PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
+        bool useRepairLine = hasRepairLine && !eliteRelaxSafety
+            && unit.GetAircraftType() == AircraftType.None
+            && unit.GetDomain() != Domain.Naval;
+        // Sem linha nao ha retaguarda territorial para exigir. Servico,
+        // ocupacao e ameaca local continuam sendo validados abaixo.
         bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
         bool needsPassengerRelease = IsAirTransporter(unit) && HasTransportCargo(unit);
         int passengerCount = needsPassengerRelease ? CollectPassengers(unit).Count : 0;
@@ -672,15 +666,15 @@ public partial class AIController
 
             if (!isHomeRepair
                 && !eliteRelaxSafety
-                && !rebelIgnoresSectorSafety
+                && hasRepairLine
                 && !behindLine
                 && !IsRepairConstructionSectorSafe(c, aiTeam))
             {
                 if (log) Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
                 continue;
             }
-            if (!isHomeRepair && rebelIgnoresSectorSafety)
-                if (log) Debug.Log($"[Repair] rebelde aceita {cc} apesar do setor={c.Sector}; avaliando servico e ameaca local.");
+            if (!isHomeRepair && !hasRepairLine)
+                if (log) Debug.Log($"[Repair] sem linha aceita {cc} apesar do setor={c.Sector}; avaliando servico e ameaca local.");
             bool occupiedCell = occupied.Contains(cc) && cc != fromCell;
             if (occupiedCell && !isHomeRepair)
             {

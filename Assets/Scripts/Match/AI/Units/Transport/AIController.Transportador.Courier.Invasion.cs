@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -57,10 +57,11 @@ public partial class AIController
         if (snapshot != null && snapshot.IsInvading)
             return true;
 
-        // Facção sem QG (rebeldes) não monta massa: sem produção, ela nunca junta assalto+artilharia
-        // perto do APC, então a cadeia GoGreen/ponte/screen seria um bloqueio permanente — o mesmo
-        // deadlock descrito acima, só que sem saída. Rebelde infiltra, não faz invasão de conjunto.
-        if (snapshot != null && ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        // Carga sem vaga infiltra: nao aguarda massa de uma operacao
+        // a que nenhum dos passageiros pertence.
+        if (snapshot != null && transporter != null
+            && AreAllPassengersPlanless(CollectPassengers(transporter),
+                ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex))))
             return true;
 
         if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
@@ -89,7 +90,9 @@ public partial class AIController
 
         // Ver IsTransportInvasionCourierCellAllowed: de nada adianta o APC rebelde avançar se a
         // carga fica presa dentro dele por falta de screen.
-        if (snapshot != null && ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        if (snapshot != null && transporter != null
+            && AreAllPassengersPlanless(CollectPassengers(transporter),
+                ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex))))
             return true;
 
         if (!IsTransportInvasionCourierCellAllowed(transporter, snapshot, transporterCell, target))
