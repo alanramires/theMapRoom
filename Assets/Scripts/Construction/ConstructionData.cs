@@ -192,10 +192,6 @@ public class ConstructionData : ScriptableObject
     [Tooltip("IA repoe o recurso da construcao quando ele cai para este percentual da reserva configurada. Zero so pede quando zerar. Padrao: 25%.")]
     public int aiStockRestockTriggerPercent = 25;
 
-    [Header("Rebel AI")]
-    [Tooltip("A faccao sem QG (rebelde) NUNCA produz — nem no que captura — porque sua doutrina e negacao territorial, nao expansao produtiva. Esta flag e a excecao renegada: um predio marcado permite que o rebelde que o TOMAR compre unidades aqui, ignorando as regras de dono (OriginalOwner/FirstOwner) — afinal um insurgente jamais e o dono original do que conquista. So sellingRule=Disabled ainda barra. Default false: marque apenas os poucos predios que voce quer que abasteçam a insurgencia.")]
-    public bool allowRebelAIPurchase = false;
-
     [Header("Construction Configuration")]
     [FormerlySerializedAs("defaultSiteRuntime")]
     [Tooltip("Configuracao padrao de captura, producao e logistica desta construcao. Pode ser sobrescrita por ponto do mapa.")]

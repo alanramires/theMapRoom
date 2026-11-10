@@ -273,12 +273,9 @@ public class ConstructionManager : MonoBehaviour
         totalMs = activeTeamChangedHandlerTotalMs;
     }
 
-    // Faccao sem QG (rebeldes/dissidentes). Nao existe flag de mapa: e derivado e dinamico -
-    // o time nao possui NENHUMA construcao com isPlayerHeadQuarter. Se um dia tomar um QG,
-    // deixa de ser rebelde no mesmo instante. Regras associadas:
-    //   1) captura ignora pre-requisito de progressao (MatchController.CanCaptureConstruction);
-    //   2) nunca produz, nem em predio capturado cuja regra de venda permitiria (CanProduceUnitsForTeam);
-    //   3) nao e derrotado por 0 unidades (MatchController.TryDefeatTeamIfZeroUnits).
+    // Ausencia de QG e derivada e dinamica: capturar um QG promove o time
+    // imediatamente. Compra segue a sellingRule da instancia; 0 unidades pode
+    // eliminar qualquer slot. Captura ainda consulta esta derivacao.
     // Guarda: se NENHUM QG do tabuleiro tem dono, o conceito nao se aplica e ninguem e rebelde.
     // Isso tambem cobre a janela de carga em que AllActive ainda nao foi populado.
     public static bool IsHeadQuarterlessTeam(TeamId team)
@@ -674,7 +671,7 @@ public class ConstructionManager : MonoBehaviour
             originalOwnerInitialized = true;
         }
 
-        if (!firstOwnerInitialized && slotIndex >= 0)
+        if (!firstOwnerInitialized && slotIndex >= 0 && !IsHeadQuarterlessTeam(teamId))
         {
             firstOwnerSlotIndex = slotIndex;
             firstOwnerInitialized = true;
@@ -702,7 +699,7 @@ public class ConstructionManager : MonoBehaviour
             originalOwnerInitialized = true;
         }
 
-        if (!firstOwnerInitialized && slotIndex >= 0)
+        if (!firstOwnerInitialized && slotIndex >= 0 && !IsHeadQuarterlessTeam(teamId))
         {
             firstOwnerSlotIndex = slotIndex;
             firstOwnerInitialized = true;
@@ -1386,19 +1383,8 @@ public class ConstructionManager : MonoBehaviour
             return false;
         if (buyerTeam != teamId)
             return false;
-        // Rebeldes/dissidentes nao produzem em lugar nenhum — nem no que capturaram, mesmo que a
-        // sellingRule do predio permitisse. Excecao por predio: allowRebelAIPurchase (ConstructionData)
-        // libera ESTE predio renegado para o rebelde que o tomou. Ver IsHeadQuarterlessTeam.
-        bool rebelPurchaseException = IsHeadQuarterlessTeam(buyerTeam) && DataAllowsRebelPurchase();
-        if (IsHeadQuarterlessTeam(buyerTeam) && !rebelPurchaseException)
-            return false;
         if (siteRuntime.offeredUnits == null || siteRuntime.offeredUnits.Count <= 0)
             return false;
-
-        // O predio renegado ignora as regras de dono: um rebelde nunca e o OriginalOwner/FirstOwner
-        // de algo que capturou. So Disabled (predio sem mercado) ainda barra.
-        if (rebelPurchaseException)
-            return siteRuntime.sellingRule != ConstructionUnitMarketRule.Disabled;
 
         switch (siteRuntime.sellingRule)
         {
@@ -1413,13 +1399,6 @@ public class ConstructionManager : MonoBehaviour
             default:
                 return false;
         }
-    }
-
-    // Excecao rebelde por predio: a flag allowRebelAIPurchase do ConstructionData marca este predio
-    // como renegado — um time sem QG que o capture pode produzir aqui. Ver CanProduceUnitsForVisualTeamAfterSlotValidation.
-    private bool DataAllowsRebelPurchase()
-    {
-        return TryGetConstructionData(out ConstructionData data) && data != null && data.allowRebelAIPurchase;
     }
 
     public bool CanProduceUnitsForSlot(int buyerSlotIndex)
@@ -2037,7 +2016,7 @@ public class ConstructionManager : MonoBehaviour
                 originalOwnerInitialized = true;
             }
 
-            if (!firstOwnerInitialized && slotIndex >= 0)
+            if (!firstOwnerInitialized && slotIndex >= 0 && !IsHeadQuarterlessTeam(teamId))
             {
                 firstOwnerSlotIndex = slotIndex;
                 firstOwnerInitialized = true;

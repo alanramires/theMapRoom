@@ -14,7 +14,6 @@ public class ConstructionDataEditor : Editor
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
     private bool showLogisticsSection;
     private bool showProductionSection;
-    private bool showAIBehaviorSection;
     private bool showUnitInformationSection;
     private bool showAircraftOpsSection;
     private bool showNavalOpsSection;
@@ -25,7 +24,6 @@ public class ConstructionDataEditor : Editor
     {
         showLogisticsSection = false;
         showProductionSection = false;
-        showAIBehaviorSection = false;
         showUnitInformationSection = false;
         showAircraftOpsSection = false;
         showNavalOpsSection = false;
@@ -39,7 +37,6 @@ public class ConstructionDataEditor : Editor
             serializedObject,
             "m_Script",
             "constructionConfiguration",
-            "allowRebelAIPurchase",
             "allowAircraftTakeoffAndLanding",
             "aircraftUnitsPaysUpkeep",
             "legacyRequiredLandingSkills",
@@ -67,7 +64,6 @@ public class ConstructionDataEditor : Editor
         EditorGUILayout.Space();
         DrawLogisticsSection();
         EditorGUILayout.Space();
-        DrawAIBehaviorSection();
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -260,33 +256,6 @@ public class ConstructionDataEditor : Editor
                 "desligado. A lista não faz nada enquanto isso.",
                 MessageType.Warning);
         }
-    }
-
-    private void DrawAIBehaviorSection()
-    {
-        showAIBehaviorSection = EditorGUILayout.Foldout(
-            showAIBehaviorSection,
-            "AI Behavior",
-            toggleOnLabelClick: true,
-            EditorStyles.foldoutHeader);
-        if (!showAIBehaviorSection)
-            return;
-
-        EditorGUI.indentLevel++;
-
-        SerializedProperty rebelBuyProp = serializedObject.FindProperty("allowRebelAIPurchase");
-        if (rebelBuyProp != null)
-        {
-            EditorGUILayout.HelpBox(
-                "Allow Rebel AI Purchase: a faccao sem QG (rebelde) NUNCA produz por padrao — nem no que captura. " +
-                "Marque para tornar ESTE predio uma excecao renegada: o rebelde que o capturar pode comprar aqui, " +
-                "ignorando OriginalOwner/FirstOwner (rebelde nunca e o dono original do que toma). So Selling Rule = " +
-                "Disabled ainda barra. Nao afeta times COM QG.",
-                MessageType.Info);
-            EditorGUILayout.PropertyField(rebelBuyProp, new GUIContent("Allow Rebel AI Purchase"));
-        }
-
-        EditorGUI.indentLevel--;
     }
 
     private void DrawProductionSection(SerializedProperty configProperty)

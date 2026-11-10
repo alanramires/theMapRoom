@@ -682,6 +682,17 @@ public class MapHelperWindow : EditorWindow
                 EditorUtility.SetDirty(mundo);
             }
 
+            EditorGUI.BeginChangeCheck();
+            bool defeatForZeroUnits = EditorGUILayout.Toggle(
+                new GUIContent("derrota com 0 unidades", "Elimina o slot a partir do turno 2. Aulas continuam protegidas."),
+                q.allowDefeatForZeroUnits);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(mundo, "Regra de eliminacao do quadrante");
+                q.allowDefeatForZeroUnits = defeatForZeroUnits;
+                EditorUtility.SetDirty(mundo);
+            }
+
             DrawEconomiaInicial(q);
 
             EditorGUILayout.LabelField(

@@ -75,3 +75,20 @@ aceitando o EWACS, sem sobrescrever o primeiro escolta. Reavaliação pelo próp
 Consultas auxiliares de decolagem/courier não registram claims. Não é uma atribuição 1:1 geral
 nem estado persistido. Fixture sequencial, progressão preventiva e compilação: PASS fora do Play;
 limpeza do início da Fase 2 conferida no código, com limpeza simulada na fixture.
+
+
+### 2026-11-10 — fatia A: partida e propriedade sem excecao de faccao
+
+- `verificar_regras_sem_qg.cs`: PASS no Editor, fora do Play, em cena temporaria. Tres slots: sem QG toma QG, elimina apenas o dono anterior e a partida continua; promocao dinamica preservada. Compra segue FreeMarket/OriginalOwner/FirstOwner/Disabled, sem flag de faccao; ocupacao sem QG nao grava FirstOwner nos setters de slot/team, e o primeiro captor com QG grava.
+- Zero unidades elimina tambem o slot sem QG e neutraliza suas construcoes pelo `MarkSlotDefeated`. Fixture cobre primeiro turno, configuracao desativada e tutorial; captura de QG tambem nao elimina em tutorial. Ultimo sobrevivente recebe motivo `HeadQuarterCaptured`.
+- `QuadranteData.allowDefeatForZeroUnits` e configuracao autoral serializada, conservada pelo bake, editavel no Map Helper e aplicada pelo QuadranteController ao pintar. Sem quadrante, permanece o valor serializado da cena. Fixture confere aplicacao true/false e fallback null; pintura completa ainda nao observada em Play.
+- Removidos campo `allowRebelAIPurchase`, excecao de compra e secao correspondente do Inspector. Antes da remocao, flag ligada em Barracks, Docas, Garagem APC, Hidrobase e Terminal Rodoviario; autor avisado. Nenhuma sellingRule de instancia foi migrada automaticamente. Serializacao legada nos assets deixa de ser lida.
+- Ambas assemblies compiladas por `bash tools/compilar.sh`. Teste usa a resolucao privada da captura apos a guarda de runtime; nao executa animacao nem captura em Play. Intercepta o evento final para nao registrar progresso nem iniciar apresentacao na cena do autor. Derivacao `IsHeadQuarterlessTeam` inalterada. B, C e renomeacoes nao iniciados.
+
+
+### 2026-11-10 — A6: eliminacao por exercito tambem apenas elimina
+
+- `HandleUnitDestroyed` e o inicio de `ReleaseUnitsForActiveTeam` usam `TryResolveArmyElimination`: marca/neutraliza pelo fluxo existente e consulta `TryDeclareLastStandingWinner(ArmyEliminated, defeatedTeam)`. Tres lados continuam com dois sobreviventes; 1v1 termina com o unico de pe. Guardas de runtime, tutorial, configuracao e turno preservadas.
+- `DeclareEliminationVictory` ficou apenas para rendicao; removida a sobrecarga por TeamId sem chamadores e corrigido o comentario antigo sobre primeiro eliminador.
+- `verificar_regras_sem_qg.cs`: PASS ampliado, fora do Play. O mesmo funil chamado no inicio do turno foi exercitado com slot sem QG/zero unidades: tres slots eliminam/neutralizam sem vencedor; dois slots coroam o sobrevivente com `ArmyEliminated`. Fixture nao executa o turno completo nem dispara destruicao em Play; ligacao dos dois pontos ao funil conferida no codigo. Demais casos da fatia A continuam passando. Ambas assemblies compilaram com `bash tools/compilar.sh`.
+- B e C nao iniciados.

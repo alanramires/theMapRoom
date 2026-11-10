@@ -33,6 +33,10 @@ public class QuadranteData : INoDoMapa
     [Min(1)] public int width = 18;
     [Min(1)] public int height = 18;
 
+    [Header("Regras da partida — autoral, sobrevive ao bake")]
+    [Tooltip("Elimina slots sem unidades a partir do turno 2. Aulas continuam protegidas. Aplicado ao pintar o quadrante na Batalha.")]
+    public bool allowDefeatForZeroUnits = true;
+
     [Header("Estado")]
     [Tooltip(
         "Em desenvolvimento: o quadrante aparece e pode ser selecionado na Campanha, " +

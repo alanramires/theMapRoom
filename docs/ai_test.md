@@ -390,3 +390,20 @@ Compilacao e tools/ai_test/verificar_abate_espera_carona.cs passaram fora do Pla
 
 - Revisão 5 (2026-11-10): `plannedEwacsEscorts` guarda EWACS InstanceId -> primeiro interceptador que escolheu sua escolta nesta passada; limpo ao lado de `plannedDestinations` no início de `Phase2_UnitActions`. `ResolveAirCombatFallbackAnchor` consulta o claim antes da cobertura conjunta: outro caça escolhe o capitão se ele está exposto, com tier `Exposed:EWACS#n (escoltado por #m) → Vanguarda#k`. Sem outro elo exposto continua aceitando o EWACS e conserva o primeiro dono do claim; o próprio dono pode ser reavaliado sem ser desviado. Não há atribuição global 1:1 nem persistência em save. Consultas de decolagem e do courier usam `registerEscortClaim:false` e não criam escolta por previsão.
 - Fixture `verificar_interceptador_ancora_exposta.cs` ampliada: dois caças em sequência, duplicação quando não há outro elo, dono preservado, consulta sem registro, reavaliação idempotente e nova escolha após limpeza simulada do dicionário: PASS fora do Play. A limpeza no começo da Fase 2 foi conferida no código; a fixture não executa o laço de ações da partida. `verificar_caca_a_controle_ceu.cs` e as duas assemblies: PASS. Estado confirmado de movimento/ação não foi alterado; falta Play.
+
+
+### 2026-11-10 — fatia A: partida e propriedade sem excecao de faccao
+
+- `verificar_regras_sem_qg.cs`: PASS no Editor, fora do Play, em cena temporaria. Tres slots: sem QG toma QG, elimina apenas o dono anterior e a partida continua; promocao dinamica preservada. Compra segue FreeMarket/OriginalOwner/FirstOwner/Disabled, sem flag de faccao; ocupacao sem QG nao grava FirstOwner nos setters de slot/team, e o primeiro captor com QG grava.
+- Zero unidades elimina tambem o slot sem QG e neutraliza suas construcoes pelo `MarkSlotDefeated`. Fixture cobre primeiro turno, configuracao desativada e tutorial; captura de QG tambem nao elimina em tutorial. Ultimo sobrevivente recebe motivo `HeadQuarterCaptured`.
+- `QuadranteData.allowDefeatForZeroUnits` e configuracao autoral serializada, conservada pelo bake, editavel no Map Helper e aplicada pelo QuadranteController ao pintar. Sem quadrante, permanece o valor serializado da cena. Fixture confere aplicacao true/false e fallback null; pintura completa ainda nao observada em Play.
+- Removidos campo `allowRebelAIPurchase`, excecao de compra e secao correspondente do Inspector. Antes da remocao, flag ligada em Barracks, Docas, Garagem APC, Hidrobase e Terminal Rodoviario; autor avisado. Nenhuma sellingRule de instancia foi migrada automaticamente. Serializacao legada nos assets deixa de ser lida.
+- Ambas assemblies compiladas por `bash tools/compilar.sh`. Teste usa a resolucao privada da captura apos a guarda de runtime; nao executa animacao nem captura em Play. Intercepta o evento final para nao registrar progresso nem iniciar apresentacao na cena do autor. Derivacao `IsHeadQuarterlessTeam` inalterada. B, C e renomeacoes nao iniciados.
+
+
+### 2026-11-10 — A6: eliminacao por exercito tambem apenas elimina
+
+- `HandleUnitDestroyed` e o inicio de `ReleaseUnitsForActiveTeam` usam `TryResolveArmyElimination`: marca/neutraliza pelo fluxo existente e consulta `TryDeclareLastStandingWinner(ArmyEliminated, defeatedTeam)`. Tres lados continuam com dois sobreviventes; 1v1 termina com o unico de pe. Guardas de runtime, tutorial, configuracao e turno preservadas.
+- `DeclareEliminationVictory` ficou apenas para rendicao; removida a sobrecarga por TeamId sem chamadores e corrigido o comentario antigo sobre primeiro eliminador.
+- `verificar_regras_sem_qg.cs`: PASS ampliado, fora do Play. O mesmo funil chamado no inicio do turno foi exercitado com slot sem QG/zero unidades: tres slots eliminam/neutralizam sem vencedor; dois slots coroam o sobrevivente com `ArmyEliminated`. Fixture nao executa o turno completo nem dispara destruicao em Play; ligacao dos dois pontos ao funil conferida no codigo. Demais casos da fatia A continuam passando. Ambas assemblies compilaram com `bash tools/compilar.sh`.
+- B e C nao iniciados.

@@ -418,6 +418,15 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool atalhoRPassarTurnoUsaConfirmacao = false;
     [Tooltip("Se false, o time com 0 unidades nao e eliminado automaticamente. Util para testes sem unidades.")]
     [SerializeField] private bool allowDefeatForZeroUnits = true;
+    public bool AllowDefeatForZeroUnits => allowDefeatForZeroUnits;
+
+    // Sem quadrante, conserva a configuracao serializada da cena.
+    public void ApplyQuadrantMatchRules(QuadranteData quadrant)
+    {
+        if (quadrant != null)
+            allowDefeatForZeroUnits = quadrant.allowDefeatForZeroUnits;
+    }
+
     [Tooltip("Se true, capturar o QG (isPlayerHeadQuarter) de um time o elimina imediatamente e pode encerrar a partida.")]
     [SerializeField] private bool allowDefeatForHeadQuarterCapture = true;
     [SerializeField, Min(1)] private int maxUnitsPerTeam = 40;
@@ -2688,43 +2697,27 @@ public class MatchController : MonoBehaviour
 
     private bool TryDefeatSlotIfZeroUnits(PlayerSlotId slotId)
     {
-        // Antes de marcar o slot como derrotado: numa aula isso tiraria o slot da
-        // rotacao de turnos mesmo sem declarar vencedor.
-        if (!UsesMatchEndRules)
+        // Aulas, cenarios sem eliminacao e o primeiro turno continuam protegidos.
+        if (!UsesMatchEndRules || !allowDefeatForZeroUnits || currentTurn < 2)
             return false;
-        if (!IsValidPlayerSlot(slotId))
-            return false;
-        int playerIndex = slotId.Value;
-        TeamId team = players[playerIndex].teamId;
-        if (players[playerIndex].defeated)
-            return false;
-        // Derrota por 0 unidades so vale para slots com QG. Uma faccao rebelde (sem QG) some do
-        // tabuleiro sem encerrar a partida e sem neutralizar o que ja tinha capturado.
-        if (ConstructionManager.IsHeadQuarterlessTeam(team))
+        if (!IsValidPlayerSlot(slotId) || players[slotId.Value].defeated)
             return false;
 
         List<UnitManager> allUnits = GetActiveUnitsOnScene();
         for (int i = 0; i < allUnits.Count; i++)
         {
             UnitManager unit = allUnits[i];
-            if (unit != null && unit.SlotIndex == playerIndex)
+            if (unit != null && unit.SlotIndex == slotId.Value)
                 return false;
         }
 
-        PlayerEntry entry = players[playerIndex];
-        entry.defeated = true;
-        players[playerIndex] = entry;
-
-        NeutralizeConstructionsOwnedBySlot(slotId);
-        Debug.Log($"[Match] Slot {playerIndex} ({TeamUtils.GetName(team)}) derrotado (0 unidades). Construcoes neutralizadas.");
-        OnTeamDefeated?.Invoke(team);
-        return true;
+        return MarkSlotDefeated(slotId, "0 unidades");
     }
 
     // Chamado do ponto unico de conclusao de captura (ExecuteCaptureSequence), valido tanto para o
     // jogador humano quanto para a IA (que captura pelo mesmo caminho via Automation ->
-    // HandleCaptureActionRequested). Se o alvo for um QG, o antigo dono e eliminado na hora e o
-    // capturador vence imediatamente (mesmo com outros jogadores/IA ainda em jogo).
+    // HandleCaptureActionRequested). Se o alvo for um QG, o antigo dono e eliminado na hora. A
+    // partida so termina se sobrar um unico jogador.
     public void NotifyConstructionCaptured(ConstructionManager construction, int previousOwnerSlot, int newOwnerSlot, TeamId previousOwner, TeamId newOwner)
     {
         if (Application.isPlaying && construction != null && newOwnerSlot >= 0 && previousOwnerSlot != newOwnerSlot &&
@@ -2734,6 +2727,13 @@ public class MatchController : MonoBehaviour
         }
 
         if (!Application.isPlaying || hasVictoryWinner)
+            return;
+        ResolveHeadQuarterCapture(construction, previousOwnerSlot, newOwnerSlot, previousOwner, newOwner);
+    }
+
+    private void ResolveHeadQuarterCapture(ConstructionManager construction, int previousOwnerSlot, int newOwnerSlot, TeamId previousOwner, TeamId newOwner)
+    {
+        if (hasVictoryWinner)
             return;
         if (!allowDefeatForHeadQuarterCapture || !UsesMatchEndRules)
             return;
@@ -2746,11 +2746,7 @@ public class MatchController : MonoBehaviour
             return;
 
         Debug.Log($"[Match] QG de {TeamUtils.GetName(previousOwner)} capturado por {TeamUtils.GetName(newOwner)}. Time eliminado.");
-        // O primeiro a capturar um QG vence na hora, mesmo com outros jogadores em jogo.
-        DeclareEliminationVictory(
-            PlayerSlotId.FromIndex(newOwnerSlot),
-            PlayerSlotId.FromIndex(previousOwnerSlot),
-            VictoryReason.HeadQuarterCaptured);
+        TryDeclareLastStandingWinner(VictoryReason.HeadQuarterCaptured, previousOwner);
     }
 
     public bool HasCapturedBuilding(PlayerSlotId slotId, ConstructionData building)
@@ -2933,7 +2929,7 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private bool TryDeclareLastStandingWinner()
+    private bool TryDeclareLastStandingWinner(VictoryReason reason = VictoryReason.ArmyEliminated, TeamId defeatedTeam = TeamId.Neutral)
     {
         if (hasVictoryWinner)
             return true;
@@ -2958,28 +2954,19 @@ public class MatchController : MonoBehaviour
         victoryWinnerSlotIndex = winnerSlot;
         TeamId winner = players[winnerSlot].teamId;
         victoryWinnerTeam = winner;
-        HandleVictoryAestheticPresentation(winner, TeamId.Neutral, VictoryReason.ArmyEliminated);
+        HandleVictoryAestheticPresentation(winner, defeatedTeam, reason);
         return true;
     }
 
-    // Regra: o PRIMEIRO a eliminar um jogador (capturando o QG ou destruindo o exercito por
-    // inteiro) vence na hora, mesmo que ainda restem outros jogadores/IA. O vencedor e o time
-    // que executou a eliminacao.
-    private bool DeclareEliminationVictory(TeamId winnerTeam, TeamId defeatedTeam, VictoryReason reason)
+    // Os dois pontos de eliminacao por exercito usam o mesmo funil: elimina
+    // o slot e so conclui a partida se restar um unico jogador.
+    private bool TryResolveArmyElimination(PlayerSlotId defeatedSlot)
     {
-        if (hasVictoryWinner)
-            return true;
-        if (!UsesMatchEndRules)
-            return DeclareMatchEndDuringTutorial(reason);
-        if (winnerTeam == TeamId.Neutral || winnerTeam == defeatedTeam)
+        if (!TryDefeatSlotIfZeroUnits(defeatedSlot))
             return false;
 
-        hasVictoryWinner = true;
-        victoryWinnerSlotIndex = TryGetUniqueSlotForTeam(winnerTeam, out PlayerSlotId winnerSlot)
-            ? winnerSlot.Value
-            : -1;
-        victoryWinnerTeam = winnerTeam;
-        HandleVictoryAestheticPresentation(winnerTeam, defeatedTeam, reason);
+        TeamId defeatedTeam = GetVisualTeamForSlot(defeatedSlot);
+        TryDeclareLastStandingWinner(VictoryReason.ArmyEliminated, defeatedTeam);
         return true;
     }
 
@@ -3014,12 +3001,7 @@ public class MatchController : MonoBehaviour
             return;
 
         PlayerSlotId defeatedSlot = PlayerSlotId.FromIndex(unit.SlotIndex);
-        if (TryDefeatSlotIfZeroUnits(defeatedSlot))
-        {
-            // O primeiro a destruir por completo o exercito de um jogador vence na hora.
-            PlayerSlotId winnerSlot = ActiveSlotId != defeatedSlot ? ActiveSlotId : ResolveFirstAliveOpponentSlot(defeatedSlot);
-            DeclareEliminationVictory(winnerSlot, defeatedSlot, VictoryReason.ArmyEliminated);
-        }
+        TryResolveArmyElimination(defeatedSlot);
     }
 
     private void NormalizeState()
@@ -3779,11 +3761,8 @@ public class MatchController : MonoBehaviour
         // Checagem de derrota por 0 unidades: marca o time como defeated.
         if (allowDefeatForZeroUnits && currentTurn >= 2 && activeTeamId >= 0)
         {
-            if (TryDefeatSlotIfZeroUnits(activeSlot))
-            {
-                DeclareEliminationVictory(ResolveFirstAliveOpponentSlot(activeSlot), activeSlot, VictoryReason.ArmyEliminated);
+            if (TryResolveArmyElimination(activeSlot))
                 return;
-            }
         }
 
         TurnPerfLog("ReleaseUnits.EvaluateVictoryStars", stageStartMs);
@@ -11852,6 +11831,8 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
+    // Apenas a rendicao declara diretamente seu vencedor. QG e exercito
+    // eliminam o dono e passam por TryDeclareLastStandingWinner.
     private bool DeclareEliminationVictory(PlayerSlotId winnerSlot, PlayerSlotId defeatedSlot, VictoryReason reason)
     {
         if (hasVictoryWinner)

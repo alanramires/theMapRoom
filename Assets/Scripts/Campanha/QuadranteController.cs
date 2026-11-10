@@ -656,6 +656,7 @@ public class QuadranteController : MonoBehaviour
         // entrega os dois. Atribui SEMPRE, inclusive null: quadrante sem aula nao
         // pode herdar o roteiro que a cena Batalha tenha serializado.
         match?.SetActiveTutorialFromQuadrant(quadrante.tutorial);
+        match?.ApplyQuadrantMatchRules(quadrante);
 
         // DEPOIS do Apply, nunca antes: o Apply reimporta a lista inteira de
         // jogadores e sobrescreveria a caixa do quadrante com os zeros da cena.
