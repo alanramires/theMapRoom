@@ -860,6 +860,30 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 Debug.Log($"[AI Shopping] defesa blindada fallback: sem caixa para elite tank, tentando apoio anti-blindado {armorFallbackFireSupport.displayName} custo={armorFallbackFireSupport.cost} cash={remaining}");
             }
         }
+        UnitData eliteInterceptorTarget = FindEliteInterceptorReserveTarget(snapshot);
+        int reserveForEliteInterceptor = 0;
+        var interceptorProgression = new List<AIShoppingDemand>();
+        AddEliteProgressionDemand(snapshot, interceptorProgression, UnitRole.Interceptador,
+            CountCompositionRole(snapshot, UnitRole.Interceptador),
+            CountTotalVisibleEnemyAircraft(snapshot) > 0 ? 23 : 25, maxEliteLevel: 1);
+        if (interceptorProgression.Count == 0) eliteInterceptorTarget = null;
+        bool interceptorWinsReserve = eliteInterceptorTarget != null
+            && SelectEliteReserveTarget(snapshot, eliteAssaultTargetForReserve,
+                eliteInterceptorTarget, eliteFireSupportTarget) == eliteInterceptorTarget;
+        if (interceptorWinsReserve)
+        {
+            AIShoppingDemand control = interceptorProgression[0];
+            openCacaASlots = Mathf.Max(1, openCacaASlots);
+            if (TryPreCommitDemand(snapshot, control, null, orders,
+                    new HashSet<ConstructionManager>(), occupied, ref remaining, remaining,
+                    "controle_do_ar", "interceptador preventivo")) openCacaASlots--;
+            else
+                reserveForEliteInterceptor = ComputeStrategicSavingReserve(
+                    snapshot, interceptorProgression, remaining, null, out _);
+            wantsEliteAssault = false;
+            nextTurnEliteAssaultReserve = false;
+            wantsEliteFireSupport = false;
+        }
         int reserveForEliteAssault = 0;
         int eliteAssaultSafetyBuffer = 0;
         if (nextTurnEliteAssaultReserve)
@@ -1079,6 +1103,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteFireSupport));
                 }
             }
+            if (reserveForEliteInterceptor > 0 && !forcedProduction)
+                spendBudget = Mathf.Min(spendBudget, Mathf.Max(0, remaining - reserveForEliteInterceptor));
             bool canBuyEliteBreakthroughHere = wantsEliteAssault
                 && !eliteAssaultBought
                 && eliteAssaultTarget != null

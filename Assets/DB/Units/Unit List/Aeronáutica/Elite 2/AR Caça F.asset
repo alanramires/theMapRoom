@@ -35,7 +35,7 @@ MonoBehaviour:
   combatClassification: 2
   roles: 08000000
   aiInitiative: 1
-  aiPurchaseMode: 2
+  aiPurchaseMode: 0
   bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 6

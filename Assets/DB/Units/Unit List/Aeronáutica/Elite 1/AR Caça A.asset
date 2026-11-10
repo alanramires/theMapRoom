@@ -35,7 +35,7 @@ MonoBehaviour:
   combatClassification: 0
   roles: 0800000011000000
   aiInitiative: 1
-  aiPurchaseMode: 2
+  aiPurchaseMode: 0
   bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 6
@@ -47,6 +47,7 @@ MonoBehaviour:
   playConservative: 0
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 1
+  aiAttackOnlyListedTargets: 0
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
   useAttackDecision: 1

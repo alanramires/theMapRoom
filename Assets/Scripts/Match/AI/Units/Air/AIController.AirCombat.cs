@@ -89,7 +89,7 @@ public partial class AIController
                 snapshot,
                 fromCell,
                 visibleEnemies,
-                out _);
+                out _, out _, registerEscortClaim: false);
             anchor.z = 0;
             if (!TryFindAirCombatAttack(
                     unit,
@@ -215,7 +215,7 @@ public partial class AIController
             snapshot,
             fromCell,
             visibleEnemies,
-            out string anchorTier);
+            out string anchorTier, out bool sharedExposedCover, paths, occupied, takeoffMoveOptions);
         anchor.z = 0;
 
         if (TryFindAirCombatAttack(
@@ -422,7 +422,9 @@ public partial class AIController
                 paths);
         }
 
-        Vector3Int moveCell = FindAirCombatAdvanceMove(
+        // Joint coverage has already been ranked by the normal movement
+        // policy, restricted to the intersection. The flag is not log text.
+        Vector3Int moveCell = sharedExposedCover ? anchor : FindAirCombatAdvanceMove(
             fromCell,
             anchor,
             paths,
@@ -433,7 +435,15 @@ public partial class AIController
         Debug.Log(
             $"{TL("AirCombat")} {unit.InstanceId} rogue avanca via {moveCell} " +
             $"alvo={anchor} tier={anchorTier} visibleEnemies={visibleEnemies.Count}");
-        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        PlayerAction advanceAction = BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+        foreach (UnitManager prey in visibleEnemies)
+            if (prey != null && anchorTier == $"Operational:Hunt#{prey.InstanceId}")
+            {
+                TraceAIReviewParticipant(advanceAction, prey.InstanceId,
+                    "Alvo da caca operacional", "air_operational_pursuit");
+                break;
+            }
+        return advanceAction;
     }
 
     private bool TryBuildAirCombatPatrolGeometry(
@@ -762,9 +772,15 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
         List<UnitManager> visibleEnemies,
-        out string tier)
+        out string tier,
+        out bool sharedExposedCover,
+        Dictionary<Vector3Int, List<Vector3Int>> paths = null,
+        HashSet<Vector3Int> occupied = null,
+        List<int> takeoffMoveOptions = null,
+        bool registerEscortClaim = true)
     {
         tier = "None";
+        sharedExposedCover = false;
         bool isInterceptor = unit != null
             && unit.TryGetUnitData(out UnitData airData)
             && airData != null
@@ -779,26 +795,55 @@ public partial class AIController
                 out UnitManager capturer,
                 out Vector3Int capturerCell);
 
-        // Interceptadores protegem o elo mais proximo da rede: EWACS ou
-        // capitao. Ataque aereo e vigilancia armada continuam magnetizados apenas
-        // pela cabeca de ponte.
-        if (isInterceptor
-            && TryResolveNearestEwacsMagnet(
-                unit,
-                snapshot,
-                fromCell,
-                out UnitManager ewacs,
-                out Vector3Int ewacsCell)
-            && (!hasCaptain
-                || AIActionReachCoordinator.CubicDistance(
-                    fromCell,
-                    ewacsCell)
-                <= AIActionReachCoordinator.CubicDistance(
-                    fromCell,
-                    capturerCell)))
+        if (isInterceptor)
         {
-            tier = $"AirSurveillance:EWACS#{ewacs.InstanceId}";
-            return ewacsCell;
+            // Hunting precedes escort posture. The tactical attack scan still
+            // runs before this anchor can turn into a movement action.
+            if (TryResolveInterceptorAirHunt(unit, fromCell, visibleEnemies, out UnitManager airPrey))
+            {
+                tier = $"Operational:Hunt#{airPrey.InstanceId}";
+                return airPrey.CurrentCellPosition;
+            }
+            bool hasEwacs = TryResolveNearestEwacsMagnet(
+                unit, snapshot, fromCell, out UnitManager ewacs, out Vector3Int ewacsCell);
+            var threats = new Dictionary<int, UnitReachEnvelope>();
+            var umbrellas = new Dictionary<GameUnitClass, HashSet<Vector3Int>>();
+            bool ewacsExposed = hasEwacs && AIAirExposureService.IsExposed(
+                ewacsCell, snapshot, visibleEnemies, boardTilemap, terrainDatabase, threats, umbrellas);
+            bool captainExposed = hasCaptain && AIAirExposureService.IsExposed(
+                capturerCell, snapshot, visibleEnemies, boardTilemap, terrainDatabase, threats, umbrellas);
+            if (ewacsExposed && captainExposed
+                && plannedEwacsEscorts.TryGetValue(ewacs.InstanceId, out int escortId)
+                && escortId != unit.InstanceId)
+            {
+                tier = $"Exposed:EWACS#{ewacs.InstanceId} (escoltado por #{escortId}) → Vanguarda#{capturer.InstanceId}";
+                return capturerCell;
+            }
+            void ClaimEwacsEscort()
+            {
+                if (registerEscortClaim && !plannedEwacsEscorts.ContainsKey(ewacs.InstanceId))
+                    plannedEwacsEscorts[ewacs.InstanceId] = unit.InstanceId;
+            }
+            if (ewacsExposed && captainExposed
+                && TryFindSharedInterceptorCover(unit, fromCell, ewacsCell, capturerCell,
+                    paths, occupied, takeoffMoveOptions, snapshot.AITeam, out Vector3Int coverCell))
+            {
+                ClaimEwacsEscort();
+                sharedExposedCover = true;
+                tier = $"Exposed:EWACS#{ewacs.InstanceId}+Vanguarda#{capturer.InstanceId}";
+                return coverCell;
+            }
+            if (ewacsExposed)
+            {
+                ClaimEwacsEscort();
+                tier = $"Exposed:EWACS#{ewacs.InstanceId}";
+                return ewacsCell;
+            }
+            if (hasCaptain)
+            {
+                tier = $"{(captainExposed ? "Exposed" : "Covered")}:Vanguarda#{capturer.InstanceId}";
+                return capturerCell;
+            }
         }
 
         // CACA ANTES DO CAPITAO, DENTRO DO OPERACIONAL. O capitao e o magnetico de
@@ -1288,6 +1333,12 @@ public partial class AIController
             || ResolveAirCombatTargetPreference(unit, tacticalTarget) != BazookaTargetPriority.Tertiary)
             return false;
 
+        return TryResolveInterceptorAirHunt(unit, fromCell, visibleEnemies, out airPrey);
+    }
+
+    private bool TryResolveInterceptorAirHunt(UnitManager unit, Vector3Int fromCell,
+        List<UnitManager> visibleEnemies, out UnitManager airPrey)
+    {
         // Reuse the operational combat envelope; only actual airborne prey
         // compatible with a loaded weapon and primary/secondary preference.
         var prey = visibleEnemies?.FindAll(enemy => enemy != null
@@ -1296,6 +1347,54 @@ public partial class AIController
             && ResolveAirCombatTargetPreference(unit, enemy) != BazookaTargetPriority.Tertiary
             && CanAnyWeaponHitLayer(unit, enemy.GetDomain(), enemy.GetHeightLevel()));
         return TryResolveOperationalHuntTarget(unit, fromCell, prey, out airPrey);
+    }
+
+    private bool TryFindSharedInterceptorCover(UnitManager unit, Vector3Int fromCell,
+        Vector3Int ewacsCell, Vector3Int captainCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied,
+        List<int> takeoffMoveOptions, TeamId aiTeam, out Vector3Int bestCell)
+    {
+        bestCell = fromCell;
+        if (paths == null || paths.Count == 0) return false;
+        UnitReachEnvelope tactical = UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = unit, BoardMap = boardTilemap, TerrainDatabase = terrainDatabase,
+            Intent = ReachIntent.Mobility, Band = ReachBand.Tactical, PrebuiltPaths = paths
+        });
+        // Reverse response bands, two builds rather than a sensor/envelope per
+        // candidate cell. No unit is moved to the protected assets.
+        UnitReachEnvelope ResponseAt(Vector3Int origin) => UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = unit, BoardMap = boardTilemap, TerrainDatabase = terrainDatabase,
+            Intent = ReachIntent.Mobility, Band = ReachBand.Tactical,
+            OriginOverride = origin, MovementBudget = unit.MaxMovementPoints
+        });
+        UnitReachEnvelope ewacsBand = ResponseAt(ewacsCell);
+        UnitReachEnvelope captainBand = ResponseAt(captainCell);
+        if (tactical == null || ewacsBand == null || captainBand == null) return false;
+        var jointPaths = new Dictionary<Vector3Int, List<Vector3Int>>();
+        bool found = false;
+        float bestDistance = float.MaxValue;
+        foreach (Vector3Int cell in paths.Keys)
+        {
+            if (!tactical.CanReach(cell) || !ewacsBand.CanReach(cell) || !captainBand.CanReach(cell)
+                || (cell != fromCell && occupied != null && occupied.Contains(cell))
+                || !IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions)) continue;
+            jointPaths[cell] = paths[cell];
+            float distance = Mathf.Max(SectorManager.HexDistance(cell, ewacsCell),
+                SectorManager.HexDistance(cell, captainCell));
+            if (!found || distance < bestDistance
+                || (distance == bestDistance && SectorManager.HexDistance(cell, fromCell)
+                    < SectorManager.HexDistance(bestCell, fromCell)))
+            {
+                found = true; bestDistance = distance; bestCell = cell;
+            }
+        }
+        if (!found) return false;
+        bestCell = FindAirCombatAdvanceMove(fromCell, bestCell, jointPaths,
+            occupied ?? new HashSet<Vector3Int>(), aiTeam, takeoffMoveOptions,
+            requireProgress: false, allowHold: true);
+        return true;
     }
 
     private bool TryResolveOperationalHuntTarget(
@@ -1922,7 +2021,9 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         TeamId aiTeam,
         List<int> takeoffMoveOptions = null,
-        bool preferOneHexEscortBand = false)
+        bool preferOneHexEscortBand = false,
+        bool requireProgress = true,
+        bool allowHold = false)
     {
         Vector3Int bestCell = fromCell;
         float startDist = SectorManager.HexDistance(fromCell, targetCell);
@@ -1932,14 +2033,14 @@ public partial class AIController
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
-            if (cell == fromCell || occupied.Contains(cell))
+            if ((!allowHold && cell == fromCell) || (cell != fromCell && occupied.Contains(cell)))
                 continue;
             if (!IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions))
                 continue;
 
             float dist = SectorManager.HexDistance(cell, targetCell);
             float progress = startDist - dist;
-            if (progress <= 0f)
+            if (requireProgress && progress <= 0f)
                 continue;
 
             float threat = CalculateThreatLevel(cell, aiTeam);

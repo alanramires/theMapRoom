@@ -35,6 +35,56 @@ public partial class AIShoppingPlanner
         return best;
     }
 
+    private static bool HasEnemyAviationForAirControl(AIWorldSnapshot snapshot)
+        => HasEnemyAirportProductionCapacity(snapshot) || CountTotalVisibleEnemyAircraft(snapshot) > 0;
+
+    private static UnitData FindEliteInterceptorReserveTarget(AIWorldSnapshot snapshot)
+    {
+        if (snapshot?.MyBuildings == null || !HasEnemyAviationForAirControl(snapshot)) return null;
+        var field = BuildFieldUnitDataSet(snapshot);
+        foreach (UnitData data in field)
+            if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Interceptador
+                && data.eliteLevel >= 1) return null;
+        UnitData best = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
+                || building.OfferedUnits == null) continue;
+            foreach (UnitData data in building.OfferedUnits)
+                if (data != null && data.eliteLevel == 1
+                    && UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Interceptador
+                    && IsRolePurchaseAllowed(data, snapshot.Stance, false)
+                    && (data.eliteFrom == null || field.Contains(data.eliteFrom))
+                    && (best == null || data.cost < best.cost)) best = data;
+        }
+        return best;
+    }
+
+    private static int EliteReserveLineRank(UnitData data, bool airVisible)
+    {
+        UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(data);
+        if (role == UnitRole.Interceptador) return airVisible ? 0 : 1;
+        if (role == UnitRole.Assalto || role == UnitRole.AtaqueAereo
+            || role == UnitRole.DisruptorDeCaptura) return airVisible ? 1 : 0;
+        return 2;
+    }
+
+    private static int CompareEliteReserveLines(AIWorldSnapshot snapshot, UnitData a, UnitData b)
+    {
+        bool visible = CountTotalVisibleEnemyAircraft(snapshot) > 0;
+        return EliteReserveLineRank(a, visible).CompareTo(EliteReserveLineRank(b, visible));
+    }
+
+    private static UnitData SelectEliteReserveTarget(AIWorldSnapshot snapshot,
+        UnitData assault, UnitData interceptor, UnitData fireSupport)
+    {
+        UnitData best = assault;
+        foreach (UnitData candidate in new[] { interceptor, fireSupport })
+            if (candidate != null && (best == null || CompareEliteReserveLines(snapshot, candidate, best) < 0))
+                best = candidate;
+        return best;
+    }
+
     private static HashSet<UnitData> BuildFieldUnitDataSet(AIWorldSnapshot snapshot)
     {
         var set = new HashSet<UnitData>();

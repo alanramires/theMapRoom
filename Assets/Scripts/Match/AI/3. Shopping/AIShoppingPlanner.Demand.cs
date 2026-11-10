@@ -1342,6 +1342,11 @@ public partial class AIShoppingPlanner
         List<AIShoppingDemand> demands = BuildRoleShoppingDemands(snapshot);
         AIElitePurchaseCommitment eliteCommitment =
             ResolveElitePurchaseCommitment(snapshot, demands);
+        AIShoppingDemand preventiveAirControl = eliteCommitment != null
+            && eliteCommitment.role == UnitRole.Interceptador && eliteCommitment.eliteLevel == 1
+                ? demands.Find(d => d != null && d.Count > 0 && d.Role == UnitRole.Interceptador
+                    && d.IsPreventiveAirControl)
+                : null;
         // Reusa o que a demanda acabou de montar (mesmo snapshot): antes refazia roster e counter
         // uma segunda vez aqui. O rebelde volta cedo e nao monta: cai no calculo.
         AIRosterKnowledge shoppingRoster = s_lastBuiltRoster ?? BuildRosterKnowledge(snapshot, log: false);
@@ -1403,6 +1408,13 @@ public partial class AIShoppingPlanner
         int blitzArmorReserve = ComputeBlitzFirstArmorReserve(
             snapshot, demands, remaining, conscriptionTax,
             out AIShoppingDemand blitzArmorTarget, out bool buyFirstMbtNow);
+        // The selected preventive interceptor shares the existing reserve and
+        // guaranteed-purchase path; an armor bootstrap must not override it.
+        if (preventiveAirControl != null)
+        {
+            blitzArmorReserve = 0;
+            buyFirstMbtNow = false;
+        }
         if (blitzArmorReserve > reserve)
         {
             reserve = blitzArmorReserve;
@@ -1557,6 +1569,10 @@ public partial class AIShoppingPlanner
         // baratas cobrindo mais demandas) à profundidade (1 MBT caro), e o "primeiro elite = MBT"
         // nunca acontece enquanto houver artilharia de rally / contra-pressão competindo. Ocupa o
         // produtor antes do carrinho; o troco (respeitando gordura + imposto) segue pro carrinho/fill.
+        if (preventiveAirControl != null)
+            TryPreCommitDemand(snapshot, preventiveAirControl, eliteCommitment,
+                orders, usedBuildings, occupied, ref remaining,
+                remaining - reserve - conscriptionTax, "controle_do_ar", "interceptador preventivo");
         if (buyFirstMbtNow && blitzArmorTarget != null)
             TryPreCommitBlitzFirstMbt(
                 snapshot, blitzArmorTarget, eliteCommitment,
@@ -2052,11 +2068,16 @@ public partial class AIShoppingPlanner
             UnitData candidate = FindBestOfferedUnitForDemand(snapshot, demand);
             if (candidate == null)
                 continue;
-            if (bestDemand == null || candidate.eliteLevel < bestUnit.eliteLevel
+            bool compareControlLines = bestDemand != null && demand.Origin == "elite"
+                && bestDemand.Origin == "elite"
+                && (demand.Role == UnitRole.Interceptador || bestDemand.Role == UnitRole.Interceptador);
+            int lineOrder = compareControlLines
+                ? CompareEliteReserveLines(snapshot, candidate, bestUnit) : 0;
+            if (lineOrder < 0 || (lineOrder == 0 && (bestDemand == null || candidate.eliteLevel < bestUnit.eliteLevel
                 || (candidate.eliteLevel == bestUnit.eliteLevel
                     && demand.Priority < bestDemand.Priority)
                 || (candidate.eliteLevel == bestUnit.eliteLevel
-                    && demand.Priority == bestDemand.Priority && candidate.cost > bestUnit.cost))
+                    && demand.Priority == bestDemand.Priority && candidate.cost > bestUnit.cost))))
             {
                 bestDemand = demand;
                 bestUnit = candidate;
@@ -3515,6 +3536,9 @@ public partial class AIShoppingPlanner
 
         AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
         AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
+        AddEliteProgressionDemand(snapshot, demands, UnitRole.Interceptador,
+            CountCompositionRole(snapshot, UnitRole.Interceptador),
+            CountTotalVisibleEnemyAircraft(snapshot) > 0 ? 23 : 25, maxEliteLevel: 1);
         AddCounterPressureDemands(snapshot, demands, counterPressure, roster, log);
         bool groundCounterPressureCovered = counterPressure.AntiTank <= 0.05f
             && counterPressure.AntiInfantry <= 0.05f;
@@ -3830,6 +3854,7 @@ public partial class AIShoppingPlanner
             if (currentRally != incomingRally)
                 continue;
             if (current.ArtilleryWallGroup != incoming.ArtilleryWallGroup) continue;
+            if (current.IsPreventiveAirControl != incoming.IsPreventiveAirControl) continue;
             if (current.RallyResponseOffers != null || incoming.RallyResponseOffers != null) continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
                 || current.RequiredFamily != incoming.RequiredFamily
@@ -4539,14 +4564,16 @@ public partial class AIShoppingPlanner
     }
 
     private static void AddEliteProgressionDemand(AIWorldSnapshot snapshot,
-        List<AIShoppingDemand> demands, UnitRole role, int activeRoleCount, int priority)
+        List<AIShoppingDemand> demands, UnitRole role, int activeRoleCount, int priority,
+        int maxEliteLevel = int.MaxValue)
     {
-        if (activeRoleCount <= 0)
+        if (activeRoleCount <= 0
+            || (role == UnitRole.Interceptador && !HasEnemyAviationForAirControl(snapshot)))
             return;
         EliteLine line = ResolveEliteLine(snapshot, role, forElite: true);
         int currentElite = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
-            if (unit != null && unit.TryGetUnitData(out UnitData data)
+            if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
                 && CountsForEliteLine(data, line))
                 currentElite = Mathf.Max(currentElite, data.eliteLevel);
 
@@ -4557,6 +4584,7 @@ public partial class AIShoppingPlanner
             foreach (UnitData offered in building.OfferedUnits)
             {
                 if (offered == null || offered.eliteLevel <= currentElite
+                    || offered.eliteLevel > maxEliteLevel
                     || !CountsForEliteLine(offered, line)
                     || !IsEliteChainAvailable(offered, snapshot))
                     continue;
@@ -4567,9 +4595,11 @@ public partial class AIShoppingPlanner
             return;
 
         AIShoppingDemand elite = NewRoleDemand(line.Role, 1, priority, "elite",
-            $"massa={snapshot.MyUnits.Count} caixa={snapshot.Budget} nivel={currentElite}->{nextElite}", false);
+            $"massa={snapshot.MyUnits.Count} caixa={snapshot.Budget} nivel={currentElite}->{nextElite}"
+                + (role == UnitRole.Interceptador ? " controle do ar" : ""), false);
         elite.MinEliteLevel = nextElite;
         elite.MaxEliteLevel = nextElite;
+        elite.IsPreventiveAirControl = role == UnitRole.Interceptador;
         ApplyEliteLine(elite, line);
 
         // Só persegue o elite se ele cabe agora ou é alcançável dentro do horizonte de poupança.
@@ -5018,20 +5048,20 @@ public partial class AIShoppingPlanner
             // Orcamento = movimento CHEIO: e o proximo turno dele. O MP restante do turno
             // que ele ja jogou deixaria o anel com largura zero.
             int budget = Mathf.Max(1, enemy.MaxMovementPoints);
-            UnitReachEnvelope envelope = BuildAirRingEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Combat, budget)
+            UnitReachEnvelope envelope = AIAirExposureService.BuildEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Combat, budget)
                 // Sem arma (transporte puro): a ameaca e onde ele POUSA a carga.
-                ?? BuildAirRingEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Capture, budget);
+                ?? AIAirExposureService.BuildEnvelope(enemy, board, ai.TerrainDatabaseRef, ReachIntent.Capture, budget);
             if (envelope != null && TouchesRing(envelope, ours, island))
             {
                 inRing++;
                 AddRingClass(byClass, data.unitClass);
                 if (classify)
                 {
-                    HashSet<Vector3Int> umbrella = GetAntiAirUmbrella(
+                    HashSet<Vector3Int> umbrella = AIAirExposureService.GetAntiAirUmbrella(
                         snapshot, board, ai.TerrainDatabaseRef, data.unitClass, umbrellaByClass);
-                    if (TouchesUncovered(envelope, ourBuildings, umbrella))
+                    if (AIAirExposureService.TouchesUncovered(envelope, ourBuildings, umbrella))
                         AddRingClass(rearByClass, data.unitClass);
-                    if (TouchesUncovered(envelope, ourUnitsOffBuilding, umbrella))
+                    if (AIAirExposureService.TouchesUncovered(envelope, ourUnitsOffBuilding, umbrella))
                         AddRingClass(frontByClass, data.unitClass);
                 }
             }
@@ -5043,75 +5073,12 @@ public partial class AIShoppingPlanner
     // classe de presa (prioridade de alvo da ficha >= Secundaria; Terciaria e "nao listada").
     // Construido uma vez por classe e por chamada. O servico de envelope responde a area;
     // a uniao e daqui (consumidor).
-    private static HashSet<Vector3Int> GetAntiAirUmbrella(AIWorldSnapshot snapshot,
-        UnityEngine.Tilemaps.Tilemap board, TerrainDatabase terrain, GameUnitClass preyClass,
-        Dictionary<GameUnitClass, HashSet<Vector3Int>> cache)
-    {
-        if (cache.TryGetValue(preyClass, out HashSet<Vector3Int> cached))
-            return cached;
-        var umbrella = new HashSet<Vector3Int>();
-        if (snapshot?.MyUnits != null)
-            foreach (UnitManager unit in snapshot.MyUnits)
-            {
-                if (unit == null || unit.IsDead || unit.IsEmbarked
-                    || !unit.TryGetUnitData(out UnitData data) || data == null
-                    || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Antiaereo)
-                    || (int)data.ResolveAiTargetPriorityForTargetClass(preyClass)
-                        < (int)BazookaTargetPriority.Secondary)
-                    continue;
-                UnitReachEnvelope cover = BuildAirRingEnvelope(unit, board, terrain,
-                    ReachIntent.Combat, Mathf.Max(1, unit.MaxMovementPoints));
-                if (cover == null)
-                    continue;
-                foreach (Vector3Int cell in cover.AttackableCells)
-                {
-                    Vector3Int c = cell;
-                    c.z = 0;
-                    umbrella.Add(c);
-                }
-            }
-        cache[preyClass] = umbrella;
-        return umbrella;
-    }
-
-    private static bool TouchesUncovered(UnitReachEnvelope envelope, HashSet<Vector3Int> targets,
-        HashSet<Vector3Int> umbrella)
-    {
-        if (targets == null || targets.Count == 0)
-            return false;
-        bool Hit(Vector3Int cell)
-        {
-            cell.z = 0;
-            return targets.Contains(cell) && (umbrella == null || !umbrella.Contains(cell));
-        }
-        foreach (Vector3Int cell in envelope.MovementCells)
-            if (Hit(cell)) return true;
-        foreach (Vector3Int cell in envelope.AttackableCells)
-            if (Hit(cell)) return true;
-        return false;
-    }
-
     private static void AddRingClass(Dictionary<GameUnitClass, int> byClass, GameUnitClass unitClass)
     {
         if (byClass == null)
             return;
         byClass.TryGetValue(unitClass, out int n);
         byClass[unitClass] = n + 1;
-    }
-
-    private static UnitReachEnvelope BuildAirRingEnvelope(UnitManager unit,
-        UnityEngine.Tilemaps.Tilemap board, TerrainDatabase terrain, ReachIntent intent, int budget)
-    {
-        return UnitReachEnvelopeService.Build(new UnitReachRequest
-        {
-            Unit = unit,
-            BoardMap = board,
-            TerrainDatabase = terrain,
-            Intent = intent,
-            Band = ReachBand.Tactical,
-            MovementBudget = budget,
-            FilterByOperationDomain = false
-        });
     }
 
     private static bool TouchesRing(UnitReachEnvelope envelope, HashSet<Vector3Int> ours, OwnLandProbe island)

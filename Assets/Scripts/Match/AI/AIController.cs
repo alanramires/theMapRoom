@@ -263,6 +263,9 @@ public partial class AIController : MonoBehaviour
     public static bool ShowAIHUD => _instance != null && _instance.showAIUnitHUD;
 
     private readonly HashSet<Vector3Int> plannedDestinations = new HashSet<Vector3Int>();
+    // EWACS InstanceId -> first interceptor choosing its escort this Phase 2.
+    // A decision-order claim, not a persistent assignment or a global 1:1 rule.
+    private readonly Dictionary<int, int> plannedEwacsEscorts = new Dictionary<int, int>();
     // Objetivos de captura escolhidos nesta passada pela faccao sem QG. Nao se
     // confunde com plannedDestinations: aquele conjunto reserva a celula onde a
     // unidade terminara o movimento; este reserva o predio distante para que a

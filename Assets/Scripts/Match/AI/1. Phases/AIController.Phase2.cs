@@ -30,6 +30,7 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
+        plannedEwacsEscorts.Clear();
         rebelCaptureTargetReservations.Clear();
         pendingRebelCaptureTargets.Clear();
         pendingAIDesignatedMissions.Clear();

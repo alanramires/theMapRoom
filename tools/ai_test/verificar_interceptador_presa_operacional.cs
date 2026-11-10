@@ -62,7 +62,7 @@ try{
     if(!placed)throw new System.Exception("Fixture nao encontrou celula so Operacional.");
     if(!Pursuit(fighter,sam,enemies))throw new System.Exception("SAM terciario venceu presa aerea operacional.");
     var paths=UnitMovementPathRules.CalcularCaminhosValidos(map,fighter,fighter.RemainingMovementPoints,terrain);
-    var move=(UnityEngine.Vector3Int)typeof(AIController).GetMethod("FindAirCombatAdvanceMove",flags).Invoke(ai,new object[]{fighter.CurrentCellPosition,heli.CurrentCellPosition,paths,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),TeamId.Blue,null,false});
+    var move=(UnityEngine.Vector3Int)typeof(AIController).GetMethod("FindAirCombatAdvanceMove",flags).Invoke(ai,new object[]{fighter.CurrentCellPosition,heli.CurrentCellPosition,paths,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),TeamId.Blue,null,false,true,false});
     if(move==fighter.CurrentCellPosition||!paths.ContainsKey(move)||SectorManager.HexDistance(move,heli.CurrentCellPosition)>=SectorManager.HexDistance(fighter.CurrentCellPosition,heli.CurrentCellPosition))throw new System.Exception("Aproximacao nao avancou por um caminho legal.");
     if(Pursuit(fighter,heli,enemies))throw new System.Exception("Ataque aereo tatico foi substituido.");
     if(Pursuit(apache,sam,enemies))throw new System.Exception("Disruptor foi desviado para interceptacao.");

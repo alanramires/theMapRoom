@@ -261,7 +261,7 @@ public partial class AIController
                     snapshot,
                     fallbackCell,
                     visibleEnemies,
-                    out string airCombatTier);
+                    out string airCombatTier, out _, registerEscortClaim: false);
             airCombatAnchor.z = 0;
             resolvedTarget = airCombatAnchor;
             Debug.Log(
