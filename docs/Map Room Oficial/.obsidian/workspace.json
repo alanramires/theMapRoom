@@ -11,17 +11,14 @@
             "id": "9582886bfd86933b",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "Sem título.canvas",
-                "viewState": {
-                  "x": 0,
-                  "y": 0,
-                  "zoom": 0
-                }
+                "file": "The Map Room.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "Sem título"
+              "icon": "lucide-file",
+              "title": "The Map Room"
             }
           }
         ]
@@ -83,8 +80,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "07f872777f4d2fc0",
@@ -192,8 +188,8 @@
   },
   "active": "9582886bfd86933b",
   "lastOpenFiles": [
-    "The Map Room 2027 - Pitch.md",
     "Sem título.canvas",
+    "The Map Room 2027 - Pitch.md",
     "2.4 Delta PQ.md",
     "The Map Room.md",
     "Unidades.md",
