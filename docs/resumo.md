@@ -1,15 +1,30 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-09, **depois** da tag `v10.7.0`.
+Ponto de retomada. Atualizado em 2026-11-10, **depois** da tag `v10.8.0`.
 Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.7.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
-v9.2.0. Relatórios: [`relatorio_v10.7.0.md`](relatorio_v10.7.0.md),
-[`relatorio_v10.6.0.md`](relatorio_v10.6.0.md), [`relatorio_v10.5.0.md`](relatorio_v10.5.0.md).
+`v10.8.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.8.0.md`](relatorio_v10.8.0.md),
+[`relatorio_v10.7.0.md`](relatorio_v10.7.0.md), [`relatorio_v10.6.0.md`](relatorio_v10.6.0.md).
+
+**A descoberta da v10.8.0: o rebelde era o rogue.** A "AI rebel" nasceu como ramo paralelo
+para o cenário sem QG; meses depois o autor viu que rebelde = unidade sem vaga no plano, e que o
+**magnético** já era a tradução de volta. Régua para qualquer `isRebel`: *o magnético já
+responde?* Sim → a porta cai; não → o magnético está incompleto e é ele que ganha o caso.
+Nunca um terceiro caminho. Sobrou da **facção** só o que não é da unidade: sem base para o
+shopping (`HasShoppingBase`, três demandas reativas), captura sem pré-requisito e nunca dona do
+que ocupa (`firstOwnerSlotIndex`). A IA pergunta "tem vaga?" (`IsPassengerInPlanSlot`,
+`AreAllPassengersPlanless`); a partida pergunta "tem QG?". Compra pela `sellingRule` da
+instância (`allowRebelAIPurchase` morreu); 0 unidades derrota e neutraliza; QG capturado elimina
+só o dono, fim por último de pé; cenário com spawn tardio protege-se por `UsesMatchEndRules` ou
+`allowDefeatForZeroUnits` no `QuadranteData`. O Caça A entrou pela progressão do Interceptador
+com gatilho de aviação inimiga e se posiciona por **exposição** (EWACS/vanguarda fora do
+guarda-chuva, `AIAirExposureService`). **Nada disso foi visto em Play** — cinco commits, todos
+"só compilou + fixture".
 
 **A descoberta da v10.7.0: ter arma não é ter missão; ter ficha não é chegar ao alvo.**
 O counter comprava Caça A pela metralhadora. O rally comprava Tanque B ilhado. Corrigido o
@@ -393,11 +408,24 @@ A_IA_Q3  NENHUMA construção         2000 no slot 1, que não compra nada
 A_IA_Q4  NENHUMA construção         2000 no slot 0, que não compra nada
 ```
 
-Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
+Sem HQ, os dois lados do Q3 e do Q4 são facção sem QG (v8.6.1, Frente 4; desde a v10.8.0 é só "todos sem vaga").
 
 ---
 
 ## Onde eu parei
+
+### O que a v10.8.0 deixou — jogar uma partida sem QG e uma com
+
+1. **Facção sem QG em Play:** procurar `sem QG: oportunidades livres=N` e `origem=capture-opportunity`
+   no shopping; fila de carona não vazia; APC entregando carga toda sem vaga sem esperar GoGreen.
+   Conferir as `sellingRule` das instâncias onde a rebelde comprava (Barracks, Docas, Garagem APC,
+   Hidrobase, Terminal Rodoviário) — a flag por catálogo morreu e nada foi migrado.
+2. **IA com QG em Play:** o capturador sem vaga agora **caça** sem capturável à vista
+   (`TryResolvePlanlessHuntAnchor`, fog-honesto); aceito como fallback, não visto. E as demandas de
+   AA/caça podem mudar: o SAM de alcance mínimo > 1 passou a contar no guarda-chuva.
+3. **Caça A:** ver a compra pela progressão (`origem=` elite "controle do ar"), a terceira linha
+   da reserva e os tiers `Exposed`/`Covered`/`Operational:Hunt` no AI Step; três perfis.
+4. **Doutrina:** lista completa no relatório v10.8.0; nenhum item pronto para consolidar.
 
 ### O que a v10.7.0 deixou — fechar a Aeronáutica em partida
 
@@ -917,6 +945,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **porta por facção onde o magnético já responde** | `isRebel`/`IsSlotRebel` na IA era sempre um rogue mal traduzido. Pergunte "tem vaga?" (`IsPassengerInPlanSlot`); o que é da facção mora na partida e no `HasShoppingBase`, não no papel |
+| **imunidade de facção no lugar de regra de cenário** | a rebelde era imune a 0 unidades por causa de aulas com spawn tardio. Proteção de cenário é `UsesMatchEndRules`/`allowDefeatForZeroUnits` no quadrante; não dá imunidade à facção |
+| **vitória declarada por quem elimina** | `HandleUnitDestroyed` coroava quem zerava um exército mesmo com três lados. Todo fim passa por `TryDeclareLastStandingWinner`; `DeclareEliminationVictory` só na rendição |
 | **arma secundária vira missão de compra** | o Caça A foi comprado contra infantaria. `IsCounterResponseRoleAllowed` separa contramedida de compra e tiro oportunista; interceptadores respondem a ar |
 | **ficha exata pula a ilha** | `RequiredUnitId` não torna a contramedida alcançável. `FindBestEliteCounter` aplica `CounterOffLandShare`/`OffersNonLandCounter` antes da cadeia; a exclusão também vale para o pré-requisito |
 | **mesmo tanque, origem diferente** | a correção do rally funcionou e o Tanque B reapareceu pelo counter-prerequisite. Conferir `origem=`, compromisso e cadeia antes de culpar o ramo corrigido |
@@ -1155,3 +1186,10 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
     seu pré-requisito não são exceções. No rally, usar `TryGetRallyAnchorCell` e o acesso do
     `SectorManager` por ficha/produtora. Regra correta só no carrinho deixa o planejador
     continuar prometendo uma peça que não atende o destino.
+
+12. **Não crie um terceiro caminho para o que já é um modo.** A "AI rebel" foi um controlador
+    paralelo para o que o rogue da IA com plano já fazia; cada regra nova precisava ser escrita
+    duas vezes e a segunda atrasava. Antes de abrir `if (facção)`, pergunte se o magnético
+    (`TryDecidePlanlessCapturerAction`, capitão do assalto, EWACS/capitão do caça) já responde.
+    Se responde, a porta cai; se não, complete o magnético. O fato da facção fica em quem o
+    deriva (`IsHeadQuarterlessTeam`), lido só pela partida e pelo `HasShoppingBase`.
