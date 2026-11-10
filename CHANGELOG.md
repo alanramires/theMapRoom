@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 Índice das versões do projeto. Cada versão tem um relatório próprio explicando
 **o porquê**, não só o que mudou.
@@ -32,6 +32,7 @@ da cena. Um mapa novo tem de pedir autoria, não código.
 | v10.4.0 | Ler o que o jogo já sabe (Fase 2 volta a ver o inimigo; escada aérea — vanguarda pede caça, cadeia na demanda; Avião Tanque pelo vaivém; AI Step e Shopping Pressure param de refazer o jogo; GetConstructionAtCell sem busca na cena; entrega pela banda Operacional) | [relatório](docs/relatorio_v10.4.0.md) |
 | v10.5.0 | Ferido não é carga (EVAC aéreo pela regra do reparo, anel do HQ como último recurso, EVAC conjunto; reparo avaliado antes do Serviço do Comando; Disruptor por faixa estrita; cruz EVAC no HUD; diretrizes "procure a que já existe" na skill de fechamento) | [relatório](docs/relatorio_v10.5.0.md) |
 | v10.6.0 | Só aceita o que a etapa seguinte aceitaria (régua do supridor em 4 faixas + prazo Tático; recuperação aérea na célula futura; fusão só onde a fusão aceita; EVAC sem avanço → anel do HQ; reserva de pouso da aeronave ferida só na IA; swap que captura; skill pergunte-me) | [relatório](docs/relatorio_v10.6.0.md) |
+| v10.7.0 | A compra precisa cumprir a missão (parede ponderada e resposta híbrida; rally com acesso; caça persegue no Operacional e não nasce para combater infantaria; pré-requisito respeita ilha; envolvidos em rosa) | [relatório](docs/relatorio_v10.7.0.md) |
 
 ---
 
