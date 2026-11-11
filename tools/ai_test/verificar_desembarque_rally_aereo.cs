@@ -60,7 +60,10 @@ try{
     var objective=new SectorObjective{Sector=ConstructionSector.Golf,AssignedTeam=TeamId.Blue,ObjectiveType=AIObjectiveType.RallyAssembly,Status=ObjectiveStatus.Defending,RallyState=AIRallyAssemblyState.Assembling,Slots=new System.Collections.Generic.List<SlotNeed>{new SlotNeed{Role=UnitRole.Capturador,Filled=true,AssignedUnitId=main.InstanceId},new SlotNeed{Role=UnitRole.Capturador,Filled=true,AssignedUnitId=extra.InstanceId},new SlotNeed{Role=UnitRole.Transportador,Filled=true,AssignedUnitId=carrier.InstanceId}}};
     var plan=new TeamObjectivePlan{Objectives=new System.Collections.Generic.List<SectorObjective>{objective}};
     var cargo=new System.Collections.Generic.List<UnitManager>{main,extra};var decide=typeof(AIController).GetMethod("TryBuildAirRallyAssemblyDelivery",flags);
-    PlayerAction Decide(){object[] args={carrier,cargo,plan,snapshot,carrier.CurrentCellPosition,null};if(!(bool)decide.Invoke(ai,args))return null;return(PlayerAction)args[5];}
+    PlayerAction Decide(){
+        // Edicao de terreno no mesmo frame do fixture: publica uma nova area.
+        ((System.Collections.IDictionary)typeof(AIController).GetField("rallyAreaFacts",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static).GetValue(null)).Clear();
+        object[] args={carrier,cargo,plan,snapshot,carrier.CurrentCellPosition,null};if(!(bool)decide.Invoke(ai,args))return null;return(PlayerAction)args[5];}
     var action=Decide();
     if(action==null||action.SensorAction!=SensorActionType.Disembark||action.SubSteps.Count!=2)throw new System.Exception("Rally ocupado nao entregou dois passageiros: "+action?.DebugLabel);
     var used=new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>();foreach(var step in action.SubSteps)if(step.TargetHex==rally.CurrentCellPosition||SectorManager.HexDistance(step.TargetHex,rally.CurrentCellPosition)>3||!used.Add(step.TargetHex))throw new System.Exception("Desembarque ocupou rally bloqueado, saiu da area ou sobrepos passageiros.");

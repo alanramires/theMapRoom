@@ -27,6 +27,9 @@ try{
     for(int x=0;x<10;x++)for(int y=0;y<6;y++)map.SetTile(new UnityEngine.Vector3Int(x,y,0),plain.paletteTile);
     var terrain=UnityEngine.ScriptableObject.CreateInstance<TerrainDatabase>();created.Add(terrain);Set(terrain,"terrains",new System.Collections.Generic.List<TerrainTypeData>{plain,forest});
     var soldier=Asset<UnitData>("Soldado");var chinook=Asset<UnitData>("chinook");var truck=Asset<UnitData>("suprimentos");
+    // Stress de alcance: o helicoptero chega a base distante pelo Operacional,
+    // mas esse raio nao pode aumentar a area local nem virar presenca no rally.
+    chinook=UnityEngine.Object.Instantiate(chinook);created.Add(chinook);chinook.movement=24;
     var unitDb=UnityEngine.ScriptableObject.CreateInstance<UnitDatabase>();created.Add(unitDb);Set(unitDb,"units",new System.Collections.Generic.List<UnitData>{soldier,chinook,truck});
     var city=Asset<ConstructionData>("cidade");
     var constructionDb=UnityEngine.ScriptableObject.CreateInstance<ConstructionDatabase>();created.Add(constructionDb);Set(constructionDb,"constructions",new System.Collections.Generic.List<ConstructionData>{city});
@@ -59,12 +62,13 @@ try{
 
     void Check(bool yes,string why){if(!yes)throw new System.Exception(why);}
     var stat=System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static;
-    void Clear(){((System.Collections.IDictionary)typeof(AIController).GetField("rallyReadinessFacts",stat).GetValue(null)).Clear();((System.Collections.IDictionary)typeof(AIController).GetField("rallyReachFacts",stat).GetValue(null)).Clear();}
+    void Clear(){((System.Collections.IDictionary)typeof(AIController).GetField("rallyReadinessFacts",stat).GetValue(null)).Clear();((System.Collections.IDictionary)typeof(AIController).GetField("rallyReachFacts",stat).GetValue(null)).Clear();((System.Collections.IDictionary)typeof(AIController).GetField("rallyAreaFacts",stat).GetValue(null)).Clear();}
     var oldObjective=typeof(ObjectiveManager).GetField("instance",stat).GetValue(null);
     var objectiveHost=new UnityEngine.GameObject("ReadinessObjectives");objectiveHost.SetActive(false);
     var manager=objectiveHost.AddComponent<ObjectiveManager>();typeof(ObjectiveManager).GetField("instance",stat).SetValue(null,manager);
     try{
         var apache=Asset<UnitData>("apache");var fighter=Asset<UnitData>("cacaB");var bomber=Asset<UnitData>("bombardeiro");var tank=Asset<UnitData>("tanqueA");
+        apache=UnityEngine.Object.Instantiate(apache);created.Add(apache);apache.movement=16;
         Set(unitDb,"units",new System.Collections.Generic.List<UnitData>{soldier,chinook,truck,apache,fighter,bomber,tank});
         foreach(var profile in new[]{("Facil",1.2f),("Medio",1.5f),("Dificil",2f)})
             Check(UnityEngine.Mathf.Approximately(UnityEditor.AssetDatabase.LoadAssetAtPath<AIPresetData>("Assets/DB/AI/Presets/AIPreset_"+profile.Item1+".asset").rallyLocalRatio,profile.Item2),"Razao local do perfil autorado incorreta: "+profile.Item1);
@@ -80,11 +84,10 @@ try{
         var s3=Spawn(930003,soldier,new UnityEngine.Vector3Int(5,3,0),ownSlot);
         var c2=Spawn(930004,chinook,new UnityEngine.Vector3Int(3,1,0),ownSlot);
         Set(c2,"currentDomain",Domain.Air);Set(c2,"currentHeightLevel",HeightLevel.AirLow);
-        var attack=Spawn(930085,apache,new UnityEngine.Vector3Int(4,6,0),ownSlot);
-        var caca=Spawn(930080,fighter,new UnityEngine.Vector3Int(4,5,0),ownSlot);
+        var attack=Spawn(930085,apache,new UnityEngine.Vector3Int(5,2,0),ownSlot);
+        var caca=Spawn(930080,fighter,new UnityEngine.Vector3Int(3,2,0),ownSlot);
         foreach(var air in new[]{attack,caca}){Set(air,"currentDomain",Domain.Air);Set(air,"currentHeightLevel",HeightLevel.AirLow);}
-        map.SetTile(caca.CurrentCellPosition,sea.paletteTile);
-        for(int i=0;i<36;i++)Spawn(931000+i,soldier,new UnityEngine.Vector3Int(i<2?8:40+i%20,i<2?2+i:15,0),ownSlot==0?1:0);
+        for(int i=0;i<38;i++)Spawn(931000+i,soldier,new UnityEngine.Vector3Int(i<2?8:40+i%20,i<2?2+i:15,0),ownSlot==0?1:0);
         // Full editor scenes may have units already: only fixture units enter this isolated evaluation.
         var unrelated=new System.Collections.Generic.List<UnitManager>();foreach(var u in UnitManager.AllActive)if(!units.Contains(u))unrelated.Add(u);foreach(var u in unrelated)UnitManager.AllActive.Remove(u);
         try{
@@ -99,6 +102,31 @@ try{
             Check(Value<float>(r,"Artillery")==0f,"Caso inicial deveria ter zero suporte.");
             Check(Value<bool>(r,"GoGreen"),"Golf deveria GO_GREEN com piso e vantagem local. Missing="+Value<string>(r,"Missing"));
             Check(Value<int>(r,"VisibleThreats")==2,"Nao isolou os dois inimigos locais confirmados. Real="+Value<int>(r,"VisibleThreats"));
+            Check(Value<int>(r,"RequiredForce")==4,"A banda aerea inflou a razao local: "+Value<int>(r,"RequiredForce"));
+            var areaQuery=typeof(AIController).GetMethod("GetRallyArea",stat);
+            var sharedArea=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});
+            Check(object.ReferenceEquals(sharedArea,areaQuery.Invoke(null,new object[]{rally,TeamId.Blue})),"A area foi recalculada na mesma revisao.");
+            var positions=new System.Collections.Generic.Dictionary<UnitManager,UnityEngine.Vector3Int>{{attack,attack.CurrentCellPosition},{caca,caca.CurrentCellPosition},{carrier,carrier.CurrentCellPosition},{c2,c2.CurrentCellPosition}};
+            var far=new UnityEngine.Vector3Int(16,2,0);
+            Check(SectorManager.HexDistance(far,rally.CurrentCellPosition)==12f,"Caso distante nao esta a 12h.");
+            Set(attack,"currentCellPosition",far);Set(caca,"currentCellPosition",new UnityEngine.Vector3Int(16,3,0));
+            Set(carrier,"currentCellPosition",far);Set(c2,"currentCellPosition",new UnityEngine.Vector3Int(17,2,0));Clear();
+            Check(AIController.IsRallyParticipantInBand(attack,rally.CurrentCellPosition,ReachBand.Tactical),"Apache de teste deveria ter alcance ate o rally.");
+            Check(AIController.IsRallyParticipantInBand(carrier,rally.CurrentCellPosition,ReachBand.Tactical),"Chinook de teste deveria ter alcance ate o rally.");
+            r=Eval();Check(Value<float>(r,"Assault")==0f,"Apache fora da area contou como ruptura pelo alcance.");
+            Check(Value<int>(r,"Capturers")==3,"Passageiros do Chinook a 12h contaram como presentes.");
+            Check(!AIController.IsRallyParticipantPresent(carrier,rally,ReachBand.Operational),"Chinook fora do Approach contou pelo raio de voo.");
+            sharedArea=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});
+            UnityEngine.Vector3Int? forwardCell=null;
+            foreach(var cell in sharedArea.Vanguard)if(!sharedArea.Core.Contains(cell)){forwardCell=cell;break;}
+            Check(forwardCell.HasValue,"Fixture nao criou Vanguarda fora do Core terrestre.");
+            var previousTile=map.GetTile(forwardCell.Value);map.SetTile(forwardCell.Value,sea.paletteTile);
+            Set(caca,"currentCellPosition",forwardCell.Value);Clear();
+            r=Eval();sharedArea=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});
+            Check(sharedArea.Vanguard.Contains(caca.CurrentCellPosition),"Celula do caca deixou de ser Vanguarda.");
+            Check(Value<float>(r,"Assault")==1f&&AIController.IsRallyParticipantPresent(caca,rally,ReachBand.Tactical),"Caca B sobre o mar na Vanguarda nao contou ruptura 1.");
+            Check(RallyFormationReport.LocateParticipant(sharedArea,caca.CurrentCellPosition,caca)==RallyLocation.Core,"Painel divergiu da presenca na Vanguarda.");
+            map.SetTile(forwardCell.Value,previousTile);foreach(var position in positions)Set(position.Key,"currentCellPosition",position.Value);Clear();
             Set(main,"isEmbarked",false);Set(extra,"isEmbarked",false);Set(main,"currentCellPosition",new UnityEngine.Vector3Int(60,0,0));Set(extra,"currentCellPosition",new UnityEngine.Vector3Int(60,1,0));
             r=Eval();Check(!Value<bool>(r,"HoldReady")&&!Value<bool>(r,"GoGreen"),"Tres capturadores nao cumprem piso.");
             Set(main,"isEmbarked",true);Set(extra,"isEmbarked",true);Set(main,"currentCellPosition",carrier.CurrentCellPosition);Set(extra,"currentCellPosition",carrier.CurrentCellPosition);
@@ -122,7 +150,7 @@ try{
             var growing=new SectorObjective();for(int t=1;t<=5;t++)observe.Invoke(null,new object[]{growing,t,true,2f+t,10+3*t});
             Check(growing.RallyStagnantTurns==0&&(bool)saturated.Invoke(null,new object[]{growing,5,true}),"Crescimento real impediu limite de 4 turnos.");
             // Mesmo piso com outro rally held: nenhum relogio antes de controlar este predio.
-            var otherRally=Building(939001,new UnityEngine.Vector3Int(4,3,0),ConstructionSector.Alpha);
+            var otherRally=Building(939001,new UnityEngine.Vector3Int(4,1,0),ConstructionSector.Alpha);
             otherRally.Apply(city);Set(otherRally,"slotIndex",ownSlot);Set(otherRally,"teamId",TeamId.Blue);Set(otherRally,"isRallyPoint",true);Set(otherRally,"rallyOwnerSlots",new System.Collections.Generic.List<int>{ownSlot});
             var notHeld=new SectorObjective{Sector=ConstructionSector.Golf,ObjectiveType=AIObjectiveType.RallyAssembly};
             var update=typeof(AIController).GetMethod("UpdateRallyObjectiveState",stat);
@@ -142,6 +170,7 @@ try{
             var snapshot=new AIWorldSnapshot{AITeam=TeamId.Blue,AISlotIndex=ownSlot,MyUnits=new System.Collections.Generic.List<UnitManager>()};
             foreach(var u in units)if(u.SlotIndex==ownSlot)snapshot.MyUnits.Add(u);
             var resolveCaptain=typeof(AIController).GetMethod("TryResolveRallyAdvanceCaptain",stat);
+            var captainFollowerOrigin=attack.CurrentCellPosition;Set(attack,"currentCellPosition",new UnityEngine.Vector3Int(4,6,0));Clear();
             object[] captainArgs={attack,snapshot,null};
             Check((bool)resolveCaptain.Invoke(null,captainArgs)&&(UnitManager)captainArgs[2]==guard,"Escolta recalculou capitao em vez de ler o persistido.");
             var secondGroup=new SectorObjective{Sector=ConstructionSector.Alpha,RallyCaptainId=s3.InstanceId};restored.RallyAdvances.Add(secondGroup);
@@ -151,6 +180,7 @@ try{
             typeof(AIController).GetMethod("ReconcileRallyAdvanceParticipants",stat).Invoke(null,new object[]{restored,TeamId.Blue});
             Check(secondGroup.RallyParticipantIds.Contains(attack.InstanceId)&&!restored.RallyAdvances[0].RallyParticipantIds.Contains(attack.InstanceId),"Dois capitaes ficaram esperando o mesmo reforco.");
             restored.RallyAdvances.Remove(secondGroup);
+            Set(attack,"currentCellPosition",captainFollowerOrigin);Clear();
             var group=restored.RallyAdvances[0];group.RallyParticipantIds=new System.Collections.Generic.List<int>{s2.InstanceId};
             var captainOrigin=guard.CurrentCellPosition;Set(guard,"currentCellPosition",new UnityEngine.Vector3Int(9,2,0));Clear();
             var waiting=typeof(AIController).GetMethod("UpdateRallyAdvanceWaiting",stat);
@@ -173,7 +203,7 @@ try{
             Check(!(bool)waiting.Invoke(null,new object[]{restored,TeamId.Blue})&&!group.RallyWaiting&&!group.RallyParticipantIds.Contains(s2.InstanceId),"Retardatario a 40h congelou a invasao ou permaneceu no grupo.");
             Set(s2,"currentCellPosition",stragglerOrigin);Clear();
             foreach(var u in units)if(before.TryGetValue(u.InstanceId,out var old)&&u!=main&&u!=extra)Check(u.CurrentCellPosition==old.cell&&u.CurrentHP==old.hp&&u.IsEmbarked==old.embarked,"Prontidao alterou tabuleiro confirmado.");
-            return "PASS D2: Golf 36 inimigos/2 locais, captura 5, ruptura Apache+Caca B=2 sobre mar, suporte zero GO_GREEN; tres capturadores recusados; embarcado e Ocupacao; Bombardeiro suporte opcional; saturacao idempotente e limite de quatro turnos; capitao/saturacao persistidos; escolha entre grupos por Operacional; capitao espera, atira parado e retoma; retardatario 40h removido; piso sem hold nao satura; tela aerea apta/sem municao; sem mutacao da decisao. Play nao observado.";
+            return "PASS D2: Golf 36 inimigos na base/2 locais, RequiredForce=4 com Chinook de longo alcance; Apache e carga a 12h fora da area nao contam; Caca B sobre o mar na Vanguarda conta 1; area cacheada compartilhada; captura 5, ruptura 2, suporte zero GO_GREEN; tres capturadores recusados; embarcado e Ocupacao; Bombardeiro suporte opcional; saturacao idempotente e limite de quatro turnos; capitao/saturacao persistidos; escolha entre grupos por Operacional; capitao espera, atira parado e retoma; retardatario 40h removido; piso sem hold nao satura; tela aerea apta/sem municao; sem mutacao da decisao. Play nao observado.";
         }finally{foreach(var u in unrelated)if(u!=null&&!UnitManager.AllActive.Contains(u))UnitManager.AllActive.Add(u);Clear();}
     }finally{typeof(ObjectiveManager).GetField("instance",stat).SetValue(null,oldObjective);}
 }finally{

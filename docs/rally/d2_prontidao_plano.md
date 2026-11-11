@@ -52,3 +52,18 @@ Consequência para a prontidão: o piso "ruptura >= 2" vale onde a Ruptura pode 
 ar** no rally (linhas 1, 2, 4 e 5). Num rally no mar (linha 3), a Ruptura está embarcada e conta
 como Ocupação; o core é o da nota naval acima (4 de fogo de suporte naval + 4 embarcados ou 2
 transportes carregados). Isso é o degrau 7; a D2 cobre rally em terra.
+
+
+## Correção do autor sobre `53dce5f` — presença e inimigo local (2026-11-11)
+
+Esta decisão substitui a união dos Operacionais dos participantes do item 4 e o teste por alcance
+para aeronaves do item 5. O inimigo local é medido no **Approach do modelo terrestre**, a partir
+do rally, preservando névoa confirmada e direção do eixo.
+
+Presença terrestre continua pela própria banda. Para aeronave, inclusive o transporte de uma
+unidade embarcada: Tático é célula em **Core ∪ Vanguard**; Operacional é célula em **Approach**.
+Poder voar até o rally não é estar reunido nele. A mesma `RallyArea` de `RallyAreaService` é
+cacheada por rally/slot e `GlobalBoardRevision`, compartilhada por planner, painel e entrega.
+
+`IsRallyParticipantPresent` responde presença no rally; `IsRallyParticipantInBand` continua para
+coesão em relação ao capitão e cobertura da LZ, onde a banda própria permanece correta.

@@ -15,10 +15,8 @@ public partial class AIController
     {
         if (!IsActiveRallyAssemblyObjective(assigned))
             return false;
-        if (!TryGetRallyAnchorCell(assigned.Sector, out Vector3Int anchor))
-            return false;
-        Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
-        return IsRallyParticipantInBand(unit, anchor, ReachBand.Tactical);
+        return TryFindOwnedRallyForSector(assigned.Sector, unit.TeamId, out ConstructionManager rally)
+            && IsRallyParticipantPresent(unit, rally, ReachBand.Tactical);
     }
 
     // Celula do ponto de rally do setor (anchor usado na contagem de presenca do GoGreen).

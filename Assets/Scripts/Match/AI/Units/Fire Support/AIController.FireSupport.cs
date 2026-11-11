@@ -463,7 +463,8 @@ public partial class AIController
             return true;
         }
 
-        if (IsRallyParticipantInBand(unit, rally.Anchor, ReachBand.Tactical))
+        if (TryFindOwnedRallyForSector(rally.Sector, snapshot.AITeam, out ConstructionManager gatheringRally)
+            && IsRallyParticipantPresent(unit, gatheringRally, ReachBand.Tactical))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rally {rally.Sector} segura cobertura @ {fromCell} ({rally.Reason})");
             action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);

@@ -110,6 +110,7 @@ public partial class AIController
         foreach (var key in rallyReadinessFacts.Keys) if (key.slot == aiSlotIndex) staleFacts.Add(key);
         foreach (var key in staleFacts) rallyReadinessFacts.Remove(key);
         rallyReachFacts.Clear();
+        ClearRallyAreasForSlot(aiSlotIndex);
         AIRallyPlanContext context = new AIRallyPlanContext
         {
             TargetingEnemyHQ = new HashSet<ConstructionSector>(),
@@ -362,7 +363,7 @@ public partial class AIController
                 || !counted.Add(unit.InstanceId) || !unit.TryGetUnitData(out UnitData data)) continue;
             bool inCore = false;
             foreach (ConstructionManager rally in held)
-                if (IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical)) { inCore = true; break; }
+                if (IsRallyParticipantPresent(unit, rally, ReachBand.Tactical)) { inCore = true; break; }
             if (!inCore) continue;
             if (HasRallyCaptureSkill(data)) aggregate.Capturers++;
             if (unit.IsEmbarked) { aggregate.Occupation++; continue; }
@@ -383,7 +384,7 @@ public partial class AIController
         float score = 0f;
         foreach (UnitManager unit in UnitManager.AllActive)
             if (unit != null && !unit.IsDead && unit.SlotIndex == ResolveAISlotKey(aiTeam)
-                && unit.TryGetUnitData(out UnitData data) && IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical))
+                && unit.TryGetUnitData(out UnitData data) && IsRallyParticipantPresent(unit, rally, ReachBand.Tactical))
                 score += HasRallyCaptureSkill(data) ? 100f : unit.IsEmbarked ? 0f
                     : GetRallyAssaultWeight(data) * 300f + GetRallyArtilleryWeight(data) * 200f;
         return score;
@@ -1786,6 +1787,7 @@ public partial class AIController
     private static void ResetRallyDecisionFacts()
     {
         rallyReadinessFacts.Clear(); rallyReachFacts.Clear(); rallyReachRevision = -1;
+        rallyAreaFacts.Clear(); rallyAreaRevision = -1;
     }
 
     private static readonly Dictionary<(int rally, int slot, int turn), AIRallyReadiness> rallyReadinessFacts = new Dictionary<(int, int, int), AIRallyReadiness>();
@@ -1840,22 +1842,69 @@ public partial class AIController
         return GetRallyReach(mover, band, origin)?.MovementCells.Contains(anchor) == true;
     }
 
-    private static HashSet<Vector3Int> GetRallyModelCells(ConstructionSector sector, TeamId team)
+    // Area publicada por revisao confirmada: planner, tela e transporte compartilham
+    // as mesmas bandas e faixas. Nunca constroi um envelope por participante.
+    private static int rallyAreaRevision = -1;
+    private static readonly Dictionary<(ConstructionManager rally, int slot), RallyArea> rallyAreaFacts
+        = new Dictionary<(ConstructionManager, int), RallyArea>();
+
+    private static void ClearRallyAreasForSlot(int slot)
     {
+        var keys = new List<(ConstructionManager rally, int slot)>();
+        foreach (var key in rallyAreaFacts.Keys) if (key.slot == slot) keys.Add(key);
+        foreach (var key in keys) rallyAreaFacts.Remove(key);
+    }
+
+    private static RallyArea GetRallyArea(ConstructionManager rally, TeamId team)
+    {
+        if (rally == null) return null;
+        int revision = ThreatRevisionTracker.GlobalBoardRevision;
+        if (rallyAreaRevision != revision) { rallyAreaFacts.Clear(); rallyAreaRevision = revision; }
         int slot = ResolveAISlotKey(team);
-        if (!TryFindOwnedRallyForSector(sector, team, out ConstructionManager rally)) return new HashSet<Vector3Int>();
+        var key = (rally, slot);
+        if (rallyAreaFacts.TryGetValue(key, out RallyArea cached)) return cached;
         AIController ai = GetRallyContext(slot, rally.BoardTilemap);
-        if (ai == null) return new HashSet<Vector3Int>();
+        if (ai == null || ai.boardTilemap == null || ai.terrainDatabase == null) return null;
+        var allies = new List<UnitManager>(); var enemies = new List<UnitManager>();
         UnitDatabase database = null;
         foreach (UnitManager unit in UnitManager.AllActive)
-            if (unit != null && unit.SlotIndex == slot && unit.BoardTilemap == ai.boardTilemap && unit.UnitDatabase != null)
-            { database = unit.UnitDatabase; break; }
+        {
+            if (unit == null || unit.IsDead || unit.gameObject.scene != rally.gameObject.scene) continue;
+            if (unit.SlotIndex == slot)
+            {
+                allies.Add(unit);
+                if (database == null && unit.UnitDatabase != null) database = unit.UnitDatabase;
+            }
+            else if (!unit.IsEmbarked && PlayerSlotRelations.AreEnemies(slot, unit.SlotIndex)
+                && ai.matchController.IsUnitVisibleForSlot(unit, PlayerSlotId.FromIndex(slot))) enemies.Add(unit);
+        }
         if (database == null) database = FindAnyObjectByType<UnitSpawner>()?.UnitDatabase;
         UnitData model = ai.ResolveRallyFormationModel(rally, QuadranteController.Active?.BuiltQuadrant, database, out _);
-        return UnitReachEnvelopeService.Build(new UnitReachRequest { ModelData = model, ModelTeam = team, ModelSlot = slot,
-            BoardMap = ai.boardTilemap, TerrainDatabase = ai.terrainDatabase, OriginOverride = rally.CurrentCellPosition,
-            Intent = ReachIntent.Mobility, Band = ReachBand.Tactical, SubStep = ReachSubStep.Terrestre })?.MovementCells
-            ?? new HashSet<Vector3Int>();
+        Vector3Int? axisOrigin = null;
+        InvasionAxisMap axisMap = ai.currentAxisMap ?? InvasionAxisMap.Build(PlayerSlotId.FromIndex(slot), ai.boardTilemap);
+        foreach (var axis in axisMap.Axes)
+            if (!axis.IsInvasionAxis && axis.RallySector == rally.Sector) { axisOrigin = axis.HqCell; break; }
+        RallyArea area = RallyAreaService.Build(rally, model, team, slot, ai.boardTilemap, ai.terrainDatabase, allies, enemies, axisOrigin);
+        rallyAreaFacts[key] = area;
+        return area;
+    }
+
+    public static bool IsRallyParticipantPresent(UnitManager unit, ConstructionManager rally, ReachBand band)
+    {
+        UnitManager mover = unit != null && unit.IsEmbarked ? unit.EmbarkedTransporter : unit;
+        return mover != null && IsRallyParticipantPresent(unit, rally, band, mover.CurrentCellPosition);
+    }
+
+    internal static bool IsRallyParticipantPresent(UnitManager unit, ConstructionManager rally, ReachBand band, Vector3Int position)
+    {
+        UnitManager mover = unit != null && unit.IsEmbarked ? unit.EmbarkedTransporter : unit;
+        if (mover == null || rally == null || !mover.TryGetUnitData(out UnitData data)) return false;
+        position.z = 0;
+        if (!data.IsAircraft()) return IsRallyParticipantInBand(unit, rally.CurrentCellPosition, band, position);
+        RallyArea area = GetRallyArea(rally, mover.TeamId);
+        if (area == null) return false;
+        return band == ReachBand.Tactical ? area.Core.Contains(position) || area.Vanguard.Contains(position)
+            : area.Approach.Contains(position);
     }
 
     private static int RallyForceScore(int capturers, float breakthrough, float support)
@@ -1868,14 +1917,9 @@ public partial class AIController
         AIController ai = GetRallyContext(slot, rally.BoardTilemap);
         MatchController match = ai?.matchController;
         if (ai == null || ai.boardTilemap == null || match == null) return 0f;
-        var cells = new HashSet<Vector3Int>();
-        foreach (UnitManager unit in UnitManager.AllActive)
-            if (unit != null && !unit.IsDead && unit.SlotIndex == slot && !unit.IsEmbarked
-                && IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical))
-            {
-                UnitReachEnvelope reach = GetRallyReach(unit, ReachBand.Operational);
-                if (reach != null) cells.UnionWith(reach.MovementCells);
-            }
+        RallyArea area = GetRallyArea(rally, team);
+        if (area == null) return 0f;
+        HashSet<Vector3Int> cells = area.Approach;
         Vector2 center = HexCoordinates.GetCellCenterWorld(ai.boardTilemap, rally.CurrentCellPosition);
         Vector2 forward = Vector2.zero;
         InvasionAxisMap axisMap = ai.currentAxisMap ?? InvasionAxisMap.Build(PlayerSlotId.FromIndex(slot), ai.boardTilemap);
@@ -1924,13 +1968,14 @@ public partial class AIController
         foreach (UnitManager unit in UnitManager.AllActive)
         {
             if (unit == null || unit.IsDead || unit.SlotIndex != ResolveAISlotKey(team)
-                || !IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Operational)) continue;
-            bool core = IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical);
+                ) continue;
+            bool core = IsRallyParticipantPresent(unit, rally, ReachBand.Tactical);
+            if (!core && !IsRallyParticipantPresent(unit, rally, ReachBand.Operational)) continue;
             bool assigned = objective.Slots.Exists(need => need.Filled && need.AssignedUnitId == unit.InstanceId);
             if (!core && !assigned && !plan.RogueUnitIds.Contains(unit.InstanceId)) continue;
             participants.Add(unit.InstanceId);
             if (unit.IsEmbarked || !unit.TryGetUnitData(out UnitData data) || !HasRallyCaptureSkill(data)
-                || !IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical)) continue;
+                || !IsRallyParticipantPresent(unit, rally, ReachBand.Tactical)) continue;
             if (objective.RallyCaptainId < 0 || unit.InstanceId < objective.RallyCaptainId) objective.RallyCaptainId = unit.InstanceId;
         }
         objective.RallyParticipantIds = new List<int>(participants);

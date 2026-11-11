@@ -136,10 +136,10 @@ Estado em `Assets/Scripts/Match/AI/2. Planner/AIController.PlanEvaluator.RallyPo
 
 | antes da D2 | implementado na D2 (aguarda revisão em Play) |
 |---|---|
-| raios fixos por papel: força 3, ataque aéreo 5, artilharia 4, vigilância 6, logística 5 | presença por Tático/Operacional da própria unidade; Core/Approach do modelo continuam como geometria terrestre de reunião |
+| raios fixos por papel: força 3, ataque aéreo 5, artilharia 4, vigilância 6, logística 5 | terrestre pela banda própria; aeronave pela célula em Core ∪ Vanguard (Tático) ou Approach (Operacional); área do modelo compartilhada/cacheada |
 | embarcado não conta | conta uma vez por InstanceId, na banda do transporte, como carga de Ocupação; não soma Ruptura nem Dissuasão; passageiro capturador atende a cota de captura |
 | artilharia obrigatória + válvula de ruptura esmagadora | Dissuasão soma suporte e força, sem gate; removidos artGlobal/artLocal, requisitos mínimos e ASSEMBLING_WAIT_ART |
-| pacote escala com o inimigo do mapa inteiro | piso de 4 capturadores e ruptura 2; razão contra inimigos locais confirmados no Operacional do core e na direção do eixo (Fácil 1,2; Médio 1,5; Difícil 2,0) |
+| pacote escala com o inimigo do mapa inteiro | piso de 4 capturadores e ruptura 2; razão contra inimigos locais confirmados no Approach do modelo terrestre e na direção do eixo (Fácil 1,2; Médio 1,5; Difícil 2,0) |
 | rallies conquistados somam massa | BuildRallyAggregate preservado com identidade única; liberação conjunta preservada; capitão de cada grupo persistido e reforço pelo Operacional real |
 | timeout fixo de 4 turnos | saturação: dois turnos sem +1 ruptura/+2 força, ou quatro turnos desde o piso; observação idempotente por turno; só libera com piso presente |
 | 2:1 e domínio macro | preservados como saídas existentes; ativação pelo eixo preservada |

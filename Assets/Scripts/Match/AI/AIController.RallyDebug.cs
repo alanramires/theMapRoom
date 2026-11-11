@@ -44,28 +44,23 @@ public partial class AIController
         int slot = rallyFormationRequestedSlot >= 0 ? rallyFormationRequestedSlot : matchController.ActiveSlotId.Value;
         if (!matchController.IsValidPlayerSlotIndex(slot)) { rallyFormationMessage = "Slot invalido."; return; }
         TeamId team = matchController.GetVisualTeamForSlot(PlayerSlotId.FromIndex(slot));
-        var allies = new List<UnitManager>(); var enemies = new List<UnitManager>();
+        var allies = new List<UnitManager>();
         foreach (UnitManager unit in UnitManager.AllActive)
         {
             if (unit == null || unit.IsDead || unit.gameObject.scene != gameObject.scene) continue;
             if (unit.SlotIndex == slot) allies.Add(unit);
-            else if (!unit.IsEmbarked && PlayerSlotRelations.AreEnemies(slot, unit.SlotIndex)
-                && matchController.IsUnitVisibleForSlot(unit, PlayerSlotId.FromIndex(slot))) enemies.Add(unit);
         }
         UnitDatabase database = FindAnyObjectByType<UnitSpawner>()?.UnitDatabase;
         if (database == null) foreach (UnitManager unit in allies)
             if (unit.UnitDatabase != null) { database = unit.UnitDatabase; break; }
         QuadranteData quadrant = QuadranteController.Active?.BuiltQuadrant;
-        InvasionAxisMap axisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(slot), boardTilemap);
         rallyFormationReports.Clear();
         foreach (ConstructionManager rally in ConstructionManager.AllActive)
         {
             if (rally == null || rally.gameObject.scene != gameObject.scene || !IsRallyOwnedBySlot(rally, team, slot)) continue;
             UnitData model = ResolveRallyFormationModel(rally, quadrant, database, out bool fallback);
-            Vector3Int? axisOrigin = null;
-            foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
-                if (!axis.IsInvasionAxis && axis.RallySector == rally.Sector) { axisOrigin = axis.HqCell; break; }
-            RallyArea area = RallyAreaService.Build(rally, model, team, slot, boardTilemap, terrainDatabase, allies, enemies, axisOrigin);
+            RallyArea area = GetRallyArea(rally, team);
+            if (area == null) continue;
             rallyFormationReports.Add(RallyFormationReport.BuildForSlot(this, slot, area, allies, rallyObservedMoves, fallback));
         }
         rallyFormationMessage = $"Slot {slot}, {rallyFormationReports.Count} rally(s). Atualizado no Neutral confirmado.";

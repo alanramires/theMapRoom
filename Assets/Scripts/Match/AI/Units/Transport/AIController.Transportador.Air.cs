@@ -299,7 +299,7 @@ public partial class AIController
             Vector3Int cell = ownRally.CurrentCellPosition; cell.z = 0;
             anchors[passenger.InstanceId] = cell;
             if (!cellsBySector.TryGetValue(assigned.Sector, out var coreCells))
-            { coreCells = GetRallyModelCells(assigned.Sector, snapshot.AITeam); cellsBySector[assigned.Sector] = coreCells; }
+            { coreCells = GetRallyArea(ownRally, snapshot.AITeam)?.Core ?? new HashSet<Vector3Int>(); cellsBySector[assigned.Sector] = coreCells; }
             rallyCells[passenger.InstanceId] = coreCells;
         }
         var paths = UnitMovementPathRules.CalcularCaminhosValidos(

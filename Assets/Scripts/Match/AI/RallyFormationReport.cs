@@ -35,15 +35,14 @@ public sealed class RallyFormationReport
     public static RallyLocation Locate(RallyArea area, Vector3Int cell)
     { cell.z = 0; return area.Core.Contains(cell) ? RallyLocation.Core : area.Approach.Contains(cell) ? RallyLocation.Approach : RallyLocation.Outside; }
 
-    // Aeronaves nao seguem o recorte terrestre do modelo. Projeta as mesmas bandas
-    // em distancia hexagonal; isto muda so a localizacao exibida, nao a prontidao.
+    // A tela pergunta a mesma presenca que a prontidao: aeronave na area,
+    // terrestre pela banda propria; carga pela posicao do transporte.
     public static RallyLocation LocateParticipant(RallyArea area, Vector3Int cell, UnitManager unit)
     {
         if (unit == null) return Locate(area, cell);
-        Vector3Int pivot = area.Rally.CurrentCellPosition;
         // A mesma pergunta para origem atual e destino previsto, sem mover a unidade.
-        return AIController.IsRallyParticipantInBand(unit, pivot, ReachBand.Tactical, cell) ? RallyLocation.Core
-            : AIController.IsRallyParticipantInBand(unit, pivot, ReachBand.Operational, cell) ? RallyLocation.Approach : RallyLocation.Outside;
+        return AIController.IsRallyParticipantPresent(unit, area.Rally, ReachBand.Tactical, cell) ? RallyLocation.Core
+            : AIController.IsRallyParticipantPresent(unit, area.Rally, ReachBand.Operational, cell) ? RallyLocation.Approach : RallyLocation.Outside;
     }
 
     public static RallyFormationReport BuildForSlot(AIController controller, int slot, RallyArea area,
