@@ -210,3 +210,11 @@ Cada degrau é uma versão `Y` e passa por Play antes do próximo.
 - **Unidade-modelo naval:** qual unidade, e se a bandeira naval tem setor.
 - **Quanto "esticou demais":** sair do Tático do capitão basta, ou é preciso uma fração do core?
 - **Assalto aéreo vale 1 e terrestre 2:** o Apache e o caça contam igual?
+
+
+## Plano de implementação da D2 e nota naval
+
+O [plano completo da D2](d2_prontidao_plano.md) registra o bloco do autor e a nota posterior:
+vanguarda ocupada é opcional durante o trânsito marítimo; Ruptura embarcada não precisa formar
+uma linha na frente dos destroyers. Isso não altera por si só o piso de ruptura nem inclui
+bandeira no mar nesta entrega. Nenhum desses itens foi implementado por esta nota.
