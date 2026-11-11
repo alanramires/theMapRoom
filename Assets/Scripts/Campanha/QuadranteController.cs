@@ -142,6 +142,7 @@ public class QuadranteController : MonoBehaviour
     public string MundoId => mundo != null ? mundo.mundoId : string.Empty;
     public string CampanhaId => campanhaId;
     public string QuadranteId => quadranteId;
+    public QuadranteData BuiltQuadrant => built ? quadranteConstruido : null;
 
     /// <summary>
     /// Eixos autorados do slot no quadrante que ESTA pintado. Falso = nao ha

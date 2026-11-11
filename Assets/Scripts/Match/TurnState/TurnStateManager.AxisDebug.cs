@@ -153,7 +153,7 @@ public partial class TurnStateManager
     // Mesma conta do spotter: cada segmento e um pedaco da polilinha que corre da base para o
     // rally e recomeca. A quantidade de segmentos cresce com o comprimento do eixo, para o
     // tracejado manter o espacamento num caminho longo.
-    private void AnimateAxisDebugTracks()
+    private void AnimateAxisDebugTracks(IEnumerable<AxisDebugTrack> tracks = null)
     {
         float multiplier = GetMirandoSpotterPreviewMultiplier();
         float speed = Mathf.Max(0.2f, GetMirandoSpotterSegmentSpeed());
@@ -161,7 +161,7 @@ public partial class TurnStateManager
         float width = Mathf.Max(0.02f, GetMirandoPreviewWidth() * multiplier);
         int baseQuantity = Mathf.Max(1, GetMirandoSpotterSegmentQuantities());
 
-        foreach (AxisDebugTrack track in axisDebugTracks)
+        foreach (AxisDebugTrack track in tracks ?? axisDebugTracks)
         {
             float cycleLen = track.pathLength + segmentLen;
             int quantity = Mathf.Max(baseQuantity, Mathf.CeilToInt(cycleLen / (segmentLen * 2.5f)));

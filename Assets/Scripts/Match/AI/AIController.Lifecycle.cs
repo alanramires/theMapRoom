@@ -246,6 +246,7 @@ public partial class AIController
 
     {
 
+        SetRallyFormationVisible(false);
         InvalidateAIReview();
         turnStateManager?.ReleaseAIReviewPairs();
         MatchController.OnActiveTeamChanged -= HandleTeamChanged;

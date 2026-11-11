@@ -349,6 +349,10 @@ public sealed class UnitReachProfile
 /// </summary>
 public sealed class UnitReachRequest
 {
+    // Modelo sem instancia em campo; suportado somente para Mobility.
+    public UnitData ModelData;
+    public TeamId ModelTeam;
+    public int ModelSlot = -1;
     public UnitManager Unit;
     public Tilemap BoardMap;
     public TerrainDatabase TerrainDatabase;
@@ -652,6 +656,25 @@ public static class UnitReachEnvelopeService
     /// </summary>
     public static UnitReachEnvelope Build(UnitReachRequest request)
     {
+        if (request != null && request.Unit == null && request.ModelData != null)
+        {
+            if (request.Intent != ReachIntent.Mobility || request.BoardMap == null || !request.OriginOverride.HasValue)
+                return null;
+            UnitManager model = UnitManager.CreateDetachedPlanningModel(request.ModelData, request.ModelTeam,
+                request.ModelSlot, request.BoardMap, request.OriginOverride.Value);
+            try
+            {
+                UnitReachRequest adapted = CloneForBand(request, request.Band);
+                adapted.Unit = model;
+                // A area e terreno: nao depende da ocupacao de participantes.
+                if (request.Band == ReachBand.Tactical)
+                    adapted.PrebuiltCosts = AIActionReachCoordinator.BuildSectorReachMap(model, request.BoardMap,
+                        request.TerrainDatabase, request.OriginOverride.Value, model.MaxMovementPoints, false);
+                return Build(adapted);
+            }
+            finally { UnityEngine.Object.DestroyImmediate(model.gameObject); }
+        }
+
         if (request == null || request.Unit == null)
             return null;
 

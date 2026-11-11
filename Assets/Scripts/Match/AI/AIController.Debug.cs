@@ -1131,7 +1131,7 @@ public partial class AIController
 
     private void LateUpdate()
     {
-        bool visible = HasPendingAIReview && !aiReviewApproved && IsAIReviewWindowVisible();
+        bool visible = !rallyFormationVisible && HasPendingAIReview && !aiReviewApproved && IsAIReviewWindowVisible();
         if (!visible || aiReviewVisualAction == null)
         {
             if (aiReviewDrawnAction != null) turnStateManager?.ClearAIReviewPairs();
@@ -1160,6 +1160,7 @@ public partial class AIController
 
     private bool IsAIReviewWindowVisible()
     {
+        if (rallyFormationVisible) return true;
         return aiReviewVisible && (aiStep || HasPendingAIReview)
             && matchController != null && matchController.IsActiveTeamAI()
             && !PlayerPauseHolds();
@@ -1234,7 +1235,8 @@ public partial class AIController
         GUI.DrawTexture(windowRect, Texture2D.whiteTexture);
         GUI.color = previousColor;
         aiReviewWindowRect = GUI.Window(0x41495354, windowRect,
-            DrawAIReviewWindowContents, "AI STEP - revisao antes da execucao (arraste pelo titulo)");
+            rallyFormationVisible ? DrawRallyFormationWindowContents : DrawAIReviewWindowContents,
+            rallyFormationVisible ? "RALLY - formacao (somente leitura)" : "AI STEP - revisao antes da execucao (arraste pelo titulo)");
         GetAIReviewWindowRect(); // Mantem o titulo acessivel, inclusive apos redimensionar a Game view.
         if (Event.current.type == EventType.ScrollWheel && aiReviewWindowRect.Contains(Event.current.mousePosition))
             Event.current.Use();

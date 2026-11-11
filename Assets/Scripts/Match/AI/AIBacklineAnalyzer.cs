@@ -66,7 +66,8 @@ public static class AIBacklineAnalyzer
         IReadOnlyList<Vector3Int> enemyCells,
         Vector3Int anchor,
         AIBacklineSettings settings,
-        HashSet<Vector3Int> occupied = null)
+        HashSet<Vector3Int> occupied = null,
+        Vector2? forwardOverride = null)
     {
         var result = new AIBacklineResult();
         anchor.z = 0;
@@ -77,7 +78,7 @@ public static class AIBacklineAnalyzer
             return result;
         }
 
-        if (!TryBuildFrontGeometry(combatantCells, anchor, settings, result))
+        if (!TryBuildFrontGeometry(combatantCells, anchor, settings, result, forwardOverride))
         {
             result.Error = "Faixa de vanguarda vazia.";
             return result;
@@ -198,7 +199,8 @@ public static class AIBacklineAnalyzer
         IReadOnlyList<Vector3Int> combatantCells,
         Vector3Int anchor,
         AIBacklineSettings settings,
-        AIBacklineResult result)
+        AIBacklineResult result,
+        Vector2? forwardOverride = null)
     {
         if (combatantCells == null || combatantCells.Count == 0)
             return false;
@@ -241,7 +243,8 @@ public static class AIBacklineAnalyzer
         frontCentroidWorld /= result.FrontBandCells.Count;
         result.FrontCentroidWorld = frontCentroidWorld;
 
-        Vector2 forward = ToWorld(anchor, settings) - frontCentroidWorld;
+        Vector2 forward = forwardOverride.HasValue && forwardOverride.Value.sqrMagnitude > 0.0001f
+            ? forwardOverride.Value : ToWorld(anchor, settings) - frontCentroidWorld;
         result.Forward = forward.sqrMagnitude > 1e-4f ? forward.normalized : Vector2.up;
         result.Lateral = new Vector2(-result.Forward.y, result.Forward.x);
 

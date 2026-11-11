@@ -30,6 +30,7 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
+        rallyObservedMoves.Clear();
         plannedEwacsEscorts.Clear();
         planlessCaptureTargetReservations.Clear();
         pendingPlanlessCaptureTargets.Clear();
@@ -375,6 +376,7 @@ public partial class AIController
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
             float executionStartedAt = Time.realtimeSinceStartup;
+            if (action.HasMoveTo) rallyObservedMoves[unit.InstanceId] = action.MoveTo;
             yield return ExecuteAIBatchWithDebugStep(action);
             float executionMs = (Time.realtimeSinceStartup - executionStartedAt) * 1000f;
             perfExecutionTotalMs += executionMs;
@@ -394,6 +396,7 @@ public partial class AIController
             }
             else
             {
+                rallyObservedMoves.Remove(unit.InstanceId);
                 pendingPlanlessCaptureTargets.Remove(
                     unit.InstanceId);
                 pendingAIDesignatedMissions.Remove(

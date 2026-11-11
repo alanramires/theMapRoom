@@ -693,6 +693,17 @@ public class MapHelperWindow : EditorWindow
                 EditorUtility.SetDirty(mundo);
             }
 
+            EditorGUI.BeginChangeCheck();
+            EditorGUILayout.LabelField("Rally - unidade-modelo", EditorStyles.boldLabel);
+            UnitData rallyLand = (UnitData)EditorGUILayout.ObjectField("Terra (padrao Soldado)", q.rallyModelLand, typeof(UnitData), false);
+            UnitData rallyNaval = (UnitData)EditorGUILayout.ObjectField("Mar", q.rallyModelNaval, typeof(UnitData), false);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(mundo, "Modelos de rally");
+                q.rallyModelLand = rallyLand; q.rallyModelNaval = rallyNaval;
+                EditorUtility.SetDirty(mundo);
+            }
+
             DrawEconomiaInicial(q);
 
             EditorGUILayout.LabelField(

@@ -58,6 +58,7 @@ public partial class AIController
     private struct AIRallyReadiness
     {
         public bool Held;
+        public bool HoldReady, BreakthroughReady, ArtilleryReady, ForceReady;
         public int Capturers;
         public float Assault;
         public int AirAttack;
@@ -380,13 +381,18 @@ public partial class AIController
         readiness.Timeout = startedTurn >= 0 && turnNumber >= 0
             && turnNumber - startedTurn >= RallyAssemblyTimeoutTurns;
 
+        bool hasBreakthrough = breakthrough >= readiness.RequiredPackages;
         bool hasHoldPackage = readiness.Held
             && readiness.Capturers >= 1
-            && breakthrough >= readiness.RequiredPackages;
+            && hasBreakthrough;
         bool hasArtillery = readiness.Artillery >= readiness.RequiredArtillery;
         bool hasLocalLaunchArtillery = readiness.LocalArtillery
             >= Mathf.Min(RallyMinimumLocalLaunchArtillery, readiness.RequiredArtillery);
         bool hasRequiredForce = readiness.ForceScore >= readiness.RequiredForce;
+        readiness.HoldReady = hasHoldPackage;
+        readiness.BreakthroughReady = hasBreakthrough;
+        readiness.ArtilleryReady = hasArtillery;
+        readiness.ForceReady = hasRequiredForce;
         // DOMÍNIO macro (Ganhando) GREENA o rally held mesmo sem a composição completa: se você já
         // domina território E força, segurar a montagem só atrasa o fechamento. Assim o HUD fica
         // verde E a massa montada é LIBERADA pra invadir (a lógica de assembly para de segurar).

@@ -591,6 +591,17 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log($"[Debug Command] Show AI Step {(visible ? "ON" : "OFF")} (decisao preservada).");
             }
         }
+        else if (TryParseRallyDebugCommand(command, out bool showRally, out int rallySlot))
+        {
+            AIController ai = FindAnyObjectByType<AIController>();
+            if (ai == null) Debug.Log("[Debug Command] AIController nao encontrado.");
+            else
+            {
+                Debug.Log("[Debug Command] " + ai.SetRallyFormationVisible(showRally, rallySlot));
+                executed = true;
+                cursorController?.PlayDoneSfx();
+            }
+        }
         else if (TryParseAxisDebugCommand(command, out bool showAxis, out int axisSlot))
         {
             TurnStateManager tsm = turnStateManager != null ? turnStateManager : FindAnyObjectByType<TurnStateManager>();
@@ -1115,6 +1126,7 @@ public class PanelDebugController : MonoBehaviour
             "fow on|off|partial | set fow <0-100>\n" +
             "panelrodada on|off - controla somente a cortina de privacidade\n" +
             "show ai step [on|off] | ai show step [on|off] - alterna/abre/fecha a revisao sem aprovar\n" +
+            "ai show rally [on|off] [slot] | show rally [on|off] [slot] - formacao do montinho, somente leitura\n" +
             "show axis | show eixos [slot] - eixos da base ao rally (1 vermelho, 2 laranja, 3 grafite); sem slot segue a vez\n" +
             "hide axis | hide eixos\n" +
             "ai pause | pause ai\n" +
@@ -1128,6 +1140,22 @@ public class PanelDebugController : MonoBehaviour
     }
 
     // "SHOW AXIS", "SHOW EIXOS", "SHOW EIXO" (+ slot opcional) e os HIDE correspondentes.
+    private static bool TryParseRallyDebugCommand(string command, out bool show, out int slot)
+    {
+        show = true; slot = -1;
+        string[] parts = command.Trim().ToUpperInvariant().Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+        int i = parts.Length > 0 && parts[0] == "AI" ? 1 : 0;
+        if (parts.Length < i + 2 || parts[i] != "SHOW" || parts[i + 1] != "RALLY") return false;
+        bool seenMode = false, seenSlot = false;
+        for (i += 2; i < parts.Length; i++)
+        {
+            if (!seenMode && (parts[i] == "ON" || parts[i] == "OFF")) { show = parts[i] == "ON"; seenMode = true; }
+            else if (!seenSlot && int.TryParse(parts[i], out int parsed) && parsed >= 0 && parsed <= 3) { slot = parsed; seenSlot = true; }
+            else return false;
+        }
+        return true;
+    }
+
     private static bool TryParseAxisDebugCommand(string command, out bool show, out int slot)
     {
         show = false;

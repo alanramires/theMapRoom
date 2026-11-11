@@ -37,6 +37,12 @@ public class QuadranteData : INoDoMapa
     [Tooltip("Elimina slots sem unidades a partir do turno 2. Aulas continuam protegidas. Aplicado ao pintar o quadrante na Batalha.")]
     public bool allowDefeatForZeroUnits = true;
 
+    [Header("Rally")]
+    [Tooltip("Modelo terrestre da area de formacao. Vazio usa Soldado do UnitDatabase.")]
+    public UnitData rallyModelLand;
+    [Tooltip("Modelo naval da area de formacao. Vazio usa o fallback Soldado.")]
+    public UnitData rallyModelNaval;
+
     [Header("Estado")]
     [Tooltip(
         "Em desenvolvimento: o quadrante aparece e pode ser selecionado na Campanha, " +

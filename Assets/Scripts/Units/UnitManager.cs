@@ -689,6 +689,7 @@ public class UnitManager : MonoBehaviour
 
     private void OnDisable()
     {
+        if (detachedPlanningData != null) return;
         if (Application.isPlaying)
         {
             Vector3Int cell = currentCellPosition;
@@ -1643,6 +1644,7 @@ public class UnitManager : MonoBehaviour
 
     public int GetMaxHP()
     {
+        if (detachedPlanningData != null) return Mathf.Max(1, detachedPlanningData.maxHP);
         if (unitDatabase != null && !string.IsNullOrWhiteSpace(unitId) && unitDatabase.TryGetById(unitId, out UnitData data))
             return Mathf.Max(1, data.maxHP);
 
@@ -1661,6 +1663,7 @@ public class UnitManager : MonoBehaviour
 
     public int GetMovementRange()
     {
+        if (detachedPlanningData != null) return Mathf.Max(0, detachedPlanningData.movement);
         if (unitDatabase != null && !string.IsNullOrWhiteSpace(unitId) && unitDatabase.TryGetById(unitId, out UnitData data))
             return Mathf.Max(0, data.movement);
 
@@ -1899,6 +1902,7 @@ public class UnitManager : MonoBehaviour
 
     public MovementCategory GetMovementCategory()
     {
+        if (detachedPlanningData != null) return detachedPlanningData.movementCategory;
         if (unitDatabase != null && !string.IsNullOrWhiteSpace(unitId) && unitDatabase.TryGetById(unitId, out UnitData data))
             return data.movementCategory;
 
@@ -2735,8 +2739,28 @@ public class UnitManager : MonoBehaviour
         }
     }
 
+    // Adaptador inerte para consultas de envelope por ficha. Nunca e ativado,
+    // registrado, sincronizado com a cena nem aplicado com Apply/Setup.
+    private UnitData detachedPlanningData;
+    internal static UnitManager CreateDetachedPlanningModel(UnitData data, TeamId team, int slot,
+        UnityEngine.Tilemaps.Tilemap map, Vector3Int origin)
+    {
+        var host = new GameObject("ReadOnlyReachModel") { hideFlags = HideFlags.HideAndDontSave };
+        host.SetActive(false);
+        var model = host.AddComponent<UnitManager>();
+        model.detachedPlanningData = data;
+        model.unitId = data.id; model.teamId = team; model.slotIndex = slot;
+        model.boardTilemap = map; model.currentCellPosition = origin;
+        model.currentDomain = data.domain; model.currentHeightLevel = data.heightLevel;
+        model.layerStateInitialized = true;
+        model.currentHP = data.maxHP; model.maxFuel = Mathf.Max(1, data.autonomia); model.currentFuel = model.maxFuel;
+        model.remainingMovementPoints = data.movement;
+        return model;
+    }
+
     private UnitData TryGetUnitData()
     {
+        if (detachedPlanningData != null) return detachedPlanningData;
         if (unitDatabase == null || string.IsNullOrWhiteSpace(unitId))
             return null;
         if (!unitDatabase.TryGetById(unitId, out UnitData data))
