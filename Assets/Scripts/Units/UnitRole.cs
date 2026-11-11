@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 public enum UnitRole
 {
@@ -8,6 +8,7 @@ public enum UnitRole
     Assalto = 2,
     FogoIndireto = 5,
     Interceptador = 8,
+    [UnityEngine.InspectorName("Ataque ao Solo")]
     AtaqueAereo = 9,
     Antiaereo = 10,
     // 11 reservado — antigo RaidAntiSub; nao reutilizar.
@@ -75,6 +76,9 @@ public enum UnitRoleFamily
     Logistica = 6,
 }
 
+/// <summary>Matriz derivada da familia. Nao e campo de ficha nem estado de save.</summary>
+public enum UnitForce { Nenhuma, Ruptura, Dissuasao, Ocupacao, Apoio }
+
 public enum UnitBattleParticipation
 {
     None = 0,
@@ -88,11 +92,9 @@ public static class UnitRoleCompatibility
     /// Rótulo → família (autor, 2026-10-03). Os rótulos ficaram por conta do shopping;
     /// o comportamento é da família.
     ///
-    /// NÃO substitui ResolveCompositionRole, e diverge dele de propósito num ponto: lá o
-    /// ArtilheiroCombatente é Assalto só se for blindado (senão Fogo Indireto), porque
-    /// aquilo conta COMPOSIÇÃO para a compra. Aqui é sempre Assalto — o Obus Leve é
-    /// "uma unidade de assalto do exército". Como ele luta (a seta do híbrido) vem da
-    /// arma, não daqui (UnitCombatModalityRules).
+    /// Atualizacao do autor (D1): Ataque ao Solo e ArtilheiroCombatente pertencem
+    /// a FogoDeSuporte, inclusive blindado e alcance 1. DisruptorDeCaptura segue
+    /// em Assalto. A forma de lutar continua nas armas (UnitCombatModalityRules).
     /// </summary>
     public static UnitRoleFamily ResolveFamily(UnitRole role)
     {
@@ -103,13 +105,13 @@ public static class UnitRoleCompatibility
                 return UnitRoleFamily.Capturador;
 
             case UnitRole.Assalto:
-            case UnitRole.AtaqueAereo:
             case UnitRole.DisruptorDeCaptura:
             case UnitRole.Interceptador:
             case UnitRole.InterceptadorDeDisruptor:
-            case UnitRole.ArtilheiroCombatente:
                 return UnitRoleFamily.Assalto;
 
+            case UnitRole.AtaqueAereo:
+            case UnitRole.ArtilheiroCombatente:
             case UnitRole.FogoIndireto:
             case UnitRole.Antiaereo:
             case UnitRole.AntiaereoCombatente:
@@ -138,6 +140,22 @@ public static class UnitRoleCompatibility
             ? ResolveFamily(data.roles[0])
             : UnitRoleFamily.Nenhuma;
     }
+
+    public static UnitForce ResolveForce(UnitRoleFamily family)
+    {
+        switch (family)
+        {
+            case UnitRoleFamily.Assalto: return UnitForce.Ruptura;
+            case UnitRoleFamily.FogoDeSuporte: return UnitForce.Dissuasao;
+            case UnitRoleFamily.Capturador:
+            case UnitRoleFamily.Transportador: return UnitForce.Ocupacao;
+            case UnitRoleFamily.Vigilancia:
+            case UnitRoleFamily.Logistica: return UnitForce.Apoio;
+            default: return UnitForce.Nenhuma;
+        }
+    }
+
+    public static UnitForce ResolveForce(UnitData data) => ResolveForce(ResolveFamily(data));
 
     public static UnitBattleParticipation ResolveBattleParticipation(
         UnitRole role)
@@ -275,9 +293,7 @@ public static class UnitRoleCompatibility
         if (primary == UnitRole.CapturadorCombatente)
             return UnitRole.Capturador;
         if (primary == UnitRole.ArtilheiroCombatente)
-            return data.unitClass == GameUnitClass.Armored
-                ? UnitRole.Assalto
-                : UnitRole.FogoIndireto;
+            return UnitRole.FogoIndireto;
         if (primary == UnitRole.TransportadorAereo)
             return UnitRole.Transportador;
         if (primary == UnitRole.DisruptorDeCaptura)

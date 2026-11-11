@@ -61,7 +61,7 @@ public sealed class RallyFormationReport
             Vector3Int position = unit.IsEmbarked && unit.EmbarkedTransporter != null
                 ? unit.EmbarkedTransporter.CurrentCellPosition : unit.CurrentCellPosition;
             var participant = new RallyFormationParticipant { Unit = unit, Position = position,
-                Location = Locate(area, position), Expected = ExpectedPosition(unit, area) };
+                Location = Locate(area, position), Expected = ExpectedPosition(unit) };
             if (moves != null && moves.TryGetValue(unit.InstanceId, out Vector3Int move)) participant.PlannedDestination = move;
             if (unit.AIHasDesignatedMission) participant.MissionDestination = unit.AIDesignatedMissionTargetCell;
             if (participant.Destination.HasValue)
@@ -76,26 +76,11 @@ public sealed class RallyFormationReport
         return report;
     }
 
-    private static string ExpectedPosition(UnitManager unit, RallyArea area)
+    private static string ExpectedPosition(UnitManager unit)
     {
         if (!unit.TryGetUnitData(out UnitData data)) return "sem ficha";
-        UnitRoleFamily family = UnitRoleCompatibility.ResolveFamily(data);
-        if (family == UnitRoleFamily.Capturador || family == UnitRoleFamily.Transportador || family == UnitRoleFamily.Logistica)
-            return "retaguarda (familia " + family + ")";
-        // A pergunta de revide e do sensor, nao do nome da peca. Ar que so
-        // bombardeia solo nao se defende na propria camada e fica atras.
-        bool canDefend = PodeMirarSensor.TryResolveCounterAttackFromData(data, data, 1, null, out _, out _, out _);
-        if (!canDefend) return "retaguarda (sem revide na propria camada)";
-        if (family == UnitRoleFamily.Assalto)
-            foreach (UnitEmbarkedWeapon weapon in unit.GetEmbarkedWeapons())
-                if (weapon?.weapon != null)
-                    foreach (Vector3Int cell in area.Vanguard)
-                    {
-                        float distance = SectorManager.HexDistance(unit.CurrentCellPosition, cell);
-                        if (distance >= weapon.GetRangeMin() && distance <= weapon.GetRangeMax())
-                            return "vanguarda (banda da arma alcanca)";
-                    }
-        return "retaguarda (apoio/fora da banda da vanguarda)";
+        return UnitRoleCompatibility.ResolveForce(data) == UnitForce.Ruptura
+            ? "vanguarda" : "retaguarda";
     }
 
     public string ToDisplayText()
