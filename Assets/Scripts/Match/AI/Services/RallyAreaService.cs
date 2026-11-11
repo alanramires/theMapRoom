@@ -10,6 +10,7 @@ public sealed class RallyArea
     public readonly HashSet<Vector3Int> Approach = new HashSet<Vector3Int>();
     public readonly HashSet<Vector3Int> Vanguard = new HashSet<Vector3Int>();
     public readonly HashSet<Vector3Int> Rear = new HashSet<Vector3Int>();
+    public Vector2 Forward;
     public string Orientation;
     public string Error;
 }
@@ -59,10 +60,15 @@ public static class RallyAreaService
             forwardOverride: forward);
         if (line.Success)
         {
+            area.Forward = line.Forward;
             area.Vanguard.UnionWith(line.VanguardCells);
             // Faixas geometricas de apresentacao: o envelope terrestre nao apaga o mar.
-            area.Vanguard.RemoveWhere(cell => !map.HasTile(cell));
+            area.Vanguard.RemoveWhere(cell => !map.HasTile(cell)
+                || Vector2.Dot((Vector2)HexCoordinates.GetCellCenterWorld(map, cell) - center, area.Forward) <= 0f);
             area.Rear.UnionWith(line.RearScoreMap.Keys);
+            var assemblyArea = new HashSet<Vector3Int>(area.Core);
+            assemblyArea.UnionWith(area.Approach);
+            area.Rear.IntersectWith(assemblyArea);
             area.Rear.RemoveWhere(cell => !map.HasTile(cell));
             area.Rear.ExceptWith(area.Vanguard);
         }

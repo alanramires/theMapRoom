@@ -64,7 +64,12 @@ try{
         Check(area.Core.Count>1&&area.Approach.Count>area.Core.Count,"Core e Approach nao refletem bandas diferentes do modelo: "+area.Core.Count+"/"+area.Approach.Count);
         Check(area.Core.IsSubsetOf(area.Approach),"Core nao esta contido no Operacional.");
         Check(area.Vanguard.Count>0&&area.Rear.Count>0,"Geometria nao produziu vanguarda e retaguarda para testar intersecao.");
+        var assemblyArea=new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(area.Core);assemblyArea.UnionWith(area.Approach);
+        Check(area.Rear.IsSubsetOf(assemblyArea),"Rear escapou de Core uniao Approach.");
         Check(!area.Vanguard.Overlaps(area.Rear),"Vanguard e Rear se sobrepoem.");
+        var rallyWorld=(UnityEngine.Vector2)HexCoordinates.GetCellCenterWorld(map,rally.CurrentCellPosition);
+        foreach(var cell in area.Vanguard)
+            Check(UnityEngine.Vector2.Dot((UnityEngine.Vector2)HexCoordinates.GetCellCenterWorld(map,cell)-rallyWorld,area.Forward)>0f,"Vanguard ficou atras do rally.");
         Check(area.Orientation.Contains("eixo"),"Sem inimigo conhecido nao orientou pelo eixo.");
         var moves=new System.Collections.Generic.Dictionary<int,UnityEngine.Vector3Int>{{going.InstanceId,new UnityEngine.Vector3Int(13,12,0)},{outside.InstanceId,new UnityEngine.Vector3Int(2,1,0)}};
         var readiness=new RallyReadinessReport{Status="ASSEMBLING",Missing="fixture",Hold=true};
@@ -86,7 +91,7 @@ try{
         var parser=typeof(PanelDebugController).GetMethod("TryParseRallyDebugCommand",sf);
         foreach(string command in new[]{"AI SHOW RALLY","SHOW RALLY 1","AI SHOW RALLY OFF 1","SHOW RALLY 1 ON"}){object[] args={command,false,-1};Check((bool)parser.Invoke(null,args),"Comando recusado: "+command);}
         object[] invalid={"AI SHOW RALLY 99",false,-1};Check(!(bool)parser.Invoke(null,invalid),"Slot invalido aceito.");
-        return "PASS: modelo define Tactical/Core e Operational/Approach distintos; Vanguard/Rear nao vazios e disjuntos; eixo sem inimigo conhecido; vaga+rogues uma vez; core/indo/fora e destinos exatos; missao fallback; demanda preenchida/vazia; movimento do modelo altera area; parser/aliases; sem unidade registrada, revisao de tabuleiro alterada ou acao executada. UI e trilhas nao vistas em Play.";
+        return "PASS: modelo define Tactical/Core e Operational/Approach distintos; Vanguard/Rear nao vazios e disjuntos; Rear contida na montagem; Vanguard a frente do rally sem recorte terrestre; eixo sem inimigo conhecido; vaga+rogues uma vez; core/indo/fora e destinos exatos; missao fallback; demanda preenchida/vazia; movimento do modelo altera area; parser/aliases; sem unidade registrada, revisao de tabuleiro alterada ou acao executada. UI e trilhas nao vistas em Play.";
     }finally{objectiveField.SetValue(null,oldObjective);}
 }finally{
     UnityEngine.Application.logMessageReceived-=captureLog;
