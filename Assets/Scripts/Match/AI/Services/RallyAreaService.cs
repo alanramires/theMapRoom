@@ -60,9 +60,10 @@ public static class RallyAreaService
         if (line.Success)
         {
             area.Vanguard.UnionWith(line.VanguardCells);
-            area.Vanguard.IntersectWith(area.Approach);
+            // Faixas geometricas de apresentacao: o envelope terrestre nao apaga o mar.
+            area.Vanguard.RemoveWhere(cell => !map.HasTile(cell));
             area.Rear.UnionWith(line.RearScoreMap.Keys);
-            area.Rear.IntersectWith(area.Approach);
+            area.Rear.RemoveWhere(cell => !map.HasTile(cell));
             area.Rear.ExceptWith(area.Vanguard);
         }
         else area.Error = line.Error;

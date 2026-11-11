@@ -35,6 +35,20 @@ public sealed class RallyFormationReport
     public static RallyLocation Locate(RallyArea area, Vector3Int cell)
     { cell.z = 0; return area.Core.Contains(cell) ? RallyLocation.Core : area.Approach.Contains(cell) ? RallyLocation.Approach : RallyLocation.Outside; }
 
+    // Aeronaves nao seguem o recorte terrestre do modelo. Projeta as mesmas bandas
+    // em distancia hexagonal; isto muda so a localizacao exibida, nao a prontidao.
+    public static RallyLocation LocateParticipant(RallyArea area, Vector3Int cell, UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || !data.IsAircraft()) return Locate(area, cell);
+        float coreRadius = 0f, approachRadius = 0f;
+        Vector3Int pivot = area.Rally.CurrentCellPosition;
+        foreach (Vector3Int c in area.Core) coreRadius = Mathf.Max(coreRadius, SectorManager.HexDistance(pivot, c));
+        foreach (Vector3Int c in area.Approach) approachRadius = Mathf.Max(approachRadius, SectorManager.HexDistance(pivot, c));
+        float distance = SectorManager.HexDistance(pivot, cell);
+        return area.Core.Count > 0 && distance <= coreRadius ? RallyLocation.Core
+            : area.Approach.Count > 0 && distance <= approachRadius ? RallyLocation.Approach : RallyLocation.Outside;
+    }
+
     public static RallyFormationReport BuildForSlot(AIController controller, int slot, RallyArea area,
         IReadOnlyList<UnitManager> units, IReadOnlyDictionary<int, Vector3Int> moves, bool fallback = false)
     {
@@ -62,12 +76,12 @@ public sealed class RallyFormationReport
             Vector3Int position = unit.IsEmbarked && unit.EmbarkedTransporter != null
                 ? unit.EmbarkedTransporter.CurrentCellPosition : unit.CurrentCellPosition;
             var participant = new RallyFormationParticipant { Unit = unit, Position = position,
-                Location = Locate(area, position), Expected = ExpectedPosition(unit) };
+                Location = LocateParticipant(area, position, unit), Expected = ExpectedPosition(unit) };
             if (moves != null && moves.TryGetValue(unit.InstanceId, out Vector3Int move)) participant.PlannedDestination = move;
             if (unit.AIHasDesignatedMission) participant.MissionDestination = unit.AIDesignatedMissionTargetCell;
             if (participant.Destination.HasValue)
             {
-                participant.DestinationLocation = Locate(area, participant.Destination.Value);
+                participant.DestinationLocation = LocateParticipant(area, participant.Destination.Value, unit);
                 participant.GoingToArea = participant.Destination.Value != position
                     && participant.DestinationLocation != RallyLocation.Outside;
             }

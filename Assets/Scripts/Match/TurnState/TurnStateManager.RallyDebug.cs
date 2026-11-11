@@ -23,8 +23,8 @@ public partial class TurnStateManager
         if (map == null) return;
         foreach (RallyFormationReport report in reports)
         {
-            DrawRallyBand(map, report.Area.Rear, new Color(0.6f,0.3f,0.8f,0.55f), false);
-            DrawRallyBand(map, report.Area.Vanguard, new Color(1f,0.25f,0.25f,0.65f), false);
+            DrawRallyBand(map, report.Area.Rear, new Color(0.75f,0.35f,1f,0.9f), false, inset: 0.82f);
+            DrawRallyBand(map, report.Area.Vanguard, new Color(1f,0.25f,0.25f,0.95f), false, inset: 0.82f);
             DrawRallyBand(map, report.Area.Approach, new Color(1f,0.65f,0.1f), true);
             DrawRallyBand(map, report.Area.Core, new Color(0.1f,0.35f,1f), true);
             DrawRallyBand(map, new HashSet<Vector3Int>{report.Area.Rally.CurrentCellPosition}, Color.white, false);
@@ -46,7 +46,7 @@ public partial class TurnStateManager
         while (true) { AnimateAxisDebugTracks(rallyDebugTracks); yield return null; }
     }
 
-    private void DrawRallyBand(Tilemap map, HashSet<Vector3Int> cells, Color color, bool boundaryOnly)
+    private void DrawRallyBand(Tilemap map, HashSet<Vector3Int> cells, Color color, bool boundaryOnly, float inset = 1f)
     {
         var neighbors = new List<Vector3Int>(6);
         foreach (Vector3Int cell in cells)
@@ -68,7 +68,7 @@ public partial class TurnStateManager
             line.sharedMaterial = material; line.sortingLayerID = GetMirandoPreviewSortingLayerId(); line.sortingOrder = GetMirandoPreviewSortingOrder();
             line.startColor = line.endColor = color; line.widthMultiplier = boundaryOnly ? 0.045f : 0.022f;
             line.positionCount = directions.Count;
-            for (int i=0; i<directions.Count; i++) line.SetPosition(i, center + (directions[i]+directions[(i+1)%directions.Count])/3f);
+            for (int i=0; i<directions.Count; i++) line.SetPosition(i, center + (directions[i]+directions[(i+1)%directions.Count]) * (inset / 3f));
             rallyDebugOutlines.Add(go);
         }
     }

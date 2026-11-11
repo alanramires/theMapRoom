@@ -4,6 +4,7 @@ using UnityEngine;
 public partial class AIController
 {
     private bool rallyFormationVisible;
+    private ConstructionManager rallyFormationSelected;
     private int rallyFormationRequestedSlot = -1;
     private Vector2 rallyFormationScroll;
     private readonly Dictionary<int, Vector3Int> rallyObservedMoves = new Dictionary<int, Vector3Int>();
@@ -15,6 +16,7 @@ public partial class AIController
     {
         rallyFormationVisible = visible;
         rallyFormationRequestedSlot = slot;
+        rallyFormationSelected = null;
         CursorController.OnBoardSettledAtNeutral -= RefreshRallyAfterNeutral;
         rallyFormationReports.Clear();
         if (turnStateManager != null) turnStateManager.SetRallyDebugReports(null);
@@ -67,7 +69,21 @@ public partial class AIController
             rallyFormationReports.Add(RallyFormationReport.BuildForSlot(this, slot, area, allies, rallyObservedMoves, fallback));
         }
         rallyFormationMessage = $"Slot {slot}, {rallyFormationReports.Count} rally(s). Atualizado no Neutral confirmado.";
-        turnStateManager?.SetRallyDebugReports(rallyFormationReports);
+        rallyFormationReports.Sort((a, b) => RallyDisplayOrder(a).CompareTo(RallyDisplayOrder(b)));
+        if (rallyFormationSelected != null && !rallyFormationReports.Exists(r => r.Area.Rally == rallyFormationSelected)) rallyFormationSelected = null;
+        PublishRallyDisplay();
+    }
+
+    private static int RallyDisplayOrder(RallyFormationReport report)
+    {
+        if (report.Area.Rally.SlotIndex != report.Slot) return 2;
+        return report.Readiness.Status != null && report.Readiness.Status.StartsWith("ASSEMBLING") ? 0 : 1;
+    }
+
+    private void PublishRallyDisplay()
+    {
+        turnStateManager?.SetRallyDebugReports(rallyFormationSelected == null ? rallyFormationReports
+            : rallyFormationReports.FindAll(r => r.Area.Rally == rallyFormationSelected));
     }
 
     // Ponte de leitura para o consumidor; a formula continua no dono original.
@@ -106,9 +122,24 @@ public partial class AIController
         var style = new GUIStyle(GUI.skin.label) { wordWrap = false };
         var bold = new GUIStyle(style) { fontStyle = FontStyle.Bold };
         GUILayout.Label(rallyFormationMessage ?? "Aguardando Neutral.", style);
+        GUILayout.BeginHorizontal();
+        foreach (RallyFormationReport item in rallyFormationReports)
+        {
+            bool selected = item.Area.Rally == rallyFormationSelected;
+            if (GUILayout.Button((selected ? "[" : "") + item.Area.Rally.Sector + (selected ? "]" : "")))
+            {
+                rallyFormationSelected = selected ? null : item.Area.Rally;
+                rallyFormationScroll = Vector2.zero;
+                PublishRallyDisplay();
+                if (rallyFormationSelected != null) FocusAIReviewCell(rallyFormationSelected.CurrentCellPosition);
+            }
+        }
+        GUILayout.EndHorizontal();
+        GUILayout.Label("Clique no rally para isolar; clique novamente para mostrar todos.", style);
         rallyFormationScroll = GUILayout.BeginScrollView(rallyFormationScroll);
         foreach (RallyFormationReport report in rallyFormationReports)
         {
+            if (rallyFormationSelected != null && report.Area.Rally != rallyFormationSelected) continue;
             GUILayout.BeginHorizontal();
             Vector3Int cell = report.Area.Rally.CurrentCellPosition;
             string model = (report.ModelFallback ? "fallback: " : "") + (report.Area.Model?.displayName ?? "indisponivel");
@@ -116,36 +147,49 @@ public partial class AIController
             GUILayout.FlexibleSpace();
             string status = report.Readiness.Status ?? "WAIT";
             var statusStyle = new GUIStyle(bold) { alignment = TextAnchor.MiddleRight };
-            statusStyle.normal.textColor = status == "GO_GREEN" || status == "READY" ? Color.green
-                : status == "ASSEMBLING" ? Color.yellow : Color.red;
+            statusStyle.normal.textColor = status.StartsWith("GO_GREEN") || status == "READY" ? Color.green
+                : status.StartsWith("ASSEMBLING") ? Color.yellow : Color.red;
             GUILayout.Label(status, statusStyle);
             GUILayout.EndHorizontal();
-            DrawRallyReadinessBar("Hold", report.Readiness.HoldValues, report.Readiness.Hold, style);
+            DrawRallyReadinessBar("Hold (cap.)", report.Readiness.HoldValues, report.Readiness.Hold, style);
             DrawRallyReadinessBar("Ruptura", report.Readiness.BreakthroughValues, report.Readiness.Breakthrough, style);
             DrawRallyReadinessBar("Artilharia", report.Readiness.ArtilleryValues, report.Readiness.Artillery, style);
-            DrawRallyReadinessBar("Forca", report.Readiness.ForceValues, report.Readiness.Force, style);
+            DrawRallyReadinessBar("Forca (pts)", report.Readiness.ForceValues, report.Readiness.Force, style);
+            GUILayout.Label("Hold: cota de capturadores; verde exige controle do rally e ruptura pronta.", style);
             GUILayout.Label("Missing: " + report.Readiness.Missing, style);
+            GUILayout.Label($"Vanguarda vermelha: {report.Area.Vanguard.Count} | Retaguarda violeta: {report.Area.Rear.Count} | {report.Area.Orientation}", style);
             if (!string.IsNullOrEmpty(report.Area.Error)) GUILayout.Label("Geometria: " + report.Area.Error, style);
-            GUILayout.Label("DEMANDA", bold);
+            GUILayout.Label("DEMANDA DO OBJETIVO", bold);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Forca", bold, GUILayout.Width(100f));
+            GUILayout.Label("Papel", bold, GUILayout.Width(170f));
+            GUILayout.Label("Preenchidas", bold, GUILayout.MinWidth(100f));
+            GUILayout.Label("Vazias", bold, GUILayout.MinWidth(100f));
+            GUILayout.EndHorizontal();
             if (report.Objective?.Slots == null) GUILayout.Label("Sem objetivo RallyAssembly publicado no plano.", style);
             else foreach (UnitForce force in RallyDisplayForces)
             {
-                var roles = new Dictionary<UnitRole, string>();
+                var roles = new Dictionary<UnitRole, (int filled, int empty)>();
                 foreach (SlotNeed need in report.Objective.Slots)
                 {
                     if (UnitRoleCompatibility.ResolveForce(UnitRoleCompatibility.ResolveFamily(need.Role)) != force) continue;
-                    roles.TryGetValue(need.Role, out string slots);
-                    roles[need.Role] = slots + (need.Filled ? "■ " : "□ ");
+                    roles.TryGetValue(need.Role, out var slots);
+                    if (need.Filled) slots.filled++; else slots.empty++;
+                    roles[need.Role] = slots;
                 }
                 if (roles.Count == 0) continue;
-                GUILayout.Label(force.ToString(), bold);
+                bool first = true;
                 foreach (var role in roles)
                 {
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label("    " + role.Key, style, GUILayout.Width(210f));
-                    GUILayout.Label(role.Value, style);
+                    GUILayout.Label(first ? force.ToString() : "", bold, GUILayout.Width(100f));
+                    first = false;
+                    GUILayout.Label(role.Key.ToString(), style, GUILayout.Width(170f));
+                    GUILayout.Label(role.Value.filled > 0 ? new string('■', role.Value.filled) : "·", style, GUILayout.MinWidth(100f));
+                    GUILayout.Label(role.Value.empty > 0 ? new string('□', role.Value.empty) : "·", style, GUILayout.MinWidth(100f));
                     GUILayout.EndHorizontal();
                 }
+                GUILayout.Space(4f);
             }
 
             // Passageiros sao apresentados na linha do transporte; o relatorio continua intacto.
@@ -175,7 +219,7 @@ public partial class AIController
                         if (carrier.AIHasDesignatedMission) carrierRow.MissionDestination = carrier.AIDesignatedMissionTargetCell;
                         if (carrierRow.Destination.HasValue)
                         {
-                            carrierRow.DestinationLocation = RallyFormationReport.Locate(report.Area, carrierRow.Destination.Value);
+                            carrierRow.DestinationLocation = RallyFormationReport.LocateParticipant(report.Area, carrierRow.Destination.Value, carrier);
                             carrierRow.GoingToArea = carrierRow.Destination.Value != carrierRow.Position
                                 && carrierRow.DestinationLocation != RallyLocation.Outside;
                         }
