@@ -7,9 +7,25 @@ Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ## Estado
 
-`v10.8.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
-v9.2.0. Relatórios: [`relatorio_v10.8.0.md`](relatorio_v10.8.0.md),
-[`relatorio_v10.7.0.md`](relatorio_v10.7.0.md), [`relatorio_v10.6.0.md`](relatorio_v10.6.0.md).
+`v10.9.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.9.0.md`](relatorio_v10.9.0.md),
+[`relatorio_v10.8.0.md`](relatorio_v10.8.0.md), [`relatorio_v10.7.0.md`](relatorio_v10.7.0.md).
+
+**A descoberta da v10.9.0: a conta, a vaga e o gate têm de ler a mesma régua.** O rally de
+Golf esperava 3 de artilharia num mapa sem artilharia, com 33 mil parados, enquanto o autor
+dizia há semanas que "artilharia é OPCIONAL" e a proposta escrita concordava. O mesmo erro
+voltou duas vezes no dia: a conta somava o Caça B como Ruptura e a vaga pedia
+`UnitRole.Assalto`; "rally no meu Tático" dava o Apache no hangar como presente e o caça
+colado em Golf como Approach, porque alcance de aeronave é meio mapa. Entrou: **matriz de
+Forças** (Ruptura/Dissuasão/Ocupação/Apoio; Bombardeiro, Obus Leve e Tanque Pesado viram
+Fogo de Suporte, Apache fica Disruptor/Assalto), **prontidão** com piso 4+2, suporte que soma e
+nunca gateia, inimigo local no Approach do modelo com razão por perfil (`rallyLocalRatio`),
+saturação, capitão persistido e ESPERANDO com tiro parado, **presença aérea pela célula na
+área** (`IsRallyParticipantPresent`) e embarcado como Ocupação, e o **catálogo de papéis como
+asset** (`UnitRoleCatalog`, `Tools > Role Families` edita; os cinco `switch` de `UnitRole.cs`
+morreram sem fallback). Para o caça virar porradeiro o autor marca `Assalto` em "satisfaz
+também" no asset. **Visto em Play:** duas fotos de Golf T11 e o Ctrl+Z da janela. O resto, só
+fixture.
 
 **A descoberta da v10.8.0: o rebelde era o rogue.** A "AI rebel" nasceu como ramo paralelo
 para o cenário sem QG; meses depois o autor viu que rebelde = unidade sem vaga no plano, e que o
@@ -413,6 +429,21 @@ Sem HQ, os dois lados do Q3 e do Q4 são facção sem QG (v8.6.1, Frente 4; desd
 ---
 
 ## Onde eu parei
+
+### O que a v10.9.0 deixou — ver o rally sair
+
+1. **D2 em Play:** save do slot 3, turno 11, `ai show rally 1`. Esperado: Hold 5/4, Suporte
+   "(opcional)", Força com exigido pequeno (dois inimigos perto), Apache na base em Fora, Caça B
+   no Core. Depois GO_GREEN em Golf; logs `ESPERANDO`, `solta retardatário`, capitão retomando.
+   Dono: `EvaluateRallyReadiness` e `UpdateRallyAdvanceWaiting` em
+   `AIController.PlanEvaluator.RallyPoints.cs`.
+2. **Flag do caça:** até marcar `Assalto` em "satisfaz também" de `Interceptador` e
+   `InterceptadorDeDisruptor` no `UnitRoleCatalog.asset`, a vaga de ruptura segue pedindo blindado.
+3. **D4 = formação ativa** (Ruptura na vanguarda e flancos, resto na retaguarda, usando a
+   `RallyArea` da tela) só depois do item 1. **Degrau 7** = rally naval (core 4 fogo de suporte
+   naval + 4 embarcados ou 2 transportes carregados; navios bombardeiam e esperam). Pergunta
+   aberta: quem segura o capitão no ESPERANDO — hoje todo participante, logística inclusa.
+4. **Doutrina:** `docs/AI Behavior/Forcas.md` não existe; lista completa no relatório v10.9.0.
 
 ### O que a v10.8.0 deixou — jogar uma partida sem QG e uma com
 
@@ -945,6 +976,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **a conta diz uma coisa, o gate ou a vaga diz outra** | artilharia "opcional" na doutrina e obrigatória no gate; Caça B somado como Ruptura e vaga pedindo `UnitRole.Assalto`. Quem gateia, quem conta e quem abre vaga leem o mesmo dono (`EvaluateRallyReadiness`, `EnsureRallyRoleSlots` byForce) |
+| **alcance de aeronave tomado por presença** | "rally no meu Tático" dá o Apache no hangar como presente: a banda de um avião é meio mapa. Aéreo é presente pela **célula** na área do rally (`IsRallyParticipantPresent`); a banda própria só para terrestre e para o que é relativo ao capitão |
+| **tabela de doutrina vivendo em `switch`** | família, Força e "satisfaz" em `UnitRole.cs` obrigavam commit para o autor mudar uma flag. Catálogo é asset (`UnitRoleCatalog`); o código lê, não decide. Sem fallback para tabela em código |
+| **relógio que começa antes do gate** | a saturação contava turnos de piso com o rally ainda inimigo e disparava GO_GREEN no turno da captura. Observação e consulta usam o mesmo predicado (`HoldReady && BreakthroughReady`) |
 | **porta por facção onde o magnético já responde** | `isRebel`/`IsSlotRebel` na IA era sempre um rogue mal traduzido. Pergunte "tem vaga?" (`IsPassengerInPlanSlot`); o que é da facção mora na partida e no `HasShoppingBase`, não no papel |
 | **imunidade de facção no lugar de regra de cenário** | a rebelde era imune a 0 unidades por causa de aulas com spawn tardio. Proteção de cenário é `UsesMatchEndRules`/`allowDefeatForZeroUnits` no quadrante; não dá imunidade à facção |
 | **vitória declarada por quem elimina** | `HandleUnitDestroyed` coroava quem zerava um exército mesmo com três lados. Todo fim passa por `TryDeclareLastStandingWinner`; `DeclareEliminationVictory` só na rendição |
@@ -1193,3 +1228,11 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
     (`TryDecidePlanlessCapturerAction`, capitão do assalto, EWACS/capitão do caça) já responde.
     Se responde, a porta cai; se não, complete o magnético. O fato da facção fica em quem o
     deriva (`IsHeadQuarterlessTeam`), lido só pela partida e pelo `HasShoppingBase`.
+
+13. **Quem gateia, quem conta e quem abre vaga leem a mesma régua, no mesmo dono.** O rally
+    exigia 3 de artilharia (`hasArtillery`) enquanto a doutrina a dava como opcional; a conta
+    somava o Caça B como Ruptura e a vaga pedia `UnitRole.Assalto`; a presença aérea era medida
+    pelo alcance. Cada divergência dessas é uma IA esperando algo que a outra metade já entregou.
+    Antes de criar gate, contagem ou vaga, ache o dono (`EvaluateRallyReadiness`,
+    `EnsureRallyRoleSlots`, `IsRallyParticipantPresent`) e faça os três lerem dele — e se a
+    régua é doutrina configurável, ela mora em asset (`UnitRoleCatalog`), não em `switch`.
