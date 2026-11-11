@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c217a92e83610f049bd2c88587b84d23, type: 3}
+  m_Name: UnitRoleCatalog
+  m_EditorClassIdentifier: Assembly-CSharp::UnitRoleCatalog
+  entries:
+  - role: 1
+    familia: 1
+    forca: 3
+    participacao: 2
+    contaComo: 1
+    satisfazTambem: 
+  - role: 12
+    familia: 1
+    forca: 3
+    participacao: 2
+    contaComo: 1
+    satisfazTambem: 0100000002000000
+  - role: 2
+    familia: 2
+    forca: 1
+    participacao: 2
+    contaComo: 2
+    satisfazTambem: 
+  - role: 16
+    familia: 2
+    forca: 1
+    participacao: 2
+    contaComo: 9
+    satisfazTambem: 09000000
+  - role: 8
+    familia: 2
+    forca: 1
+    participacao: 2
+    contaComo: 8
+    satisfazTambem: 
+  - role: 17
+    familia: 2
+    forca: 1
+    participacao: 2
+    contaComo: 8
+    satisfazTambem: 08000000
+  - role: 5
+    familia: 3
+    forca: 2
+    participacao: 1
+    contaComo: 5
+    satisfazTambem: 
+  - role: 9
+    familia: 3
+    forca: 2
+    participacao: 2
+    contaComo: 9
+    satisfazTambem: 
+  - role: 13
+    familia: 3
+    forca: 2
+    participacao: 2
+    contaComo: 5
+    satisfazTambem: 0200000005000000
+  - role: 10
+    familia: 3
+    forca: 2
+    participacao: 2
+    contaComo: 10
+    satisfazTambem: 05000000
+  - role: 14
+    familia: 3
+    forca: 2
+    participacao: 2
+    contaComo: 14
+    satisfazTambem: 0a0000000200000005000000
+  - role: 3
+    familia: 4
+    forca: 3
+    participacao: 0
+    contaComo: 3
+    satisfazTambem: 
+  - role: 6
+    familia: 5
+    forca: 4
+    participacao: 0
+    contaComo: 6
+    satisfazTambem: 
+  - role: 4
+    familia: 6
+    forca: 4
+    participacao: 0
+    contaComo: 4
+    satisfazTambem: 
+  - role: 7
+    familia: 6
+    forca: 4
+    participacao: 0
+    contaComo: 7
+    satisfazTambem: 

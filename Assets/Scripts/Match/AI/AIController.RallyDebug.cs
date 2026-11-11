@@ -167,7 +167,7 @@ public partial class AIController
                 var roles = new Dictionary<UnitRole, (int filled, int empty)>();
                 foreach (SlotNeed need in report.Objective.Slots)
                 {
-                    if (UnitRoleCompatibility.ResolveForce(UnitRoleCompatibility.ResolveFamily(need.Role)) != force) continue;
+                    if (UnitRoleCompatibility.ResolveForce(need.Role) != force) continue;
                     roles.TryGetValue(need.Role, out var slots);
                     if (need.Filled) slots.filled++; else slots.empty++;
                     roles[need.Role] = slots;

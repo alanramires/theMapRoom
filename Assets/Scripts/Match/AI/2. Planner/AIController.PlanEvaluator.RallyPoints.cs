@@ -629,12 +629,17 @@ public partial class AIController
             return;
 
         EnsureRallyRoleSlots(obj, UnitRole.Capturador, requiredCapturers, aiTeam, rallyAnchor);
+        // D3 (autor, 2026-11-11): a vaga de ruptura e por FORCA. Qualquer rotulo de Ruptura
+        // ja recrutado (Caca B como Interceptador, Apache como Disruptor) cobre a vaga; a
+        // conta de prontidao e a vaga passam a falar a mesma lingua, e o Shopping deixa de
+        // pedir blindado para um piso que o caca ja fechou.
         EnsureRallyRoleSlots(
             obj,
             UnitRole.Assalto,
             requiredBreakthrough,
             aiTeam,
-            rallyAnchor);
+            rallyAnchor,
+            byForce: true);
         EnsureRallyArtillerySlots(obj, 0, aiTeam); // nao cria vagas obrigatorias de suporte.
     }
 
@@ -695,12 +700,18 @@ public partial class AIController
         UnitRole role,
         int required,
         TeamId aiTeam,
-        Vector3Int rallyAnchor)
+        Vector3Int rallyAnchor,
+        bool byForce = false)
     {
+        // byForce: conta toda vaga cujo rotulo pertence a mesma Forca do pedido (vaga de
+        // Assalto preenchida por Interceptador conta ruptura). O excedente removido continua
+        // sendo so vaga ABERTA do proprio rotulo (FindRallyExcessSlotIndex).
+        UnitForce force = byForce ? UnitRoleCompatibility.ResolveForce(role) : UnitForce.Nenhuma;
         int current = 0;
         for (int i = 0; i < obj.Slots.Count; i++)
         {
-            if (obj.Slots[i].Role == role)
+            UnitRole slotRole = obj.Slots[i].Role;
+            if (slotRole == role || (byForce && force != UnitForce.Nenhuma && UnitRoleCompatibility.ResolveForce(slotRole) == force))
                 current++;
         }
 

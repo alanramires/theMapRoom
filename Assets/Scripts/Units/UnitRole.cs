@@ -37,23 +37,22 @@ public enum UnitRole
     // Antes chamado Suprimentos: o papel e movimentar carga, nao prestar servico de
     // suprimento (quem supre e Logistica). Valor 7 preservado — esta serializado nos UnitData.
     Estoque = 7,
-    // Transporte AÉREO operacional (Chinook): mesma mecânica do Transportador, mas com
-    // política de shopping própria — compra de início de jogo focada nos nós
-    // INTERMEDIÁRIOS do eixo, enquanto o APC só gera demanda depois que os nós
-    // iniciais do eixo foram conquistados.
-    TransportadorAereo = 15,
+    // 15 reservado — antigo TransportadorAereo; nao reutilizar. Incorporado ao
+    // Transportador (governanca G17): o Chinook declara Transportador e a politica de
+    // compra aerea vive no Shopping pela ficha (isTransporter + dominio), nao pelo rotulo.
+    // Em 2026-11-11 (D3) nao havia leitor em codigo nem ficha com o valor 15.
     // Disruptor de captura (autor, 2026-11-06): "Voce nao vai fazer dinheiro nao!".
     // Caca quem faz dinheiro para o inimigo — capturador capturando, transportador,
     // capturador — em vez de orbitar o capitao. Sub-rotulo de AtaqueAereo (o shopping o
-    // conta como ataque aereo; ver MatchesLabel), familia Assalto. O que ele caca sai das
-    // ARMAS da ficha, nao do rotulo: nada aqui sabe que e um helicoptero.
+    // conta como ataque aereo; ver MatchesLabel). O que ele caca sai das ARMAS da ficha,
+    // nao do rotulo: nada aqui sabe que e um helicoptero.
     DisruptorDeCaptura = 16,
     // Interceptador de Disruptores (autor, 2026-11-07): o "Interceptador" eram dois trabalhos
     // com um nome so. Este caca o DISRUPTOR (Apache) que morde o nosso comboio aereo — e quem
     // a ESCOLTA pede. O Interceptador (8) segue sendo o de aeronaves (Caca A/F: abate o que
     // voa, bombardeiro primeiro). Sub-rotulo de Interceptador, no mesmo molde do Disruptor
-    // sob AtaqueAereo: MatchesLabel/CanSatisfy fazem o codigo antigo continuar vendo-o
-    // como interceptador. A presa preferida sai da prioridade de alvo da ficha.
+    // sob AtaqueAereo: MatchesLabel faz o codigo antigo continuar vendo-o como interceptador.
+    // A presa preferida sai da prioridade de alvo da ficha.
     InterceptadorDeDisruptor = 17
 }
 
@@ -63,7 +62,8 @@ public enum UnitRole
 /// RÓTULOS dentro de uma família: o que o shopping pede e o que a ficha declara.
 /// Contrato: docs/AI Behavior/contrato_questionario.md §7.1; ficha_do_papel.md §7.7.
 ///
-/// Não é serializado em lugar nenhum: deriva sempre do rótulo (roles[0], a essência).
+/// Não é serializado em ficha nem em save: deriva do rótulo (roles[0], a essência)
+/// pelo UnitRoleCatalog.
 /// </summary>
 public enum UnitRoleFamily
 {
@@ -76,7 +76,7 @@ public enum UnitRoleFamily
     Logistica = 6,
 }
 
-/// <summary>Matriz derivada da familia. Nao e campo de ficha nem estado de save.</summary>
+/// <summary>Grupo de combate (matriz do autor). Por rotulo, no UnitRoleCatalog.</summary>
 public enum UnitForce { Nenhuma, Ruptura, Dissuasao, Ocupacao, Apoio }
 
 public enum UnitBattleParticipation
@@ -86,52 +86,18 @@ public enum UnitBattleParticipation
     Direct = 2
 }
 
+/// <summary>
+/// Leitura do UnitRoleCatalog (D3, 2026-11-11). Antes, cinco switch moravam aqui;
+/// agora toda resposta vem do asset. O que FICA em codigo e capacidade mecanica da
+/// ficha (quem carrega satisfaz Transportador, quem supre satisfaz Logistica) e a
+/// identidade de sub-rotulo (MatchesLabel), que nao e doutrina: e o nome.
+/// </summary>
 public static class UnitRoleCompatibility
 {
-    /// <summary>
-    /// Rótulo → família (autor, 2026-10-03). Os rótulos ficaram por conta do shopping;
-    /// o comportamento é da família.
-    ///
-    /// Atualizacao do autor (D1): Ataque ao Solo e ArtilheiroCombatente pertencem
-    /// a FogoDeSuporte, inclusive blindado e alcance 1. DisruptorDeCaptura segue
-    /// em Assalto. A forma de lutar continua nas armas (UnitCombatModalityRules).
-    /// </summary>
+    private static UnitRoleCatalogEntry Entry(UnitRole role) => UnitRoleCatalog.Active?.Get(role);
+
     public static UnitRoleFamily ResolveFamily(UnitRole role)
-    {
-        switch (role)
-        {
-            case UnitRole.Capturador:
-            case UnitRole.CapturadorCombatente:
-                return UnitRoleFamily.Capturador;
-
-            case UnitRole.Assalto:
-            case UnitRole.DisruptorDeCaptura:
-            case UnitRole.Interceptador:
-            case UnitRole.InterceptadorDeDisruptor:
-                return UnitRoleFamily.Assalto;
-
-            case UnitRole.AtaqueAereo:
-            case UnitRole.ArtilheiroCombatente:
-            case UnitRole.FogoIndireto:
-            case UnitRole.Antiaereo:
-            case UnitRole.AntiaereoCombatente:
-                return UnitRoleFamily.FogoDeSuporte;
-
-            case UnitRole.Transportador:
-            case UnitRole.TransportadorAereo:
-                return UnitRoleFamily.Transportador;
-
-            case UnitRole.Vigilancia:
-                return UnitRoleFamily.Vigilancia;
-
-            case UnitRole.Logistica:
-            case UnitRole.Estoque:
-                return UnitRoleFamily.Logistica;
-
-            default:
-                return UnitRoleFamily.Nenhuma;
-        }
-    }
+        => Entry(role)?.familia ?? UnitRoleFamily.Nenhuma;
 
     /// <summary>A família da essência: roles[0]. Ficha sem papel não tem família.</summary>
     public static UnitRoleFamily ResolveFamily(UnitData data)
@@ -141,46 +107,19 @@ public static class UnitRoleCompatibility
             : UnitRoleFamily.Nenhuma;
     }
 
-    public static UnitForce ResolveForce(UnitRoleFamily family)
+    public static UnitForce ResolveForce(UnitRole role)
+        => Entry(role)?.forca ?? UnitForce.Nenhuma;
+
+    /// <summary>A Força da essência: roles[0].</summary>
+    public static UnitForce ResolveForce(UnitData data)
     {
-        switch (family)
-        {
-            case UnitRoleFamily.Assalto: return UnitForce.Ruptura;
-            case UnitRoleFamily.FogoDeSuporte: return UnitForce.Dissuasao;
-            case UnitRoleFamily.Capturador:
-            case UnitRoleFamily.Transportador: return UnitForce.Ocupacao;
-            case UnitRoleFamily.Vigilancia:
-            case UnitRoleFamily.Logistica: return UnitForce.Apoio;
-            default: return UnitForce.Nenhuma;
-        }
+        return data != null && data.roles != null && data.roles.Count > 0
+            ? ResolveForce(data.roles[0])
+            : UnitForce.Nenhuma;
     }
 
-    public static UnitForce ResolveForce(UnitData data) => ResolveForce(ResolveFamily(data));
-
-    public static UnitBattleParticipation ResolveBattleParticipation(
-        UnitRole role)
-    {
-        switch (role)
-        {
-            case UnitRole.FogoIndireto:
-                return UnitBattleParticipation.Indirect;
-
-            case UnitRole.Capturador:
-            case UnitRole.Assalto:
-            case UnitRole.Interceptador:
-            case UnitRole.InterceptadorDeDisruptor:
-            case UnitRole.AtaqueAereo:
-            case UnitRole.DisruptorDeCaptura:
-            case UnitRole.Antiaereo:
-            case UnitRole.CapturadorCombatente:
-            case UnitRole.ArtilheiroCombatente:
-            case UnitRole.AntiaereoCombatente:
-                return UnitBattleParticipation.Direct;
-
-            default:
-                return UnitBattleParticipation.None;
-        }
-    }
+    public static UnitBattleParticipation ResolveBattleParticipation(UnitRole role)
+        => Entry(role)?.participacao ?? UnitBattleParticipation.None;
 
     public static UnitBattleParticipation ResolveBattleParticipation(
         UnitData data)
@@ -207,30 +146,8 @@ public static class UnitRoleCompatibility
     {
         if (actualRole == requestedRole)
             return true;
-
-        switch (actualRole)
-        {
-            case UnitRole.CapturadorCombatente:
-                return requestedRole == UnitRole.Capturador
-                    || requestedRole == UnitRole.Assalto;
-            case UnitRole.ArtilheiroCombatente:
-                return requestedRole == UnitRole.Assalto
-                    || requestedRole == UnitRole.FogoIndireto;
-            case UnitRole.Antiaereo:
-                return requestedRole == UnitRole.FogoIndireto;
-            case UnitRole.AntiaereoCombatente:
-                return requestedRole == UnitRole.Antiaereo
-                    || requestedRole == UnitRole.Assalto
-                    || requestedRole == UnitRole.FogoIndireto;
-            case UnitRole.TransportadorAereo:
-                return requestedRole == UnitRole.Transportador;
-            case UnitRole.DisruptorDeCaptura:
-                return requestedRole == UnitRole.AtaqueAereo;
-            case UnitRole.InterceptadorDeDisruptor:
-                return requestedRole == UnitRole.Interceptador;
-            default:
-                return false;
-        }
+        UnitRoleCatalogEntry entry = Entry(actualRole);
+        return entry != null && entry.satisfazTambem != null && entry.satisfazTambem.Contains(requestedRole);
     }
 
     /// <summary>
@@ -241,7 +158,8 @@ public static class UnitRoleCompatibility
     /// Existe porque dezenas de pontos testam `roles[0] == AtaqueAereo` estrito (shopping,
     /// combate aereo, rally, carona aerea). Sem um ponto unico, criar o sub-rotulo tirava
     /// o Apache de todos eles em silencio. Mais estreito que CanSatisfy de proposito:
-    /// CapturadorCombatente satisfaz Assalto, mas nao E um Assalto na essencia.
+    /// CapturadorCombatente satisfaz Assalto, mas nao E um Assalto na essencia. Fica em
+    /// codigo: e identidade do nome, nao doutrina configuravel.
     /// </summary>
     public static bool MatchesLabel(UnitRole actualRole, UnitRole requestedRole)
     {
@@ -284,23 +202,15 @@ public static class UnitRoleCompatibility
         return false;
     }
 
+    /// <summary>Como o Shopping CONTA a ficha: o "conta como" da essencia no catalogo.</summary>
     public static UnitRole ResolveCompositionRole(UnitData data)
     {
         if (data == null || data.roles == null || data.roles.Count == 0)
             return UnitRole.None;
 
         UnitRole primary = data.roles[0];
-        if (primary == UnitRole.CapturadorCombatente)
-            return UnitRole.Capturador;
-        if (primary == UnitRole.ArtilheiroCombatente)
-            return UnitRole.FogoIndireto;
-        if (primary == UnitRole.TransportadorAereo)
-            return UnitRole.Transportador;
-        if (primary == UnitRole.DisruptorDeCaptura)
-            return UnitRole.AtaqueAereo;
-        if (primary == UnitRole.InterceptadorDeDisruptor)
-            return UnitRole.Interceptador;
-        return primary;
+        UnitRoleCatalogEntry entry = Entry(primary);
+        return entry != null && entry.contaComo != UnitRole.None ? entry.contaComo : primary;
     }
 
     // Transporte operacional (APC, Chinook, navio de desembarque etc.) é diferente da
