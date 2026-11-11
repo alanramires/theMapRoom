@@ -13,6 +13,16 @@ public partial class AIController
         public BazookaTargetPriority TargetPreference;
     }
 
+    private static bool TryResolveAirRallyAssembly(UnitManager unit, AIWorldSnapshot snapshot, out ConstructionManager rally)
+    {
+        rally = null;
+        if (unit == null || snapshot == null) return false;
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        SectorObjective objective = ResolveAnyAssignedObjective(unit, plan);
+        return IsRallyAssemblyObjective(objective) && IsRallyAssemblingState(objective.RallyState)
+            && TryFindOwnedRallyForSector(objective.Sector, snapshot.AITeam, out rally);
+    }
+
     private PlayerAction TryDecideAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot)
     {
         if (!IsAirCombatUnit(unit) || snapshot == null)
@@ -208,6 +218,7 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
+        bool assembling = TryResolveAirRallyAssembly(unit, snapshot, out ConstructionManager assemblyRally);
         List<UnitManager> visibleEnemies =
             CollectVisibleAirCombatEnemies(unit, snapshot);
         Vector3Int anchor = ResolveAirCombatFallbackAnchor(
@@ -231,7 +242,7 @@ public partial class AIController
         {
             // A tertiary ground shot must not interrupt an interceptor's
             // reachable air mission. Tactical air attacks still win above.
-            if (TryResolveInterceptorOperationalPursuit(
+            if (!assembling && TryResolveInterceptorOperationalPursuit(
                     unit, target, fromCell, visibleEnemies, out UnitManager airPrey))
             {
                 Vector3Int pursuitCell = FindAirCombatAdvanceMove(
@@ -254,6 +265,16 @@ public partial class AIController
             Debug.Log($"{TL("AirCombat")} {unit.InstanceId} rogue ataca via {attackCell} -> {target.UnitDisplayName}#{target.InstanceId} ({attackReason})");
             return BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
                 target.InstanceId.ToString(), targetCell, paths);
+        }
+
+        // Com vaga de montagem, nenhuma caca operacional/patrulha substitui
+        // a area. O tiro local acima continua permitido; depois, atracao/hold.
+        if (assembling)
+        {
+            Vector3Int rallyMove = IsRallyParticipantPresent(unit, assemblyRally, ReachBand.Tactical)
+                ? fromCell : FindAirCombatAdvanceMove(fromCell, anchor, paths, occupied, snapshot.AITeam, takeoffMoveOptions);
+            Debug.Log($"{TL("AirCombat")} {unit.InstanceId} montagem via {rallyMove} alvo={anchor} tier={anchorTier}");
+            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, rallyMove, paths);
         }
 
         if (TryBuildAirPlatformRuntimeAction(
@@ -781,6 +802,22 @@ public partial class AIController
     {
         tier = "None";
         sharedExposedCover = false;
+        if (TryResolveAirRallyAssembly(unit, snapshot, out ConstructionManager assemblyRally))
+        {
+            tier = $"Rally:Montagem@{assemblyRally.Sector}";
+            if (IsRallyParticipantPresent(unit, assemblyRally, ReachBand.Tactical)) return fromCell;
+            RallyArea area = GetRallyArea(assemblyRally, snapshot.AITeam);
+            Vector3Int closest = assemblyRally.CurrentCellPosition;
+            float bestDistance = float.MaxValue;
+            if (area != null) foreach (Vector3Int cell in area.Vanguard)
+            {
+                float distance = SectorManager.HexDistance(fromCell, cell);
+                if (distance < bestDistance || (Mathf.Approximately(distance, bestDistance)
+                    && (cell.x < closest.x || (cell.x == closest.x && cell.y < closest.y))))
+                { closest = cell; bestDistance = distance; }
+            }
+            return closest;
+        }
         bool isInterceptor = unit != null
             && unit.TryGetUnitData(out UnitData airData)
             && airData != null
@@ -1649,6 +1686,7 @@ public partial class AIController
             return candidates;
         }
 
+        bool assembling = TryResolveAirRallyAssembly(unit, snapshot, out ConstructionManager assemblyRally);
         int stationaryMaxRange = ResolveAirCombatMaxWeaponRange(
             unit,
             SensorMovementMode.MoveuParado);
@@ -1703,6 +1741,14 @@ public partial class AIController
                 continue;
             }
 
+            if (assembling && !IsRallyParticipantPresent(unit, assemblyRally, ReachBand.Tactical, cell))
+            {
+                UnitManager policyTarget = visibleEnemies.Find(enemy => enemy != null && !enemy.IsDead
+                    && AIActionReachCoordinator.CubicDistance(cell, enemy.CurrentCellPosition) <= maxRange);
+                TraceAIReviewCandidate("Ataque.Policy", "Attack", cell, policyTarget?.InstanceId.ToString(),
+                    false, "rally_area", "fora da área do montinho");
+                continue;
+            }
             sensorCalls++;
             sensorTargets.Clear();
             if (!PodeMirarSensor.CollectTargets(

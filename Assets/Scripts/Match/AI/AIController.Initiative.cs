@@ -1063,7 +1063,16 @@ public partial class AIController
         if (capturerObjective != null) return capturerObjective;
         SectorObjective assaultObjective = ResolveAssignedAssaultObjective(unit, plan);
         if (assaultObjective != null) return assaultObjective;
-        return ResolveAssignedFireSupportObjective(unit, plan);
+        SectorObjective fireSupportObjective = ResolveAssignedFireSupportObjective(unit, plan);
+        if (fireSupportObjective != null) return fireSupportObjective;
+        // O nome "Any" tambem inclui Interceptador, AtaqueAereo e os demais
+        // papeis: a vaga publicada e autoridade, nao o badge da unidade.
+        if (unit != null && plan?.Objectives != null)
+            foreach (SectorObjective objective in plan.Objectives)
+                if (objective?.Slots != null)
+                    foreach (SlotNeed slot in objective.Slots)
+                        if (slot != null && slot.Filled && slot.AssignedUnitId == unit.InstanceId) return objective;
+        return null;
     }
 
     private static int CompareUnitInitiative(UnitManager a, UnitManager b)
