@@ -33,6 +33,7 @@ da cena. Um mapa novo tem de pedir autoria, não código.
 | v10.5.0 | Ferido não é carga (EVAC aéreo pela regra do reparo, anel do HQ como último recurso, EVAC conjunto; reparo avaliado antes do Serviço do Comando; Disruptor por faixa estrita; cruz EVAC no HUD; diretrizes "procure a que já existe" na skill de fechamento) | [relatório](docs/relatorio_v10.5.0.md) |
 | v10.6.0 | Só aceita o que a etapa seguinte aceitaria (régua do supridor em 4 faixas + prazo Tático; recuperação aérea na célula futura; fusão só onde a fusão aceita; EVAC sem avanço → anel do HQ; reserva de pouso da aeronave ferida só na IA; swap que captura; skill pergunte-me) | [relatório](docs/relatorio_v10.6.0.md) |
 | v10.7.0 | A compra precisa cumprir a missão (parede ponderada e resposta híbrida; rally com acesso; caça persegue no Operacional e não nasce para combater infantaria; pré-requisito respeita ilha; envolvidos em rosa) | [relatório](docs/relatorio_v10.7.0.md) |
+| v10.9.0 | A conta, a vaga e o gate falam a mesma língua (matriz de Forças; rally sem artilharia obrigatória: piso 4+2, razão local por perfil, saturação, capitão e ESPERANDO; presença aérea pela área; catálogo de papéis como asset editável) | [relatório](docs/relatorio_v10.9.0.md) |
 | v10.8.0 | O rebelde era o rogue (facção sem QG vira três fatos fora da IA; porta por "tem vaga?", não por "sou rebelde?"; compra pela sellingRule; 0 unidades derrota; shopping sem base reativo; Caça A controlador dos céus) | [relatório](docs/relatorio_v10.8.0.md) |
 
 ---
