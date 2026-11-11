@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIPresetData
   nomeExibido: Dificil
   doutrina: 'AI Dificil: Ela spama soldados e usa o caixa restante para unidades'
+  rallyLocalRatio: 2
   capacidades:
     respeitarListaBanida: 0
     projetarProducaoInimiga: 1

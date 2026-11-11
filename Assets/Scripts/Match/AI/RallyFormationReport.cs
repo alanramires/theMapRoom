@@ -39,14 +39,11 @@ public sealed class RallyFormationReport
     // em distancia hexagonal; isto muda so a localizacao exibida, nao a prontidao.
     public static RallyLocation LocateParticipant(RallyArea area, Vector3Int cell, UnitManager unit)
     {
-        if (unit == null || !unit.TryGetUnitData(out UnitData data) || !data.IsAircraft()) return Locate(area, cell);
-        float coreRadius = 0f, approachRadius = 0f;
+        if (unit == null) return Locate(area, cell);
         Vector3Int pivot = area.Rally.CurrentCellPosition;
-        foreach (Vector3Int c in area.Core) coreRadius = Mathf.Max(coreRadius, SectorManager.HexDistance(pivot, c));
-        foreach (Vector3Int c in area.Approach) approachRadius = Mathf.Max(approachRadius, SectorManager.HexDistance(pivot, c));
-        float distance = SectorManager.HexDistance(pivot, cell);
-        return area.Core.Count > 0 && distance <= coreRadius ? RallyLocation.Core
-            : area.Approach.Count > 0 && distance <= approachRadius ? RallyLocation.Approach : RallyLocation.Outside;
+        // A mesma pergunta para origem atual e destino previsto, sem mover a unidade.
+        return AIController.IsRallyParticipantInBand(unit, pivot, ReachBand.Tactical, cell) ? RallyLocation.Core
+            : AIController.IsRallyParticipantInBand(unit, pivot, ReachBand.Operational, cell) ? RallyLocation.Approach : RallyLocation.Outside;
     }
 
     public static RallyFormationReport BuildForSlot(AIController controller, int slot, RallyArea area,
@@ -94,7 +91,7 @@ public sealed class RallyFormationReport
     private static string ExpectedPosition(UnitManager unit)
     {
         if (!unit.TryGetUnitData(out UnitData data)) return "sem ficha";
-        return UnitRoleCompatibility.ResolveForce(data) == UnitForce.Ruptura
+        return !unit.IsEmbarked && UnitRoleCompatibility.ResolveForce(data) == UnitForce.Ruptura
             ? "vanguarda" : "retaguarda";
     }
 

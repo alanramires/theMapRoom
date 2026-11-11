@@ -96,10 +96,11 @@ try
     float zAssaultWeight=(float)typeof(AIController).GetMethod("GetRallyAssaultWeight",sf).Invoke(null,new object[]{catalog["tanqueZ"].Data});
     float zArtilleryWeight=(float)typeof(AIController).GetMethod("GetRallyArtilleryWeight",sf).Invoke(null,new object[]{catalog["tanqueZ"].Data});
     Check(zAssaultWeight==0f,"Z ainda contou como ruptura no helper por composicao.");
+    Check(zArtilleryWeight==1f,"D2: Z deveria contar suporte 1 pela Forca de Dissuasao.");
     int wall=(int)typeof(AIShoppingPlanner).GetMethod("ResolveWallPressure",sf).Invoke(null,new object[]{catalog["tanqueZ"].Data,false});
     Check(wall==12,"Z perdeu os 3 pontos ja existentes da parede elite 2.");
     rows.Add("\nDemanda medida (4 Soldados + 1 peca, sem ameaca/oferta): Tanque Z -> Assalto x"+zAssault+", Fogo x"+zFire+"; Tanque B -> Assalto x"+tankAssault+", Fogo x"+tankFire+".");
-    rows.Add("Rally atual Z: ruptura="+zAssaultWeight+", artilharia="+zArtilleryWeight+". Parede ponderada Z="+(wall/4f)+" pontos (ja era artilharia). Prontidao D2 nao alterada.");
+    rows.Add("Rally atual Z: ruptura="+zAssaultWeight+", artilharia="+zArtilleryWeight+". Parede ponderada Z="+(wall/4f)+" pontos (ja era artilharia). D2: suporte pela Forca de Dissuasao, sem gate.");
     rows.Add("PASS D1: matriz integral; grupos reais; compatibilidades/valor 9 preservados; expectativa por Forca independente de posicao/arma; demanda do Z medida. Sem fichas modificadas nem partida em Play.");
     return string.Join("\n",rows);
 }

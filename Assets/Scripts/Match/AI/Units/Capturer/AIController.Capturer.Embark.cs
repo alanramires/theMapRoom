@@ -18,7 +18,7 @@ public partial class AIController
         if (!TryGetRallyAnchorCell(assigned.Sector, out Vector3Int anchor))
             return false;
         Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
-        return SectorManager.HexDistance(anchor, cell) <= RallyAssemblyForceRadius;
+        return IsRallyParticipantInBand(unit, anchor, ReachBand.Tactical);
     }
 
     // Celula do ponto de rally do setor (anchor usado na contagem de presenca do GoGreen).
@@ -65,7 +65,7 @@ public partial class AIController
             TraceAIReviewCandidate("Embarque", "Embark", fromCell, null, false,
                 "hold_rally_assembly", "Unidade deve manter presenca na montagem do rally.");
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} NAO embarca: montando massa no rally "
-                + $"{assigned.Sector} (state={assigned.RallyState}) dentro do raio {RallyAssemblyForceRadius}h");
+                + $"{assigned.Sector} (state={assigned.RallyState}) dentro do Tatico proprio");
             return null;
         }
 

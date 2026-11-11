@@ -286,6 +286,8 @@ public partial class AIController
             || rally.CurrentCapturePoints < rally.CapturePointsMax) return false;
         Vector3Int anchor = rally.CurrentCellPosition; anchor.z = 0;
         var anchors = new Dictionary<int, Vector3Int>();
+        var rallyCells = new Dictionary<int, HashSet<Vector3Int>>();
+        var cellsBySector = new Dictionary<ConstructionSector, HashSet<Vector3Int>>();
         foreach (UnitManager passenger in passengers)
         {
             SectorObjective assigned = ResolveAnyAssignedObjective(passenger, plan);
@@ -296,6 +298,9 @@ public partial class AIController
                 || ownRally.CurrentCapturePoints < ownRally.CapturePointsMax) continue;
             Vector3Int cell = ownRally.CurrentCellPosition; cell.z = 0;
             anchors[passenger.InstanceId] = cell;
+            if (!cellsBySector.TryGetValue(assigned.Sector, out var coreCells))
+            { coreCells = GetRallyModelCells(assigned.Sector, snapshot.AITeam); cellsBySector[assigned.Sector] = coreCells; }
+            rallyCells[passenger.InstanceId] = coreCells;
         }
         var paths = UnitMovementPathRules.CalcularCaminhosValidos(
             boardTilemap, carrier, Mathf.Max(0, carrier.RemainingMovementPoints), terrainDatabase);
@@ -307,7 +312,7 @@ public partial class AIController
         }
         bool InArea(UnitManager passenger, Vector3Int cell)
             => passenger != null && anchors.TryGetValue(passenger.InstanceId, out Vector3Int center)
-                && SectorManager.HexDistance(cell, center) <= RallyAssemblyForceRadius;
+                && rallyCells.TryGetValue(passenger.InstanceId, out var coreCells) && coreCells.Contains(cell);
         bool Resolve(UnitManager passenger, Vector3Int cell, out Vector3Int target, out int cost)
         {
             target = cell; cost = 0;
@@ -315,9 +320,13 @@ public partial class AIController
         }
         bool TouchesArea(Vector3Int cell)
         {
-            foreach (Vector3Int center in anchors.Values)
-                if (SectorManager.HexDistance(cell, center) <= RallyAssemblyForceRadius + 1)
-                    return true;
+            foreach (var coreCells in cellsBySector.Values)
+            {
+                if (coreCells.Contains(cell)) return true;
+                var neighbors = new List<Vector3Int>(6);
+                UnitMovementPathRules.GetImmediateHexNeighbors(boardTilemap, cell, neighbors);
+                if (neighbors.Exists(coreCells.Contains)) return true;
+            }
             return false;
         }
         int rejectedLz = 0, emptyDeliveries = 0;
@@ -349,7 +358,7 @@ public partial class AIController
             var best = evaluated.best;
             var selected = best.spots.ConvertAll(spot => spot.option);
             paths.TryGetValue(best.cell, out List<Vector3Int> path);
-            Debug.Log($"{TL("Transporte")} rally #{carrier.InstanceId} entrega na area de {objective.Sector} ancora={anchor} raio={RallyAssemblyForceRadius}: LZ={best.cell} desembarca={selected.Count} fica={passengers.Count - selected.Count}; sem exigir captura do predio.");
+            Debug.Log($"{TL("Transporte")} rally #{carrier.InstanceId} entrega na area de {objective.Sector} ancora={anchor} core=modelo: LZ={best.cell} desembarca={selected.Count} fica={passengers.Count - selected.Count}; sem exigir captura do predio.");
             action = BuildDesembarcarBatch(carrier, snapshot.AITeam, from, selected, best.cell, path);
             return true;
         }

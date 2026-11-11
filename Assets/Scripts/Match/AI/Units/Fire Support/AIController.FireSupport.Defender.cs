@@ -14,7 +14,7 @@ public partial class AIController
 
         Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
+        Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell, unit);
 
         if (TryDecideCombatantFireSupportTacticalAction(
                 unit, snapshot, assigned, fromCell, anchor, paths, occupied,

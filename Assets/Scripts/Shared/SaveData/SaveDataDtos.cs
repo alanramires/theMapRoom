@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -308,6 +308,13 @@ public class AIObjectiveSaveData
     public int objectiveType;
     public int priority;
     public int rallyState;
+    public bool rallyOperationHistory;
+    public int rallyFloorTurn = -1, rallyLastObservedTurn = -1;
+    public int rallyPreviousForce, rallyStagnantTurns;
+    public float rallyPreviousRupture;
+    public int rallyCaptainId = -1;
+    public bool rallyWaiting;
+    public List<int> rallyParticipantIds = new List<int>();
     public int rallyAssemblyStartedTurn = -1;
     public int rallyGoGreenTurn = -1;
     public string rallyReadinessReason;

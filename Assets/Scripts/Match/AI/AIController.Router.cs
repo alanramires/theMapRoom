@@ -25,6 +25,12 @@ public partial class AIController
 
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
+        if (IsRallyCaptainWaiting(unit, snapshot))
+        {
+            Debug.Log($"{TL("Rally")} ESPERANDO: capitao #{unit.InstanceId} aguarda participantes no Tatico proprio.");
+            return BuildMoveBatch(unit, snapshot.AITeam, unit.CurrentCellPosition, unit.CurrentCellPosition);
+        }
+
         bool isAirSurveillance = IsAirSurveillanceUnit(unit);
 
         // Preserva a ordem historica para os demais papeis. Somente a

@@ -1,7 +1,7 @@
 # Plano da D2 — prontidão do rally
 
-Estado: planejado, não implementado. Transcrição do bloco do autor, com a nota naval abaixo.
-A D1 e a tela são a base; este documento não altera a prontidão em código.
+Estado: implementação da D2 concluída em 2026-11-11, aguardando revisão em Play.
+Abaixo permanece o bloco do autor, com a nota naval e a matriz por mapa; modelo/bandeira no mar continuam no degrau 7.
 
 ## Nota do autor (2026-11-11) — embarcado é Ocupação; a Marinha bombardeia e espera
 

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -786,6 +786,12 @@ public partial class AIController
             UnitManager ally = snapshot.MyUnits[i];
             if (ally == null || ally == transporter || ally == primaryPassenger || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
                 continue;
+            if (ally.TryGetUnitData(out UnitData screenData) && screenData.IsAircraft())
+            {
+                if (UnitRoleCompatibility.ResolveForce(screenData) == UnitForce.Ruptura && IsRallyUnitOperational(ally)
+                    && IsRallyParticipantInBand(ally, dropCell, ReachBand.Tactical)) return true;
+                continue;
+            }
             if (IsPrimaryLogisticsUnit(ally) || IsFireSupportUnit(ally))
                 continue;
 

@@ -605,7 +605,7 @@ public partial class AIController
                 if (obj.Status == ObjectiveStatus.Defending || obj.Status == ObjectiveStatus.Complete || obj.Status == ObjectiveStatus.Abandoned)
                     continue;
 
-                Vector3Int objAnchor = ResolveFireSupportObjectiveAnchor(obj, snapshot.AITeam, fromCell);
+                Vector3Int objAnchor = ResolveFireSupportObjectiveAnchor(obj, snapshot.AITeam, fromCell, unit);
                 objAnchor.z = 0;
 
                 int screenCount = 0;

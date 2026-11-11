@@ -71,8 +71,11 @@ try{
     plan.Objectives.Remove(otherObjective);objective.Slots.Add(extraSlot);
     Set(rally,"currentCapturePoints",rally.CapturePointsMax-1);if(Decide()!=null)throw new System.Exception("Rally nao controlado tratado como reuniao.");Set(rally,"currentCapturePoints",rally.CapturePointsMax);
     // With only one valid ground cell, deliver one and retain the other.
-    var single=action.SubSteps[0].TargetHex;var landLz=action.MoveTo;
+    var single=new UnityEngine.Vector3Int(3,2,0);var landLz=new UnityEngine.Vector3Int(3,1,0);
     for(int x=0;x<10;x++)for(int y=0;y<6;y++)map.SetTile(new UnityEngine.Vector3Int(x,y,0),sea.paletteTile);map.SetTile(single,plain.paletteTile);map.SetTile(landLz,plain.paletteTile);
+    // D2: o rally deste fixture e terrestre; o guarda continua bloqueando seu hex.
+    // A vaga livre deve pertencer ao core caminhavel do modelo, nao a uma ilha solta.
+    map.SetTile(rally.CurrentCellPosition,plain.paletteTile);
     action=Decide();if(action==null||action.SensorAction!=SensorActionType.Disembark||action.SubSteps.Count!=1)throw new System.Exception("Uma vaga nao produziu entrega parcial.");
     // No legal ground cells: safe approach/hold, never a fake capture target at sea.
     map.SetTile(single,sea.paletteTile);map.SetTile(landLz,sea.paletteTile);action=Decide();if(action==null||action.SensorAction!=SensorActionType.None)throw new System.Exception("Sem solo legal inventou desembarque/captura.");

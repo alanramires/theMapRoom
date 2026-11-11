@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -158,10 +158,13 @@ public partial class AIController
         return null;
     }
 
-    private Vector3Int ResolveFireSupportObjectiveAnchor(SectorObjective assigned, TeamId aiTeam, Vector3Int fallback)
+    private Vector3Int ResolveFireSupportObjectiveAnchor(SectorObjective assigned, TeamId aiTeam, Vector3Int fallback, UnitManager follower = null)
     {
         if (assigned == null) return fallback;
 
+        if (assigned.ObjectiveType == AIObjectiveType.InvasionAttack && follower != null
+            && TryResolveRallyAdvanceCaptain(follower, new AIWorldSnapshot { AITeam = aiTeam, AISlotIndex = follower.SlotIndex }, out UnitManager captain))
+            return captain.CurrentCellPosition;
         if (IsRallyAssemblyObjective(assigned))
             return ResolveRallyAssemblyAnchor(assigned, aiTeam, fallback);
 

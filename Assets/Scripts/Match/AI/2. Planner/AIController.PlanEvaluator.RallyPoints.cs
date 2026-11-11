@@ -7,23 +7,12 @@ public partial class AIController
 {
     private const int RallyPointSectorPriorityBonus = 55;
     private const int RallyHoldRadius = 2;
-    private const int RallyAssemblyForceRadius = 3;
-    private const int RallyAirAttackRadius = 5;
-    private const int RallyArtilleryRadius = 4;
-    private const int RallyMinimumArtillery = 3;
-    private const int RallyMinimumLocalLaunchArtillery = 3;
-    // Valvula de ruptura esmagadora: quando o pacote de assalto e tao maior que o
-    // necessario que o amaciamento de artilharia vira redundante, o rally GREENA sem
-    // esperar a cota de artilharia (que num mapa sem peca pesada pode nunca fechar).
-    // A artilharia continua sendo demandada/comprada e se junta ao ataque depois.
-    private const int RallyOverwhelmingBreakthroughFloor = 5;
+    private const int RallyMinimumCapturers = 4;
+    private const int RallyMinimumBreakthrough = 2;
     private const int RallyArtilleryRecruitRange = 8;
     private const int RallyMaximumArtilleryUnits = 12;
     private const int RallyInfantryTransportDistance = 7;
     private const int RallyUsefulApcCapacity = 2;
-    private const int RallyAirSurveillanceRadius = 6;
-    private const int RallyLogisticsRadius = 5;
-    private const int RallyAssemblyTimeoutTurns = 4;
     // Após o GoGreen a supressão NÃO solta mais no relógio: o release é por DESFECHO (a invasão
     // fracassou — colapso ou estagnação — via UpdateInvasionMonitor). Este valor é só um TETO de
     // segurança pra um sensor bugado não suprimir pra sempre.
@@ -61,21 +50,20 @@ public partial class AIController
         public bool HoldReady, BreakthroughReady, ArtilleryReady, ForceReady;
         public int Capturers;
         public float Assault;
-        public int AirAttack;
         public float Artillery;
-        public float LocalArtillery;
         public int HeldRallies;
-        public int RequiredArtillery;
         public ConstructionSector FocusSector;
         public bool IsFocus;
         public int AirSurveillance;
         public int Logistics;
         public int VisibleThreats;
         public int KnownEnemyForce;
-        public int RequiredPackages;
         public int RequiredForce;
         public int ForceScore;
-        public bool Timeout;
+        public int Occupation;
+        public float LocalEnemyForce;
+        public float LocalRatio;
+        public bool Saturated;
         public bool GoGreen;
         public AIRallyAssemblyState State;
         public string Status;
@@ -87,11 +75,11 @@ public partial class AIController
         public int HeldRallies;
         public int Capturers;
         public float Assault;
-        public int AirAttack;
         public float Artillery;
         public int AirSurveillance;
         public int Logistics;
         public ConstructionSector FocusSector;
+        public int Occupation;
     }
 
     private struct AIRallyInfluence
@@ -101,8 +89,6 @@ public partial class AIController
         public Vector3Int Anchor;
         public AIRallyAssemblyState State;
         public AIRallyReadiness Readiness;
-        public int AssemblyRadius;
-        public int SupportRadius;
         public string Reason;
     }
 
@@ -120,6 +106,10 @@ public partial class AIController
         int turnNumber,
         AIIntelReport intel)
     {
+        var staleFacts = new List<(int rally, int slot, int turn)>();
+        foreach (var key in rallyReadinessFacts.Keys) if (key.slot == aiSlotIndex) staleFacts.Add(key);
+        foreach (var key in staleFacts) rallyReadinessFacts.Remove(key);
+        rallyReachFacts.Clear();
         AIRallyPlanContext context = new AIRallyPlanContext
         {
             TargetingEnemyHQ = new HashSet<ConstructionSector>(),
@@ -243,32 +233,11 @@ public partial class AIController
         return ResolveAISlotKey(aiTeam);
     }
 
-    private static void LogRallyReadiness(
-        ConstructionManager rally,
-        int ownerSlot,
-        TeamId aiTeam,
-        int turnNumber,
-        AIIntelReport intel)
+    private static void LogRallyReadiness(ConstructionManager rally, int ownerSlot, TeamId aiTeam, int turnNumber, AIIntelReport intel)
     {
-        AIRallyReadiness readiness = EvaluateRallyReadiness(rally, aiTeam, turnNumber, -1, intel);
-        string rallyName = rally != null ? rally.name : "(null)";
-        ConstructionSector sector = rally != null ? rally.Sector : ConstructionSector.None;
-        PublishRallyHudState(rally, readiness.State, readiness.Status, turnNumber,
-            sector != ConstructionSector.None && sector == readiness.FocusSector,
-            ownerSlot);
-
-        Debug.Log(
-            $"[AI Rally][T{turnNumber}][{aiTeam}] {sector} via {rallyName} owner={ownerSlot} " +
-            $"held={readiness.Held} rallies={readiness.HeldRallies} focus={readiness.FocusSector} " +
-            $"artGlobal={readiness.Artillery:0.#}/{readiness.RequiredArtillery} " +
-            $"artLocal={readiness.LocalArtillery:0.#} cap={readiness.Capturers} " +
-            $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} " +
-            $"vigilancia={readiness.AirSurveillance} " +
-            $"log={readiness.Logistics} " +
-            $"threat={readiness.VisibleThreats} knownEnemy={readiness.KnownEnemyForce} " +
-            $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
-            $"rallyState={readiness.State} goGreen={readiness.GoGreen} timeout={readiness.Timeout} " +
-            $"missing={readiness.Missing} {readiness.Status}");
+        AIRallyReadiness r = EvaluateRallyReadiness(rally, aiTeam, turnNumber, -1, intel);
+        PublishRallyHudState(rally, r.State, r.Status, turnNumber, r.IsFocus, ownerSlot);
+        Debug.Log($"[AI Rally][T{turnNumber}][{aiTeam}] {rally.Sector} held={r.Held} cap={r.Capturers}/{RallyMinimumCapturers} ruptura={r.Assault:0.#}/{RallyMinimumBreakthrough} suporte={r.Artillery:0.#} ocupacao={r.Occupation} force={r.ForceScore}/{r.RequiredForce} inimigoLocal={r.LocalEnemyForce:0.#} razao={r.LocalRatio:0.#} saturado={r.Saturated} missing={r.Missing} {r.Status}");
     }
 
     private static AIRallyReadiness EvaluateRallyReadiness(ConstructionManager rally, TeamId aiTeam)
@@ -277,185 +246,59 @@ public partial class AIController
     }
 
     private static AIRallyReadiness EvaluateRallyReadiness(
-        ConstructionManager rally,
-        TeamId aiTeam,
-        int turnNumber,
-        int startedTurn,
-        AIIntelReport intel)
+        ConstructionManager rally, TeamId aiTeam, int turnNumber, int startedTurn, AIIntelReport intel)
     {
-        AIRallyReadiness readiness = new AIRallyReadiness
-        {
-            Status = "WAIT_HOLD",
-            State = AIRallyAssemblyState.WaitHold,
-            Missing = "hold"
-        };
-        if (rally == null)
-            return readiness;
-
-        Vector3Int anchor = rally.CurrentCellPosition;
-        anchor.z = 0;
-
-        foreach (UnitManager unit in UnitManager.AllActive)
-        {
-            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked || !unit.gameObject.activeInHierarchy)
-                continue;
-            if (!unit.TryGetUnitData(out UnitData data) || data == null)
-                continue;
-
-            Vector3Int unitCell = unit.CurrentCellPosition;
-            unitCell.z = 0;
-            float dist = SectorManager.HexDistance(anchor, unitCell);
-
-            // Cota de capturador do GoGreen conta pela SKILL "Captura Construcoes", nao por
-            // papel/classe: qualquer unidade portadora (hoje Soldado/Bazooka/Metranca; amanha
-            // um zepelim capturador) conta. Nao mexe no gate real de captura (PodeCapturarSensor).
-            bool capturer = HasRallyCaptureSkill(data);
-            bool airAttack = IsOperationalRallyAirAttackUnit(unit, data);
-            float artillery = GetRallyArtilleryWeight(data);
-            bool airSurveillanceUnit =
-                IsAirSurveillanceUnit(unit);
-            bool logistics = HasRole(data, UnitRole.Logistica);
-
-            if (dist <= RallyAssemblyForceRadius)
-            {
-                if (capturer)
-                    readiness.Capturers++;
-                readiness.Assault += GetRallyAssaultWeight(data);
-            }
-
-            // Ataque aéreo conta num raio maior (5h — aviões reposicionam rápido), mas ainda por
-            // PRESENÇA: um avião disperso longe do rally não infla o GoGreen.
-            if (dist <= RallyAirAttackRadius && airAttack)
-                readiness.AirAttack++;
-
-            if (dist <= RallyArtilleryRadius && artillery > 0f)
-                readiness.Artillery += artillery;
-            if (dist <= RallyAirSurveillanceRadius
-                && airSurveillanceUnit)
-            {
-                readiness.AirSurveillance++;
-            }
-            if (dist <= RallyLogisticsRadius && logistics)
-                readiness.Logistics++;
-        }
-
-        readiness.LocalArtillery = readiness.Artillery;
+        var r = new AIRallyReadiness { Status = "WAIT_HOLD", State = AIRallyAssemblyState.WaitHold, Missing = "hold" };
+        if (rally == null) return r;
+        int slot = ResolveAISlotKey(aiTeam);
+        var context = GetRallyContext(slot, rally.BoardTilemap);
+        int turn = turnNumber >= 0 ? turnNumber : GetMatchController()?.CurrentTurn ?? -1;
+        var key = (rally.GetEntityId().GetHashCode(), slot, turn);
+        if (rallyReadinessFacts.TryGetValue(key, out AIRallyReadiness fact)) return fact;
         AIRallyAggregate aggregate = BuildRallyAggregate(aiTeam);
-        readiness.HeldRallies = aggregate.HeldRallies;
-        readiness.RequiredArtillery = GetRallyArtilleryRequirement(aggregate.HeldRallies);
-        readiness.FocusSector = aggregate.FocusSector;
-        readiness.IsFocus = rally.Sector == aggregate.FocusSector;
-        if (aggregate.HeldRallies > 0)
-        {
-            readiness.Capturers = aggregate.Capturers;
-            readiness.Assault = aggregate.Assault;
-            readiness.AirAttack = aggregate.AirAttack;
-            readiness.Artillery = aggregate.Artillery;
-            readiness.AirSurveillance =
-                aggregate.AirSurveillance;
-            readiness.Logistics = aggregate.Logistics;
-        }
-
-        // HELD/conquistado = o DONO ATUAL do ponto de rally e a AI (rally.SlotIndex == ResolveAISlotKey(aiTeam)).
-        // NAO basta ter unidade amiga perto nem maioria de predios laterais — o slot atual do
-        // ponto tem que ser o da AI (== rally owner slot quando conquistado). Ex.: Hotel com
-        // Slot ID=0(verde) e Rally Owner=1(vermelho) NAO esta held pelo vermelho.
-        readiness.Held = rally.SlotIndex == ResolveAISlotKey(aiTeam);
-        readiness.VisibleThreats = CountVisibleEnemyThreatsNearRally(anchor, aiTeam, RallyAssemblyForceRadius + 1);
-        readiness.KnownEnemyForce = CountLiveEnemyUnits(aiTeam);
-        readiness.RequiredPackages = Mathf.Clamp(
-            Mathf.Max(
-                1,
-                Mathf.CeilToInt(readiness.KnownEnemyForce / 8f),
-                Mathf.CeilToInt(readiness.VisibleThreats / 3f)),
-            1,
-            5);
-        readiness.RequiredForce = 1
-            + (readiness.RequiredPackages * 3)
-            + (readiness.RequiredArtillery * 2);
-
-        float breakthrough = readiness.Assault + readiness.AirAttack;
-        float usefulArtillery = Mathf.Min(readiness.Artillery, readiness.RequiredArtillery);
-        readiness.ForceScore = readiness.Capturers + Mathf.RoundToInt(breakthrough * 3f)
-            + Mathf.RoundToInt(usefulArtillery * 2f);
-        readiness.Timeout = startedTurn >= 0 && turnNumber >= 0
-            && turnNumber - startedTurn >= RallyAssemblyTimeoutTurns;
-
-        bool hasBreakthrough = breakthrough >= readiness.RequiredPackages;
-        bool hasHoldPackage = readiness.Held
-            && readiness.Capturers >= 1
-            && hasBreakthrough;
-        bool hasArtillery = readiness.Artillery >= readiness.RequiredArtillery;
-        bool hasLocalLaunchArtillery = readiness.LocalArtillery
-            >= Mathf.Min(RallyMinimumLocalLaunchArtillery, readiness.RequiredArtillery);
-        bool hasRequiredForce = readiness.ForceScore >= readiness.RequiredForce;
-        readiness.HoldReady = hasHoldPackage;
-        readiness.BreakthroughReady = hasBreakthrough;
-        readiness.ArtilleryReady = hasArtillery;
-        readiness.ForceReady = hasRequiredForce;
-        // DOMÍNIO macro (Ganhando) GREENA o rally held mesmo sem a composição completa: se você já
-        // domina território E força, segurar a montagem só atrasa o fechamento. Assim o HUD fica
-        // verde E a massa montada é LIBERADA pra invadir (a lógica de assembly para de segurar).
-        // Calculado FRESCO aqui (não pelo cache) porque o rally é avaliado ANTES do macro no fluxo
-        // do plano — o cache teria o macro do turno anterior (semáforo ficava amarelo 1 turno atrás).
-        bool macroDominating = BuildMacroTerritoryContext(
-            aiTeam, SectorManager.GetAllSectorInfos(), 6,
-            CountLiveUnitsOfTeam(aiTeam), CountLiveEnemyUnits(aiTeam)).Phase == AIMacroTerritoryPhase.Dominating;
-        // Modelo multi-centro: o assalto é liberado pela PRONTIDÃO COMBINADA (todos os rallies held
-        // somam, overlap conta 1x) — NÃO por um "foco". Todo rally held vira GoGreen junto quando a
-        // massa combinada satisfaz os mínimos, OU domínio macro, OU vantagem numérica >= 2:1.
+        r.Held = rally.SlotIndex == slot;
+        r.HeldRallies = aggregate.HeldRallies;
+        r.FocusSector = aggregate.FocusSector;
+        r.IsFocus = rally.Sector == aggregate.FocusSector;
+        r.Capturers = aggregate.Capturers;
+        r.Assault = aggregate.Assault;
+        r.Artillery = aggregate.Artillery;
+        r.Occupation = aggregate.Occupation;
+        r.AirSurveillance = aggregate.AirSurveillance;
+        r.Logistics = aggregate.Logistics;
+        r.ForceScore = RallyForceScore(r.Capturers, r.Assault, r.Artillery);
+        r.LocalRatio = context != null && context.ActivePreset != null ? context.ActivePreset.rallyLocalRatio : 1.5f;
+        r.LocalEnemyForce = CountRallyLocalEnemyForce(rally, aiTeam, out int threats);
+        r.VisibleThreats = threats;
+        r.KnownEnemyForce = CountLiveEnemyUnits(aiTeam);
+        r.RequiredForce = Mathf.CeilToInt(r.LocalRatio * r.LocalEnemyForce);
+        r.HoldReady = r.Held && r.Capturers >= RallyMinimumCapturers;
+        r.BreakthroughReady = r.Assault >= RallyMinimumBreakthrough;
+        r.ArtilleryReady = true; // suporte e informacao, nunca uma trava.
+        r.ForceReady = r.ForceScore >= r.RequiredForce;
+        SectorObjective objective = FindRallyObjective(slot, rally.Sector);
+        r.Saturated = IsRallySaturated(objective, turn, r.HoldReady && r.BreakthroughReady);
+        bool macroDominating = BuildMacroTerritoryContext(aiTeam, SectorManager.GetAllSectorInfos(), 6,
+            CountLiveUnitsOfTeam(aiTeam), r.KnownEnemyForce).Phase == AIMacroTerritoryPhase.Dominating;
         int friendlyForce = CountLiveUnitsOfTeam(aiTeam);
-        bool numericalDominance = friendlyForce >= 2 * Mathf.Max(1, readiness.KnownEnemyForce);
-        // Ruptura esmagadora: hold package completo (inclui >=1 capturador) e pacote de
-        // assalto no minimo DOBRO do necessario pro inimigo conhecido. Massa dessa dimensao
-        // nao deve congelar esperando artilharia — invade e a artilharia chega depois.
-        bool overwhelmingBreakthrough = hasHoldPackage
-            && breakthrough >= Mathf.Max(RallyOverwhelmingBreakthroughFloor, readiness.RequiredPackages * 2);
-        readiness.GoGreen = readiness.Held
-            && ((hasHoldPackage && hasRequiredForce && hasArtillery)
-                || macroDominating
-                || numericalDominance
-                || overwhelmingBreakthrough);
-
-        if (!readiness.Held)
+        bool numericalDominance = friendlyForce >= 2 * Mathf.Max(1, r.KnownEnemyForce);
+        r.GoGreen = r.Held && ((r.HoldReady && r.BreakthroughReady && (r.ForceReady || r.Saturated))
+            || macroDominating || numericalDominance);
+        if (r.GoGreen)
         {
-            readiness.State = AIRallyAssemblyState.WaitHold;
-            readiness.Status = "WAIT_HOLD";
-            readiness.Missing = "hold";
+            r.State = AIRallyAssemblyState.GoGreen;
+            r.Status = r.HoldReady && r.BreakthroughReady && r.ForceReady ? "GO_GREEN"
+                : r.Saturated ? "GO_GREEN(saturado)" : numericalDominance ? "GO_GREEN(2:1)" : "GO_GREEN(macro)";
+            r.Missing = "-";
         }
-        else if (readiness.GoGreen)
+        else if (r.Held)
         {
-            readiness.State = AIRallyAssemblyState.GoGreen;
-            bool fullComposition = hasHoldPackage && hasRequiredForce && hasArtillery;
-            if (fullComposition)
-                readiness.Status = "GO_GREEN";
-            else if (numericalDominance)
-                readiness.Status = $"GO_GREEN(2:1 {friendlyForce}v{readiness.KnownEnemyForce})";
-            else if (overwhelmingBreakthrough)
-                readiness.Status = $"GO_GREEN(ruptura {breakthrough}x sem art)";
-            else
-                readiness.Status = "GO_GREEN(macro)";
-            readiness.Missing = "-";
+            r.State = AIRallyAssemblyState.Assembling;
+            r.Status = "ASSEMBLING";
+            r.Missing = BuildRallyMissingText(r);
         }
-        else if (hasHoldPackage && hasArtillery)
-        {
-            readiness.State = AIRallyAssemblyState.Ready;
-            readiness.Status = "READY";
-            readiness.Missing = "-";
-        }
-        else
-        {
-            readiness.State = AIRallyAssemblyState.Assembling;
-            readiness.Status = readiness.Artillery <= 0f ? "ASSEMBLING_WAIT_ART" : "ASSEMBLING";
-            readiness.Missing = BuildRallyMissingText(
-                readiness,
-                hasHoldPackage,
-                hasArtillery,
-                hasLocalLaunchArtillery,
-                hasRequiredForce);
-        }
-
-        return readiness;
+        rallyReadinessFacts[key] = r;
+        return r;
     }
 
     private static AIRallyAggregate BuildRallyAggregate(TeamId aiTeam)
@@ -512,48 +355,24 @@ public partial class AIController
         aggregate.FocusSector = chosenFocus;
         rallyFocusMemory[aiSlotKey] = chosenFocus;
 
+        var counted = new HashSet<int>();
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked
-                || !unit.gameObject.activeInHierarchy
-                || !unit.TryGetUnitData(out UnitData data) || data == null)
-                continue;
-
-            Vector3Int cell = unit.CurrentCellPosition;
-            cell.z = 0;
-            bool nearForce = false;
-            bool nearAir = false;
-            bool nearArtillery = false;
-            bool nearAirSurveillance = false;
-            bool nearLogistics = false;
+            if (unit == null || unit.IsDead || unit.SlotIndex != aiSlotKey || !unit.gameObject.activeInHierarchy
+                || !counted.Add(unit.InstanceId) || !unit.TryGetUnitData(out UnitData data)) continue;
+            bool inCore = false;
             foreach (ConstructionManager rally in held)
-            {
-                Vector3Int anchor = rally.CurrentCellPosition;
-                anchor.z = 0;
-                float distance = SectorManager.HexDistance(anchor, cell);
-                nearForce |= distance <= RallyAssemblyForceRadius;
-                nearAir |= distance <= RallyAirAttackRadius;
-                nearArtillery |= distance <= RallyArtilleryRadius;
-                nearAirSurveillance |=
-                    distance <= RallyAirSurveillanceRadius;
-                nearLogistics |= distance <= RallyLogisticsRadius;
-            }
-
-            if (nearForce && HasRallyCaptureSkill(data))
-                aggregate.Capturers++;
-            if (nearForce)
-                aggregate.Assault += GetRallyAssaultWeight(data);
-            if (nearAir && IsOperationalRallyAirAttackUnit(unit, data))
-                aggregate.AirAttack++;
-            if (nearArtillery)
-                aggregate.Artillery += GetRallyArtilleryWeight(data);
-            if (nearAirSurveillance
-                && IsAirSurveillanceUnit(unit))
-            {
-                aggregate.AirSurveillance++;
-            }
-            if (nearLogistics && HasRole(data, UnitRole.Logistica))
-                aggregate.Logistics++;
+                if (IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical)) { inCore = true; break; }
+            if (!inCore) continue;
+            if (HasRallyCaptureSkill(data)) aggregate.Capturers++;
+            if (unit.IsEmbarked) { aggregate.Occupation++; continue; }
+            UnitForce force = UnitRoleCompatibility.ResolveForce(data);
+            if (force == UnitForce.Ocupacao) aggregate.Occupation++;
+            if (!IsRallyUnitOperational(unit)) continue;
+            aggregate.Assault += GetRallyAssaultWeight(data);
+            aggregate.Artillery += GetRallyArtilleryWeight(data);
+            if (IsAirSurveillanceUnit(unit)) aggregate.AirSurveillance++;
+            if (HasRole(data, UnitRole.Logistica)) aggregate.Logistics++;
         }
 
         return aggregate;
@@ -561,42 +380,18 @@ public partial class AIController
 
     private static float ScoreRallyLaunchFocus(ConstructionManager rally, TeamId aiTeam)
     {
-        if (rally == null)
-            return float.MinValue;
-        Vector3Int anchor = rally.CurrentCellPosition;
-        anchor.z = 0;
         float score = 0f;
         foreach (UnitManager unit in UnitManager.AllActive)
-        {
-            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked
-                || !unit.gameObject.activeInHierarchy
-                || !unit.TryGetUnitData(out UnitData data) || data == null)
-                continue;
-            Vector3Int cell = unit.CurrentCellPosition;
-            cell.z = 0;
-            float distance = SectorManager.HexDistance(anchor, cell);
-            if (distance <= RallyAssemblyForceRadius)
-            {
-                if (HasRallyCaptureSkill(data)) score += 100f;
-                if (IsRallyPrimaryAssaultUnit(data)) score += 300f;
-            }
-            if (distance <= RallyArtilleryRadius)
-                score += GetRallyArtilleryWeight(data) * 200f;
-        }
+            if (unit != null && !unit.IsDead && unit.SlotIndex == ResolveAISlotKey(aiTeam)
+                && unit.TryGetUnitData(out UnitData data) && IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical))
+                score += HasRallyCaptureSkill(data) ? 100f : unit.IsEmbarked ? 0f
+                    : GetRallyAssaultWeight(data) * 300f + GetRallyArtilleryWeight(data) * 200f;
         return score;
     }
 
-    private static int GetRallyArtilleryRequirement(int heldRallies)
-    {
-        if (heldRallies >= 3) return 6;
-        if (heldRallies == 2) return 5;
-        return RallyMinimumArtillery;
-    }
 
-    private static int GetCurrentRallyArtilleryRequirement(TeamId aiTeam)
-    {
-        return GetRallyArtilleryRequirement(BuildRallyAggregate(aiTeam).HeldRallies);
-    }
+
+
 
     private static int CountVisibleEnemyThreatsNearRally(Vector3Int anchor, TeamId aiTeam, float radius)
     {
@@ -656,40 +451,14 @@ public partial class AIController
         return n;
     }
 
-    private static string BuildRallyMissingText(
-        AIRallyReadiness readiness,
-        bool hasHoldPackage,
-        bool hasArtillery,
-        bool hasLocalLaunchArtillery,
-        bool hasRequiredForce)
+    private static string BuildRallyMissingText(AIRallyReadiness readiness)
     {
-        string missing = "";
-        if (!hasHoldPackage)
-        {
-            if (readiness.Capturers < 1)
-                missing += $"cap({readiness.Capturers}/1)";
-            float breakthrough = readiness.Assault + readiness.AirAttack;
-            if (breakthrough < readiness.RequiredPackages)
-                missing += string.IsNullOrEmpty(missing)
-                    ? $"ruptura({breakthrough:0.#}/{readiness.RequiredPackages})"
-                    : $"+ruptura({breakthrough:0.#}/{readiness.RequiredPackages})";
-        }
-        if (!hasArtillery)
-            missing += string.IsNullOrEmpty(missing)
-                ? $"artGlobal({readiness.Artillery:0.#}/{readiness.RequiredArtillery})"
-                : $"+artGlobal({readiness.Artillery:0.#}/{readiness.RequiredArtillery})";
-        if (!hasLocalLaunchArtillery)
-        {
-            int localRequired = Mathf.Min(RallyMinimumLocalLaunchArtillery, readiness.RequiredArtillery);
-            missing += string.IsNullOrEmpty(missing)
-                ? $"artLocal({readiness.LocalArtillery:0.#}/{localRequired})"
-                : $"+artLocal({readiness.LocalArtillery:0.#}/{localRequired})";
-        }
-        if (!hasRequiredForce)
-            missing += string.IsNullOrEmpty(missing)
-                ? $"forca({readiness.ForceScore}/{readiness.RequiredForce})"
-                : $"+forca({readiness.ForceScore}/{readiness.RequiredForce})";
-        return string.IsNullOrEmpty(missing) ? "-" : missing;
+        var missing = new List<string>();
+        if (!readiness.Held) missing.Add("hold");
+        if (readiness.Capturers < RallyMinimumCapturers) missing.Add($"cap({readiness.Capturers}/{RallyMinimumCapturers})");
+        if (!readiness.BreakthroughReady) missing.Add($"ruptura({readiness.Assault:0.#}/{RallyMinimumBreakthrough})");
+        if (!readiness.ForceReady) missing.Add($"forca({readiness.ForceScore}/{readiness.RequiredForce})");
+        return missing.Count == 0 ? "-" : string.Join("+", missing);
     }
 
     private static void UpdateRallyObjectiveState(
@@ -711,26 +480,18 @@ public partial class AIController
             turnNumber,
             obj.RallyAssemblyStartedTurn,
             intel);
+        ObserveRallySaturation(obj, turnNumber, readiness.Capturers >= RallyMinimumCapturers && readiness.BreakthroughReady,
+            readiness.Assault, readiness.ForceScore);
+        readiness.Saturated = IsRallySaturated(obj, turnNumber, readiness.HoldReady && readiness.BreakthroughReady);
+        if (readiness.Saturated && readiness.Held && readiness.HoldReady && readiness.BreakthroughReady)
+        { readiness.GoGreen = true; readiness.State = AIRallyAssemblyState.GoGreen; readiness.Status = "GO_GREEN(saturado)"; readiness.Missing = "-"; }
+        rallyReadinessFacts[(rally.GetEntityId().GetHashCode(), ResolveAISlotKey(aiTeam), turnNumber)] = readiness;
         Vector3Int rallyAnchor = rally.CurrentCellPosition;
-        rallyAnchor.z = 0;
-        // Multi-centro: TODO rally held mantém seu próprio arco com uma FATIA do requisito combinado
-        // (distribuída entre os centros), em vez de um foco provisionar tudo. Capturador: 1 por centro.
         int heldRallies = Mathf.Max(1, readiness.HeldRallies);
-        int sharePackages = Mathf.CeilToInt(readiness.RequiredPackages / (float)heldRallies);
-        int shareArtillery = Mathf.CeilToInt(readiness.RequiredArtillery / (float)heldRallies);
-        EnsureRallyAssemblySlots(obj, sharePackages, 0, shareArtillery, aiTeam, rallyAnchor);
+        EnsureRallyAssemblySlots(obj, Mathf.CeilToInt(RallyMinimumCapturers / (float)heldRallies),
+            Mathf.CeilToInt(RallyMinimumBreakthrough / (float)heldRallies), aiTeam, rallyAnchor);
         obj.RallyState = readiness.State;
-        obj.RallyReadinessReason =
-            $"{readiness.Status} ready={readiness.ForceScore} cap={readiness.Capturers} " +
-            $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} " +
-            $"artGlobal={readiness.Artillery:0.#}/{readiness.RequiredArtillery} " +
-            $"artLocal={readiness.LocalArtillery:0.#} rallies={readiness.HeldRallies} " +
-            $"focus={readiness.FocusSector} " +
-            $"vigilancia={readiness.AirSurveillance} " +
-            $"log={readiness.Logistics} " +
-            $"threat={readiness.VisibleThreats} knownEnemy={readiness.KnownEnemyForce} " +
-            $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
-            $"missing={readiness.Missing}";
+        obj.RallyReadinessReason = $"{readiness.Status} cap={readiness.Capturers}/{RallyMinimumCapturers} ruptura={readiness.Assault:0.#}/{RallyMinimumBreakthrough} suporte={readiness.Artillery:0.#} force={readiness.ForceScore}/{readiness.RequiredForce} inimigoLocal={readiness.LocalEnemyForce:0.#} razao={readiness.LocalRatio:0.#} saturado={readiness.Saturated} missing={readiness.Missing}";
         PublishRallyHudState(rally, readiness.State, obj.RallyReadinessReason, turnNumber,
             rally != null && rally.Sector != ConstructionSector.None && rally.Sector == readiness.FocusSector,
             ResolveAISlotKey(aiTeam));
@@ -738,6 +499,7 @@ public partial class AIController
         if (readiness.GoGreen && obj.RallyGoGreenTurn < 0)
         {
             obj.RallyGoGreenTurn = turnNumber;
+            StartRallyAdvance(obj, rally, aiTeam);
             // O Go Green pertence a operacao, nao a um predio isolado. Suprime todos os
             // rallies DESIGNADOS para este slot, para que feeders nao iniciem uma segunda
             // montagem paralela.
@@ -880,23 +642,22 @@ public partial class AIController
 
     private static void EnsureRallyAssemblySlots(
         SectorObjective obj,
-        int requiredPackages,
-        int operationalAirAttack,
-        int requiredArtillery,
+        int requiredCapturers,
+        int requiredBreakthrough,
         TeamId aiTeam,
         Vector3Int rallyAnchor)
     {
         if (obj == null)
             return;
 
-        EnsureRallyRoleSlots(obj, UnitRole.Capturador, 1, aiTeam, rallyAnchor);
+        EnsureRallyRoleSlots(obj, UnitRole.Capturador, requiredCapturers, aiTeam, rallyAnchor);
         EnsureRallyRoleSlots(
             obj,
             UnitRole.Assalto,
-            Mathf.Max(0, requiredPackages - operationalAirAttack),
+            requiredBreakthrough,
             aiTeam,
             rallyAnchor);
-        EnsureRallyArtillerySlots(obj, requiredArtillery, aiTeam);
+        EnsureRallyArtillerySlots(obj, 0, aiTeam); // nao cria vagas obrigatorias de suporte.
     }
 
     private static void EnsureRallyArtillerySlots(SectorObjective obj, int requiredArtillery, TeamId aiTeam)
@@ -1290,6 +1051,7 @@ public partial class AIController
             return;
 
         int turn = snapshot.TurnNumber;
+        bool rallyWaiting = UpdateRallyAdvanceWaiting(plan, aiTeam);
 
         // Operação em voo? (algum rally GoGreen registrado). Sem isso, não há o que monitorar.
         var ggSectors = new List<ConstructionSector>();
@@ -1321,11 +1083,22 @@ public partial class AIController
             }
         }
 
+        // A onda liberada inclui seus participantes, mesmo quando viraram rogue no novo plano.
+        var forceIds = new HashSet<int>();
+        foreach (UnitManager unit in force) forceIds.Add(unit.InstanceId);
+        foreach (SectorObjective group in plan.RallyAdvances)
+            foreach (int id in group.RallyParticipantIds)
+            {
+                UnitManager unit = FindActiveUnit(id, aiTeam);
+                if (unit != null && !unit.IsDead && forceIds.Add(id)) force.Add(unit);
+            }
+
         // Sem objetivo de base = operação encerrada (sucesso/dissolvida): limpa silenciosamente.
         if (baseObj == null)
         {
             ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             invasionMonitors.Remove(ResolveAISlotKey(aiTeam));
+            plan.RallyAdvances.Clear();
             return;
         }
 
@@ -1335,8 +1108,8 @@ public partial class AIController
         bool inContact = false;
         foreach (UnitManager u in force)
         {
-            if (u.TryGetUnitData(out UnitData d) && d != null
-                && UnitRoleCompatibility.CanSatisfy(d, UnitRole.Assalto))
+            if (!u.IsEmbarked && u.TryGetUnitData(out UnitData d) && d != null
+                && UnitRoleCompatibility.ResolveForce(d) == UnitForce.Ruptura)
                 liveAssault++;
 
             Vector3Int c = u.CurrentCellPosition; c.z = 0;
@@ -1360,13 +1133,14 @@ public partial class AIController
                 mon.BestDistance = cur;     // progrediu -> zera estagnação
                 mon.StallCounter = 0;
             }
-            else if (!atGate && !inContact)
+            else if (!atGate && !inContact && !rallyWaiting)
             {
                 mon.StallCounter++;         // parado e fora de hold legítimo
             }
             // atGate (assaltando) ou inContact (lutando): hold legítimo, não conta estagnação.
         }
 
+        if (rallyWaiting) mon.StallCounter = 0;
         bool graceOver = turn - earliestGoGreen >= InvasionGraceTurns;
         bool collapse = graceOver && liveAssault == 0;
         bool stall = graceOver && mon.StallCounter >= InvasionStallTurns;
@@ -1379,6 +1153,7 @@ public partial class AIController
             ReleaseGoGreenFallbackAssignments(plan, aiTeam);
             ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));   // solta supressão -> rallies reabrem montagem
             invasionMonitors.Remove(aiSlotKey);
+            plan.RallyAdvances.Clear();
             // Zera o marcador de GoGreen dos objetivos pra que a 2ª onda registre um GoGreen LIMPO
             // (re-estabelecendo a supressão) em vez de ser bloqueada pelo marcador da onda falha.
             foreach (SectorObjective obj in plan.Objectives)
@@ -1454,27 +1229,12 @@ public partial class AIController
     }
 
     private static bool IsRallyPrimaryAssaultUnit(UnitData data)
-    {
-        return data != null
-            && data.domain == Domain.Land
-            && data.unitClass == GameUnitClass.Armored
-            && UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto
-            && (data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto));
-    }
+        => data != null && UnitRoleCompatibility.ResolveForce(data) == UnitForce.Ruptura;
 
-    private static bool IsOperationalRallyAirAttackUnit(UnitManager unit, UnitData data)
-    {
-        if (unit == null || data == null || unit.IsUnderRepair)
-            return false;
-        if (data.roles == null || data.roles.Count == 0 || !UnitRoleCompatibility.MatchesLabel(data.roles[0], UnitRole.AtaqueAereo))
-            return false;
-        if (unit.MaxAmmo > 0 && unit.CurrentAmmo <= 0)
-            return false;
-        if (unit.MaxFuel > 0 && unit.CurrentFuel <= 0)
-            return false;
-
-        return true;
-    }
+    private static bool IsRallyUnitOperational(UnitManager unit)
+        => unit != null && !unit.IsDead && !unit.IsUnderRepair
+            && (unit.MaxAmmo <= 0 || unit.CurrentAmmo > 0)
+            && (unit.MaxFuel <= 0 || unit.CurrentFuel > 0);
 
     private static bool IsRealRallyArtilleryUnit(UnitData data)
     {
@@ -1483,22 +1243,11 @@ public partial class AIController
 
     private static float GetRallyArtilleryWeight(UnitData data)
     {
-        if (data == null)
-            return 0f;
-        if (!HasRole(data, UnitRole.FogoIndireto) && data.unitClass != GameUnitClass.Artillery)
-            return 0f;
-
+        if (data == null || UnitRoleCompatibility.ResolveForce(data) != UnitForce.Dissuasao) return 0f;
         string key = NormalizeRallyUnitKey($"{data.id} {data.displayName} {data.apelido}");
-        if (key.Contains("obus") && key.Contains("leve"))
-            return 0.5f;
-        if (key.Contains("art") && key.Contains("campanha"))
-            return 1.5f;
-        if (key.Contains("astros") || (key.Contains("obus") && key.Contains("medio")))
-            return 1f;
-
-        // Nova artilharia ainda não cadastrada nominalmente participa como apoio leve,
-        // sem equivaler automaticamente às peças pesadas conhecidas.
-        return 0.5f;
+        if (key.Contains("obus") && key.Contains("leve")) return 0.5f;
+        if (key.Contains("art") && key.Contains("campanha")) return 1.5f;
+        return 1f;
     }
 
     private SectorObjective FindPrimaryRallyObjective(TeamObjectivePlan plan, TeamId aiTeam)
@@ -1715,7 +1464,7 @@ public partial class AIController
         Vector3Int anchor = focusRally.CurrentCellPosition;
         anchor.z = 0;
         float assignedPower = GetAssignedRallyArtilleryPower(focus, aiTeam);
-        int requiredPower = GetCurrentRallyArtilleryRequirement(aiTeam);
+        int requiredPower = RallyMaximumArtilleryUnits; // teto de recrutamento opcional, nunca gate de prontidao.
         if (assignedPower >= requiredPower)
             return;
 
@@ -1821,11 +1570,9 @@ public partial class AIController
     //   Tanque Leve (Medium, elite 0) = 1.0   |  MBT (Heavy, elite 1) = 2.5  |  Pesado (Heavy, elite 2) = 3.0
     private static float GetRallyAssaultWeight(UnitData data)
     {
-        if (!IsRallyPrimaryAssaultUnit(data))
-            return 0f;
-        float weight = data.ArmorClass >= ArmorClass.Heavy ? 2f : 1f;
-        weight += 0.5f * Mathf.Clamp(data.eliteLevel, 0, 2);
-        return weight;
+        if (!IsRallyPrimaryAssaultUnit(data)) return 0f;
+        if (data.IsAircraft() || data.unitClass != GameUnitClass.Armored) return 1f;
+        return (data.ArmorClass >= ArmorClass.Heavy ? 2f : 1f) + 0.5f * Mathf.Clamp(data.eliteLevel, 0, 2);
     }
 
     private static string NormalizeRallyUnitKey(string value)
@@ -1989,8 +1736,6 @@ public partial class AIController
         {
             Active = false,
             Anchor = fromCell,
-            AssemblyRadius = RallyAssemblyForceRadius,
-            SupportRadius = RallyArtilleryRadius,
             State = AIRallyAssemblyState.None,
             Reason = "sem rally"
         };
@@ -2045,8 +1790,6 @@ public partial class AIController
             Anchor = anchor,
             State = bestObj.RallyState,
             Readiness = readiness,
-            AssemblyRadius = RallyAssemblyForceRadius,
-            SupportRadius = RallyArtilleryRadius,
             Reason = bestObj.RallyReadinessReason
         };
         return true;
@@ -2064,6 +1807,11 @@ public partial class AIController
         if (obj == null)
             return fallback;
 
+        if (obj.RallyCaptainId >= 0)
+        {
+            UnitManager captain = FindActiveUnit(obj.RallyCaptainId, aiTeam);
+            if (captain != null && !captain.IsDead && !captain.IsEmbarked) return captain.CurrentCellPosition;
+        }
         if (TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager bestRally))
         {
             Vector3Int rallyCell = bestRally.CurrentCellPosition;
@@ -2080,4 +1828,230 @@ public partial class AIController
 
         return fallback;
     }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetRallyDecisionFacts()
+    {
+        rallyReadinessFacts.Clear(); rallyReachFacts.Clear(); rallyReachRevision = -1;
+    }
+
+    private static readonly Dictionary<(int rally, int slot, int turn), AIRallyReadiness> rallyReadinessFacts = new Dictionary<(int, int, int), AIRallyReadiness>();
+    private static int rallyReachRevision = -1;
+    private static readonly Dictionary<(int unit, Vector3Int origin, int revision, int budget, ReachBand band), UnitReachEnvelope> rallyReachFacts = new Dictionary<(int, Vector3Int, int, int, ReachBand), UnitReachEnvelope>();
+
+    private static AIController GetRallyContext(int slot, UnityEngine.Tilemaps.Tilemap map = null)
+    {
+        if (Instance != null && Instance.matchController != null && (map == null || Instance.boardTilemap == map)) return Instance;
+        foreach (AIController ai in FindObjectsByType<AIController>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if ((map == null || ai.boardTilemap == map) && ai.matchController != null)
+                return ai;
+        return null;
+    }
+
+    private static SectorObjective FindRallyObjective(int slot, ConstructionSector sector)
+        => ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(slot))?.Objectives.Find(o => o != null && o.Sector == sector);
+
+    // Consulta de presenca: banda propria, orcamento potencial e terreno, sem mover unidades.
+    private static UnitReachEnvelope GetRallyReach(UnitManager unit, ReachBand band, Vector3Int? origin = null)
+    {
+        if (unit == null) return null;
+        if (unit.IsEmbarked) unit = unit.EmbarkedTransporter;
+        if (unit == null || !unit.TryGetUnitData(out UnitData data)) return null;
+        Vector3Int from = origin ?? unit.CurrentCellPosition; from.z = 0;
+        int budget = unit.MaxMovementPoints * (band == ReachBand.Operational ? 2 : 1);
+        int revision = ThreatRevisionTracker.GlobalBoardRevision;
+        if (rallyReachRevision != revision) { rallyReachFacts.Clear(); rallyReachRevision = revision; }
+        var key = (unit.GetEntityId().GetHashCode(), from, revision, budget, band);
+        if (rallyReachFacts.TryGetValue(key, out UnitReachEnvelope cached)) return cached;
+        AIController context = GetRallyContext(unit.SlotIndex, unit.BoardTilemap);
+        var map = unit.BoardTilemap != null ? unit.BoardTilemap : context?.boardTilemap;
+        TerrainDatabase terrain = context?.terrainDatabase;
+        // TerrainDatabase e um asset: o contexto do controller e obrigatorio em runtime.
+        if (map == null || terrain == null) return null;
+        var request = new UnitReachRequest { Unit = unit, BoardMap = map, TerrainDatabase = terrain,
+            Intent = ReachIntent.Mobility, Band = band, MovementMode = UnitThreatEnvelopeMovement.Potential,
+            MovementBudget = budget, OriginOverride = from,
+            SubStep = data.IsAircraft() ? ReachSubStep.Aereo : ReachSubStep.Terrestre };
+        if (!data.IsAircraft() && band == ReachBand.Tactical) request.PrebuiltCosts = AIActionReachCoordinator.BuildSectorReachMap(unit, map, terrain, from, budget, false);
+        UnitReachEnvelope result = UnitReachEnvelopeService.Build(request);
+        rallyReachFacts[key] = result;
+        return result;
+    }
+
+    public static bool IsRallyParticipantInBand(UnitManager unit, Vector3Int anchor, ReachBand band, Vector3Int? origin = null)
+    {
+        anchor.z = 0;
+        UnitManager mover = unit != null && unit.IsEmbarked ? unit.EmbarkedTransporter : unit;
+        if (mover == null) return false;
+        if ((origin ?? mover.CurrentCellPosition) == anchor) return true;
+        return GetRallyReach(mover, band, origin)?.MovementCells.Contains(anchor) == true;
+    }
+
+    private static HashSet<Vector3Int> GetRallyModelCells(ConstructionSector sector, TeamId team)
+    {
+        int slot = ResolveAISlotKey(team);
+        if (!TryFindOwnedRallyForSector(sector, team, out ConstructionManager rally)) return new HashSet<Vector3Int>();
+        AIController ai = GetRallyContext(slot, rally.BoardTilemap);
+        if (ai == null) return new HashSet<Vector3Int>();
+        UnitDatabase database = null;
+        foreach (UnitManager unit in UnitManager.AllActive)
+            if (unit != null && unit.SlotIndex == slot && unit.BoardTilemap == ai.boardTilemap && unit.UnitDatabase != null)
+            { database = unit.UnitDatabase; break; }
+        if (database == null) database = FindAnyObjectByType<UnitSpawner>()?.UnitDatabase;
+        UnitData model = ai.ResolveRallyFormationModel(rally, QuadranteController.Active?.BuiltQuadrant, database, out _);
+        return UnitReachEnvelopeService.Build(new UnitReachRequest { ModelData = model, ModelTeam = team, ModelSlot = slot,
+            BoardMap = ai.boardTilemap, TerrainDatabase = ai.terrainDatabase, OriginOverride = rally.CurrentCellPosition,
+            Intent = ReachIntent.Mobility, Band = ReachBand.Tactical, SubStep = ReachSubStep.Terrestre })?.MovementCells
+            ?? new HashSet<Vector3Int>();
+    }
+
+    private static int RallyForceScore(int capturers, float breakthrough, float support)
+        => capturers + Mathf.RoundToInt(breakthrough * 3f) + Mathf.RoundToInt(support * 2f);
+
+    private static float CountRallyLocalEnemyForce(ConstructionManager rally, TeamId team, out int threats)
+    {
+        threats = 0;
+        int slot = ResolveAISlotKey(team);
+        AIController ai = GetRallyContext(slot, rally.BoardTilemap);
+        MatchController match = ai?.matchController;
+        if (ai == null || ai.boardTilemap == null || match == null) return 0f;
+        var cells = new HashSet<Vector3Int>();
+        foreach (UnitManager unit in UnitManager.AllActive)
+            if (unit != null && !unit.IsDead && unit.SlotIndex == slot && !unit.IsEmbarked
+                && IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical))
+            {
+                UnitReachEnvelope reach = GetRallyReach(unit, ReachBand.Operational);
+                if (reach != null) cells.UnionWith(reach.MovementCells);
+            }
+        Vector2 center = HexCoordinates.GetCellCenterWorld(ai.boardTilemap, rally.CurrentCellPosition);
+        Vector2 forward = Vector2.zero;
+        InvasionAxisMap axisMap = ai.currentAxisMap ?? InvasionAxisMap.Build(PlayerSlotId.FromIndex(slot), ai.boardTilemap);
+        foreach (var axis in axisMap.Axes)
+            if (!axis.IsInvasionAxis && axis.RallySector == rally.Sector)
+            { forward = center - (Vector2)HexCoordinates.GetCellCenterWorld(ai.boardTilemap, axis.HqCell); break; }
+        float force = 0f;
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked || !PlayerSlotRelations.AreEnemies(slot, enemy.SlotIndex)
+                || !match.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(slot)) || !cells.Contains(enemy.CurrentCellPosition)) continue;
+            Vector2 delta = (Vector2)HexCoordinates.GetCellCenterWorld(ai.boardTilemap, enemy.CurrentCellPosition) - center;
+            if (forward.sqrMagnitude > 0f && Vector2.Dot(delta, forward) < 0f) continue;
+            threats++;
+            if (!enemy.TryGetUnitData(out UnitData data)) { force += 1f; continue; }
+            force += Mathf.Max(1f, RallyForceScore(HasRallyCaptureSkill(data) ? 1 : 0, GetRallyAssaultWeight(data), GetRallyArtilleryWeight(data)));
+        }
+        return force;
+    }
+
+    private static void ObserveRallySaturation(SectorObjective obj, int turn, bool floor, float rupture, int force)
+    {
+        if (obj == null || turn < 0 || obj.RallyLastObservedTurn == turn) return;
+        if (!floor)
+        {
+            obj.RallyFloorTurn = -1; obj.RallyStagnantTurns = 0;
+        }
+        else if (obj.RallyFloorTurn < 0) { obj.RallyFloorTurn = turn; obj.RallyStagnantTurns = 0; }
+        else if (obj.RallyLastObservedTurn >= 0)
+            obj.RallyStagnantTurns = rupture - obj.RallyPreviousRupture >= 1f || force - obj.RallyPreviousForce >= 2
+                ? 0 : obj.RallyStagnantTurns + 1;
+        obj.RallyLastObservedTurn = turn;
+        obj.RallyPreviousRupture = rupture;
+        obj.RallyPreviousForce = force;
+    }
+
+    private static bool IsRallySaturated(SectorObjective obj, int turn, bool floor)
+        => floor && obj != null && obj.RallyFloorTurn >= 0
+            && (obj.RallyStagnantTurns >= 2 || turn - obj.RallyFloorTurn >= 4);
+
+    private static void StartRallyAdvance(SectorObjective objective, ConstructionManager rally, TeamId team)
+    {
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(team)));
+        if (plan == null) return;
+        var participants = new HashSet<int>();
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null || unit.IsDead || unit.SlotIndex != ResolveAISlotKey(team)
+                || !IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Operational)) continue;
+            bool core = IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical);
+            bool assigned = objective.Slots.Exists(need => need.Filled && need.AssignedUnitId == unit.InstanceId);
+            if (!core && !assigned && !plan.RogueUnitIds.Contains(unit.InstanceId)) continue;
+            participants.Add(unit.InstanceId);
+            if (unit.IsEmbarked || !unit.TryGetUnitData(out UnitData data) || !HasRallyCaptureSkill(data)
+                || !IsRallyParticipantInBand(unit, rally.CurrentCellPosition, ReachBand.Tactical)) continue;
+            if (objective.RallyCaptainId < 0 || unit.InstanceId < objective.RallyCaptainId) objective.RallyCaptainId = unit.InstanceId;
+        }
+        objective.RallyParticipantIds = new List<int>(participants);
+        if (!plan.RallyAdvances.Exists(o => o.Sector == objective.Sector && o.RallyGoGreenTurn == objective.RallyGoGreenTurn))
+            plan.RallyAdvances.Add(objective);
+        ReconcileRallyAdvanceParticipants(plan, team);
+    }
+
+    // Um liberado so pertence a um montinho. Nao deixa dois capitaes esperando
+    // a mesma unidade quando os rallies completam juntos.
+    private static void ReconcileRallyAdvanceParticipants(TeamObjectivePlan plan, TeamId team)
+    {
+        var ids = new HashSet<int>();
+        foreach (SectorObjective group in plan.RallyAdvances) ids.UnionWith(group.RallyParticipantIds);
+        foreach (SectorObjective group in plan.RallyAdvances) group.RallyParticipantIds.Clear();
+        var snapshot = new AIWorldSnapshot { AITeam = team, AISlotIndex = ResolveAISlotKey(team) };
+        foreach (int id in ids)
+        {
+            UnitManager unit = FindActiveUnit(id, team);
+            if (unit == null || unit.IsDead) continue;
+            SectorObjective own = plan.RallyAdvances.Find(g => g.RallyCaptainId == id);
+            if (own != null) { own.RallyParticipantIds.Add(id); continue; }
+            if (!TryResolveRallyAdvanceCaptain(unit, snapshot, out UnitManager captain)) continue;
+            plan.RallyAdvances.Find(g => g.RallyCaptainId == captain.InstanceId)?.RallyParticipantIds.Add(id);
+        }
+    }
+
+    private static bool TryResolveRallyAdvanceCaptain(UnitManager follower, AIWorldSnapshot snapshot, out UnitManager captain)
+    {
+        captain = null;
+        if (snapshot == null || follower == null) return false;
+        var plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        int bestCost = int.MaxValue;
+        UnitReachEnvelope operational = null;
+        foreach (SectorObjective group in plan?.RallyAdvances ?? new List<SectorObjective>())
+        {
+            UnitManager candidate = FindActiveUnit(group.RallyCaptainId, snapshot.AITeam);
+            if (candidate == null || candidate.IsDead || candidate.IsEmbarked || candidate == follower) continue;
+            operational ??= GetRallyReach(follower, ReachBand.Operational);
+            if (operational == null || !operational.MovementCells.Contains(candidate.CurrentCellPosition)) continue;
+            int cost = operational.CostByCell.TryGetValue(candidate.CurrentCellPosition, out int c) ? c
+                : operational.PathsByDestination.TryGetValue(candidate.CurrentCellPosition, out var path) && path != null ? path.Count - 1 : int.MaxValue - 1;
+            if (cost < bestCost || (cost == bestCost && (captain == null || candidate.InstanceId < captain.InstanceId)))
+            { captain = candidate; bestCost = cost; }
+        }
+        return captain != null;
+    }
+
+    private static bool UpdateRallyAdvanceWaiting(TeamObjectivePlan plan, TeamId team)
+    {
+        bool anyWaiting = false;
+        foreach (SectorObjective group in plan.RallyAdvances)
+        {
+            group.RallyWaiting = false;
+            UnitManager captain = FindActiveUnit(group.RallyCaptainId, team);
+            if (captain == null || captain.IsDead || captain.IsEmbarked) continue;
+            foreach (int id in group.RallyParticipantIds)
+            {
+                UnitManager unit = FindActiveUnit(id, team);
+                if (unit == null || unit.IsDead || unit.IsUnderRepair || unit == captain) continue;
+                if (!IsRallyParticipantInBand(unit, captain.CurrentCellPosition, ReachBand.Tactical))
+                { group.RallyWaiting = true; anyWaiting = true; break; }
+            }
+        }
+        return anyWaiting;
+    }
+
+    private static bool IsRallyCaptainWaiting(UnitManager unit, AIWorldSnapshot snapshot)
+    {
+        if (unit == null || snapshot == null || unit.IsUnderRepair) return false;
+        var plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        if (plan == null || !plan.RallyAdvances.Exists(g => g.RallyCaptainId == unit.InstanceId)) return false;
+        UpdateRallyAdvanceWaiting(plan, snapshot.AITeam);
+        return plan.RallyAdvances.Exists(g => g.RallyCaptainId == unit.InstanceId && g.RallyWaiting);
+    }
+
 }

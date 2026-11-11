@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIPresetData
   nomeExibido: "F\xE1cil"
   doutrina: "AI F\xE1cil: \xE9 como a m\xE9dia, s\xF3 que com menos dinheiro"
+  rallyLocalRatio: 1.2
   capacidades:
     respeitarListaBanida: 0
     projetarProducaoInimiga: 0

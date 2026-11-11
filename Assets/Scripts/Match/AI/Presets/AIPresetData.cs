@@ -466,6 +466,9 @@ public class AIPresetData : ScriptableObject
     [Tooltip("A doutrina em uma frase. É aqui que os documentos de perfil encostam no código.")]
     [TextArea(2, 6)] public string doutrina = "";
 
+    [Header("Rally")]
+    [Min(0f)] public float rallyLocalRatio = 1.5f;
+
     [Header("Seções")]
     public AICapabilityPreset capacidades = new AICapabilityPreset();
     public AIPapeisPreset papeis = new AIPapeisPreset();
@@ -502,6 +505,8 @@ public class AIPresetData : ScriptableObject
         if (target == null)
             return;
 
+        target.rallyLocalRatio = difficulty == AIDifficulty.Facil ? 1.2f
+            : difficulty == AIDifficulty.Dificil ? 2f : 1.5f;
         bool hard = difficulty == AIDifficulty.Dificil;
         bool easy = difficulty == AIDifficulty.Facil;
         bool conscricaoSempre = false;                 // nao vem mais da dificuldade

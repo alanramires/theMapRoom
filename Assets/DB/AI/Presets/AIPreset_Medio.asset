@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AIPresetData
   nomeExibido: "M\xE9dio"
   doutrina: "AI Padr\xE3o do Jogo."
+  rallyLocalRatio: 1.5
   capacidades:
     respeitarListaBanida: 0
     projetarProducaoInimiga: 0

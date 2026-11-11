@@ -49,6 +49,11 @@ try{
     var host=new UnityEngine.GameObject("RallyReportFixture");host.SetActive(false);var objectives=host.AddComponent<ObjectiveManager>();objectiveField.SetValue(null,objectives);
     try{
         void Check(bool ok,string why){if(!ok)throw new System.Exception(why);}
+        // D2: o relatorio le a banda da unidade no contexto real do tabuleiro.
+        var aiHost=new UnityEngine.GameObject("RallyReportAI");aiHost.SetActive(false);
+        var ai=aiHost.AddComponent<AIController>();Set(ai,"boardTilemap",map);Set(ai,"terrainDatabase",terrain);
+        var matchHost=new UnityEngine.GameObject("RallyReportMatch");matchHost.SetActive(false);
+        var match=matchHost.AddComponent<MatchController>();Set(ai,"matchController",match);
         for(int x=0;x<28;x++)for(int y=0;y<24;y++)map.SetTile(new UnityEngine.Vector3Int(x,y,0),plain.paletteTile);
         var model=UnityEngine.Object.Instantiate(soldier);created.Add(model);model.movement=3;
         var rally=Building(996001,new UnityEngine.Vector3Int(12,12,0),ConstructionSector.Alpha);

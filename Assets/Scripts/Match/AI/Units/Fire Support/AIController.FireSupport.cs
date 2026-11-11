@@ -120,7 +120,7 @@ public partial class AIController
             assigned = ResolveAssignedAssaultObjective(unit, plan);
 
         Vector3Int anchor = assigned != null
-            ? ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell)
+            ? ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell, unit)
             : ResolveRogueFireSupportAnchor(unit, snapshot, fromCell);
 
         if (IsArtilleryModeOnly(unit)
@@ -152,7 +152,7 @@ public partial class AIController
 
         Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
+        Vector3Int anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell, unit);
 
         if (TryDecideCombatantFireSupportTacticalAction(
                 unit, snapshot, assigned, fromCell, anchor, paths, occupied,
@@ -463,7 +463,7 @@ public partial class AIController
             return true;
         }
 
-        if (SectorManager.HexDistance(fromCell, rally.Anchor) <= rally.SupportRadius + 1f)
+        if (IsRallyParticipantInBand(unit, rally.Anchor, ReachBand.Tactical))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} rally {rally.Sector} segura cobertura @ {fromCell} ({rally.Reason})");
             action = BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);

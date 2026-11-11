@@ -96,9 +96,9 @@ public partial class AIController
         return new RallyReadinessReport { Status = current.Status, Missing = current.Missing,
             Hold = current.HoldReady, Breakthrough = current.BreakthroughReady,
             Artillery = current.ArtilleryReady, Force = current.ForceReady,
-            HoldValues = (current.Capturers, 1f),
-            BreakthroughValues = (current.Assault + current.AirAttack, current.RequiredPackages),
-            ArtilleryValues = (current.Artillery, current.RequiredArtillery),
+            HoldValues = (current.Capturers, RallyMinimumCapturers),
+            BreakthroughValues = (current.Assault, RallyMinimumBreakthrough),
+            ArtilleryValues = (current.Artillery, 0f),
             ForceValues = (current.ForceScore, current.RequiredForce) };
     }
 
@@ -153,9 +153,9 @@ public partial class AIController
             GUILayout.EndHorizontal();
             DrawRallyReadinessBar("Hold (cap.)", report.Readiness.HoldValues, report.Readiness.Hold, style);
             DrawRallyReadinessBar("Ruptura", report.Readiness.BreakthroughValues, report.Readiness.Breakthrough, style);
-            DrawRallyReadinessBar("Artilharia", report.Readiness.ArtilleryValues, report.Readiness.Artillery, style);
+            DrawRallyReadinessBar("Suporte", report.Readiness.ArtilleryValues, report.Readiness.Artillery, style, optional: true);
             DrawRallyReadinessBar("Forca (pts)", report.Readiness.ForceValues, report.Readiness.Force, style);
-            GUILayout.Label("Hold: cota de capturadores; verde exige controle do rally e ruptura pronta.", style);
+            GUILayout.Label("Hold: quatro capturadores; Suporte soma forca e nao trava a saida.", style);
             GUILayout.Label("Missing: " + report.Readiness.Missing, style);
             GUILayout.Label($"Vanguarda vermelha: {report.Area.Vanguard.Count} | Retaguarda violeta: {report.Area.Rear.Count} | {report.Area.Orientation}", style);
             if (!string.IsNullOrEmpty(report.Area.Error)) GUILayout.Label("Geometria: " + report.Area.Error, style);
@@ -278,7 +278,7 @@ public partial class AIController
         GUI.DragWindow(new Rect(0, 0, aiReviewWindowRect.width, 25f));
     }
 
-    private static void DrawRallyReadinessBar(string label, (float atual, float exigido) values, bool ready, GUIStyle style)
+    private static void DrawRallyReadinessBar(string label, (float atual, float exigido) values, bool ready, GUIStyle style, bool optional = false)
     {
         GUILayout.BeginHorizontal();
         GUILayout.Label(label, style, GUILayout.Width(90f));
@@ -291,7 +291,7 @@ public partial class AIController
         GUI.color = ready ? new Color(0.2f, 0.75f, 0.35f) : new Color(0.8f, 0.6f, 0.15f);
         GUI.DrawTexture(rect, Texture2D.whiteTexture);
         GUI.color = previous;
-        GUILayout.Label($"{values.atual:0.#} / {values.exigido:0.#}", style, GUILayout.Width(85f));
+        GUILayout.Label(optional ? $"{values.atual:0.#} (opcional)" : $"{values.atual:0.#} / {values.exigido:0.#}", style, GUILayout.Width(95f));
         GUILayout.EndHorizontal();
     }
 }

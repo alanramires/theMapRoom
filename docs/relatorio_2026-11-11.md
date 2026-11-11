@@ -1,4 +1,4 @@
-﻿# Relatorio — 2026-11-11
+# Relatorio — 2026-11-11
 
 ## Tela de formacao do rally (somente leitura)
 
@@ -51,3 +51,18 @@ As duas fichas continuam respeitando postura, oferta/acesso, core, caixa e poupa
 
 D2 continua nao iniciado. Sem partida em Play e sem commit nesta etapa.
 
+
+
+## D2 — Prontidão do rally por Forças (implementada; parada para revisão)
+
+- Preventivo dos documentos: `df55944`. A implementação permanece em um único commit posterior, sem misturar `RoleFamiliesWindow` nem a pasta `docs/aprenda unity`.
+- Dono preservado: `EvaluateRallyReadiness`. Ruptura usa a matriz D1 e os pesos de blindados existentes; Apache/interceptadores valem 1. Dissuasão usa os pesos de artilharia existentes e 1 para as demais fichas da família. Não existe mais contagem separada AirAttack, quota obrigatória de artilharia, válvula de ruptura esmagadora ou ASSEMBLING_WAIT_ART.
+- Piso: quatro capturadores e ruptura dois. Embarcados são carga de Ocupação na banda do transporte, uma vez por InstanceId; um tanque embarcado não soma Ruptura ou suporte. A ficha permanente não é alterada. Destroyer continua Dissuasão. Bandeira/modelo naval e core naval 4 suporte + 4 cargas/2 transportes carregados permanecem no degrau 7, conforme nota e matriz do autor.
+- Presença por envelope próprio de mobilidade (Tático/Operacional); Operacional terrestre usa o encadeamento real por turno do serviço existente. Cache de alcance por origem/revisão/banda e fato de prontidão por rally/slot/turno, renovado no planner. O painel lê o mesmo dono; destinos previstos usam a mesma pergunta sem mover unidades.
+- Inimigo local: união dos Operacionais dos participantes do core, somente inimigos visíveis pela névoa confirmada do slot, filtrados para a frente do eixo. `AIPresetData.rallyLocalRatio` tem Header Rally; Fácil 1,2, Médio 1,5, Difícil 2,0 gravados nos três perfis autorados pela API do Unity, cada diff com uma linha. O catálogo clona esses perfis sem overlay; a overlay de reserva também recebe os mesmos valores. Sem editar fichas de unidade nem escrever assets diretamente no disco. Macrodóminio, 2:1, eixo e agregação/liberação conjunta foram preservados.
+- Saturação observa uma vez por turno no objetivo: +1 ruptura ou +2 força reiniciam a estagnação; dois turnos sem crescimento relevante ou quatro desde o piso liberam mesmo com razão local aberta. Sem piso não libera por saturação. Turnos, força anterior, ruptura anterior e contador são persistidos.
+- Capitão escolhido no GoGreen entre capturadores presentes e persistido com os participantes. Objetivos históricos da operação permanecem em `TeamObjectivePlan.RallyAdvances` depois que o objetivo de montagem sai do plano, separados das tarefas ativas no save. Magnético, suporte atribuído e âncora do rally leem o capitão; reforço escolhe grupo alcançável por custo Operacional. A espera é calculada pelo monitor existente; o roteador segura o capitão até os participantes voltarem a tê-lo no Tático. A espera legítima não provoca fracasso por estagnação.
+- Tela aérea antes do desembarque: Ruptura aérea apta alcançando a LZ no Tático vale como tela. Sem munição/combustível ou em reparo não recebe essa cobertura e não cai na tela genérica.
+- `verificar_prontidao_rally.cs`: PASS fora do Play. Golf com 36 inimigos, dois locais, três soldados em terra e dois passageiros capturadores: captura 5, Apache + Caça B = ruptura 2, suporte zero, GO_GREEN. Três capturadores falham; tanque embarcado só Ocupação; Bombardeiro soma suporte sem gate. Saturação idempotente, crescimento marginal/real e teto de quatro turnos; roundtrip de capitão/saturação; escolha entre dois grupos por Operacional; capitão espera/retoma; tela aérea apta e sem munição. Nenhum batch executado.
+- Regressões PASS fora do Play: `verificar_desembarque_rally_aereo`, `verificar_tela_rally`, `verificar_shopping_sem_qg`, `verificar_caca_a_controle_ceu`, `verificar_counter_prerequisito_ilha`, `verificar_politicas_sem_plano`, `verificar_demanda_parede_artilharia`, `verificar_shopping_rally_acesso` e `verificar_matriz_forcas` (inclui Tanque Z como suporte 1). O fixture do painel recebeu contexto de IA/tabuleiro para a banda própria. O teste de uma vaga no desembarque agora mantém o rally terrestre ocupado e coloca a vaga ao lado, conectada ao core; mantém a entrega parcial e a recusa sem vaga, sem transformar esse teste em bandeira naval.
+- `bash tools/compilar.sh`: Assembly-CSharp e Assembly-CSharp-Editor verdes. Código carregado no Editor e fixtures executados, mas **nenhuma partida, tela ou avanço observado em Play**. A foto antes/depois em Golf e o comportamento de espera em partida continuam para revisão do autor. Não iniciado degrau naval nem consolidação de doutrina por skill.

@@ -66,6 +66,15 @@ public class SectorObjective
     public int                 RallyAssemblyStartedTurn = -1;
     public int                 RallyGoGreenTurn = -1;
     public string              RallyReadinessReason;
+    public int RallyFloorTurn = -1;
+    public int RallyLastObservedTurn = -1;
+    public int RallyPreviousForce;
+    public float RallyPreviousRupture;
+    public int RallyStagnantTurns;
+    public int RallyCaptainId = -1;
+    public bool RallyWaiting;
+    public List<int> RallyParticipantIds = new List<int>();
+
 
     [Header("Defesa")]
     // Por que este setor virou Defending (ex.: "intel (cap 2,3>=2)"). Runtime/HUD; não persistido.
@@ -114,6 +123,7 @@ public class TeamObjectivePlan
     public int                   SlotIndex = -1;
     public TeamId                Team;
     public List<SectorObjective> Objectives   = new List<SectorObjective>();
+    public List<SectorObjective> RallyAdvances = new List<SectorObjective>();
     public List<int>             RogueUnitIds = new List<int>();
 
     public List<int>                     HandoffVacaterIds      = new List<int>();
@@ -240,6 +250,7 @@ public class ObjectiveManager : MonoBehaviour
         {
             if (p.SlotIndex != slot.Value) continue;
             p.Objectives.Clear();
+            p.RallyAdvances.Clear();
             p.RogueUnitIds.Clear();
             return;
         }
@@ -286,7 +297,7 @@ public class ObjectiveManager : MonoBehaviour
 
             if (plan.Objectives != null)
             {
-                foreach (SectorObjective obj in plan.Objectives)
+                foreach (SectorObjective obj in ExportObjectives(plan))
                 {
                     if (obj == null)
                         continue;
@@ -302,6 +313,11 @@ public class ObjectiveManager : MonoBehaviour
                         rallyAssemblyStartedTurn = obj.RallyAssemblyStartedTurn,
                         rallyGoGreenTurn = obj.RallyGoGreenTurn,
                         rallyReadinessReason = obj.RallyReadinessReason,
+                        rallyOperationHistory = plan.RallyAdvances.Contains(obj),
+                        rallyFloorTurn = obj.RallyFloorTurn, rallyLastObservedTurn = obj.RallyLastObservedTurn,
+                        rallyPreviousForce = obj.RallyPreviousForce, rallyPreviousRupture = obj.RallyPreviousRupture,
+                        rallyStagnantTurns = obj.RallyStagnantTurns, rallyCaptainId = obj.RallyCaptainId,
+                        rallyWaiting = obj.RallyWaiting, rallyParticipantIds = new List<int>(obj.RallyParticipantIds),
                         budgetReserved = obj.BudgetReserved,
                         handoffEligible = obj.HandoffEligible,
                         preferredHandoffFromUnitId = obj.PreferredHandoffFromUnitId,
@@ -415,6 +431,10 @@ public class ObjectiveManager : MonoBehaviour
                         RallyAssemblyStartedTurn = savedObj.rallyAssemblyStartedTurn,
                         RallyGoGreenTurn = savedObj.rallyGoGreenTurn,
                         RallyReadinessReason = savedObj.rallyReadinessReason,
+                        RallyFloorTurn = savedObj.rallyFloorTurn, RallyLastObservedTurn = savedObj.rallyLastObservedTurn,
+                        RallyPreviousForce = savedObj.rallyPreviousForce, RallyPreviousRupture = savedObj.rallyPreviousRupture,
+                        RallyStagnantTurns = savedObj.rallyStagnantTurns, RallyCaptainId = savedObj.rallyCaptainId,
+                        RallyWaiting = savedObj.rallyWaiting, RallyParticipantIds = savedObj.rallyParticipantIds ?? new List<int>(),
                         BudgetReserved = savedObj.budgetReserved,
                         HandoffEligible = savedObj.handoffEligible,
                         PreferredHandoffFromUnitId = savedObj.preferredHandoffFromUnitId,
@@ -438,7 +458,8 @@ public class ObjectiveManager : MonoBehaviour
                         }
                     }
 
-                    plan.Objectives.Add(obj);
+                    if (savedObj.rallyOperationHistory) plan.RallyAdvances.Add(obj);
+                    else plan.Objectives.Add(obj);
                 }
             }
 
@@ -478,5 +499,12 @@ public class ObjectiveManager : MonoBehaviour
         return TryResolveSlot((TeamId)savedPlan.teamId, out PlayerSlotId slot)
             ? slot.Value
             : -1;
+    }
+
+    private static IEnumerable<SectorObjective> ExportObjectives(TeamObjectivePlan plan)
+    {
+        foreach (SectorObjective obj in plan.Objectives) yield return obj;
+        foreach (SectorObjective obj in plan.RallyAdvances)
+            if (!plan.Objectives.Contains(obj)) yield return obj;
     }
 }
