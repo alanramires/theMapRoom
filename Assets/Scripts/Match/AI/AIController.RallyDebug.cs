@@ -79,7 +79,11 @@ public partial class AIController
             objective != null ? objective.RallyAssemblyStartedTurn : -1, null);
         return new RallyReadinessReport { Status = current.Status, Missing = current.Missing,
             Hold = current.HoldReady, Breakthrough = current.BreakthroughReady,
-            Artillery = current.ArtilleryReady, Force = current.ForceReady };
+            Artillery = current.ArtilleryReady, Force = current.ForceReady,
+            HoldValues = (current.Capturers, 1f),
+            BreakthroughValues = (current.Assault + current.AirAttack, current.RequiredPackages),
+            ArtilleryValues = (current.Artillery, current.RequiredArtillery),
+            ForceValues = (current.ForceScore, current.RequiredForce) };
     }
 
     private UnitData ResolveRallyFormationModel(ConstructionManager rally, QuadranteData quadrant, UnitDatabase database, out bool fallback)
@@ -92,21 +96,158 @@ public partial class AIController
         return model;
     }
 
+    private static readonly UnitForce[] RallyDisplayForces = {
+        UnitForce.Ruptura, UnitForce.Dissuasao, UnitForce.Ocupacao, UnitForce.Apoio
+    };
+
     private void DrawRallyFormationWindowContents(int windowId)
     {
         GUILayout.BeginArea(new Rect(8f, 28f, aiReviewWindowRect.width - 16f, aiReviewWindowRect.height - 52f));
-        GUILayout.Label(rallyFormationMessage ?? "Aguardando Neutral.", new GUIStyle(GUI.skin.label) { wordWrap = true });
-        GUILayout.Label("Core: azul | Approach: laranja | Vanguard: vermelho | Rear: violeta\nRota verde: destino na area; cinza: fora.", new GUIStyle(GUI.skin.label) { wordWrap = true });
+        var style = new GUIStyle(GUI.skin.label) { wordWrap = false };
+        var bold = new GUIStyle(style) { fontStyle = FontStyle.Bold };
+        GUILayout.Label(rallyFormationMessage ?? "Aguardando Neutral.", style);
         rallyFormationScroll = GUILayout.BeginScrollView(rallyFormationScroll);
-        var style = new GUIStyle(GUI.skin.label) { wordWrap = true };
         foreach (RallyFormationReport report in rallyFormationReports)
         {
-            foreach (string line in report.ToDisplayText().Split('\n')) GUILayout.Label(line, style);
-            GUILayout.Space(12);
+            GUILayout.BeginHorizontal();
+            Vector3Int cell = report.Area.Rally.CurrentCellPosition;
+            string model = (report.ModelFallback ? "fallback: " : "") + (report.Area.Model?.displayName ?? "indisponivel");
+            GUILayout.Label(new GUIContent($"{report.Area.Rally.name} | {report.Area.Rally.Sector} | ({cell.x},{cell.y}) | slot {report.Slot} | {model}"), style);
+            GUILayout.FlexibleSpace();
+            string status = report.Readiness.Status ?? "WAIT";
+            var statusStyle = new GUIStyle(bold) { alignment = TextAnchor.MiddleRight };
+            statusStyle.normal.textColor = status == "GO_GREEN" || status == "READY" ? Color.green
+                : status == "ASSEMBLING" ? Color.yellow : Color.red;
+            GUILayout.Label(status, statusStyle);
+            GUILayout.EndHorizontal();
+            DrawRallyReadinessBar("Hold", report.Readiness.HoldValues, report.Readiness.Hold, style);
+            DrawRallyReadinessBar("Ruptura", report.Readiness.BreakthroughValues, report.Readiness.Breakthrough, style);
+            DrawRallyReadinessBar("Artilharia", report.Readiness.ArtilleryValues, report.Readiness.Artillery, style);
+            DrawRallyReadinessBar("Forca", report.Readiness.ForceValues, report.Readiness.Force, style);
+            GUILayout.Label("Missing: " + report.Readiness.Missing, style);
+            if (!string.IsNullOrEmpty(report.Area.Error)) GUILayout.Label("Geometria: " + report.Area.Error, style);
+            GUILayout.Label("DEMANDA", bold);
+            if (report.Objective?.Slots == null) GUILayout.Label("Sem objetivo RallyAssembly publicado no plano.", style);
+            else foreach (UnitForce force in RallyDisplayForces)
+            {
+                var roles = new Dictionary<UnitRole, string>();
+                foreach (SlotNeed need in report.Objective.Slots)
+                {
+                    if (UnitRoleCompatibility.ResolveForce(UnitRoleCompatibility.ResolveFamily(need.Role)) != force) continue;
+                    roles.TryGetValue(need.Role, out string slots);
+                    roles[need.Role] = slots + (need.Filled ? "■ " : "□ ");
+                }
+                if (roles.Count == 0) continue;
+                GUILayout.Label(force.ToString(), bold);
+                foreach (var role in roles)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label("    " + role.Key, style, GUILayout.Width(210f));
+                    GUILayout.Label(role.Value, style);
+                    GUILayout.EndHorizontal();
+                }
+            }
+
+            // Passageiros sao apresentados na linha do transporte; o relatorio continua intacto.
+            var rows = new List<RallyFormationParticipant>();
+            var seen = new HashSet<int>();
+            var aboardCounts = new Dictionary<int, int>();
+            foreach (UnitManager passenger in UnitManager.AllActive)
+                if (passenger != null && passenger.IsEmbarked && passenger.EmbarkedTransporter != null)
+                {
+                    int carrierId = passenger.EmbarkedTransporter.InstanceId;
+                    aboardCounts.TryGetValue(carrierId, out int count);
+                    aboardCounts[carrierId] = count + 1;
+                }
+            foreach (RallyFormationParticipant participant in report.Participants)
+            {
+                UnitManager unit = participant.Unit;
+                if (unit == null) continue;
+                if (unit.IsEmbarked && unit.EmbarkedTransporter != null)
+                {
+                    UnitManager carrier = unit.EmbarkedTransporter;
+                    RallyFormationParticipant carrierRow = report.Participants.Find(p => p.Unit == carrier);
+                    if (carrierRow == null)
+                    {
+                        carrierRow = new RallyFormationParticipant { Unit = carrier,
+                            Position = participant.Position, Location = participant.Location };
+                        if (rallyObservedMoves.TryGetValue(carrier.InstanceId, out Vector3Int destination)) carrierRow.PlannedDestination = destination;
+                        if (carrier.AIHasDesignatedMission) carrierRow.MissionDestination = carrier.AIDesignatedMissionTargetCell;
+                        if (carrierRow.Destination.HasValue)
+                        {
+                            carrierRow.DestinationLocation = RallyFormationReport.Locate(report.Area, carrierRow.Destination.Value);
+                            carrierRow.GoingToArea = carrierRow.Destination.Value != carrierRow.Position
+                                && carrierRow.DestinationLocation != RallyLocation.Outside;
+                        }
+                    }
+                    if (seen.Add(carrier.InstanceId)) rows.Add(carrierRow);
+                }
+                else if (seen.Add(unit.InstanceId)) rows.Add(participant);
+            }
+            int[] counts = new int[3];
+            foreach (var row in rows) counts[(int)row.Location]++;
+            GUILayout.Label("PARTICIPANTES", bold);
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(210f);
+            GUILayout.Label($"Core ({counts[0]})", bold, GUILayout.MinWidth(80f));
+            GUILayout.Label($"Approach ({counts[1]})", bold, GUILayout.MinWidth(80f));
+            GUILayout.Label($"Fora ({counts[2]})", bold, GUILayout.MinWidth(80f));
+            GUILayout.EndHorizontal();
+            foreach (UnitForce force in RallyDisplayForces)
+            {
+                bool heading = false;
+                var roles = new List<UnitRole>();
+                foreach (var row in rows)
+                    if (row.Unit.TryGetUnitData(out UnitData data) && UnitRoleCompatibility.ResolveForce(data) == force
+                        && data.roles != null && data.roles.Count > 0 && !roles.Contains(data.roles[0])) roles.Add(data.roles[0]);
+                foreach (UnitRole role in roles)
+                {
+                    if (!heading) { GUILayout.Label(force.ToString(), bold); heading = true; }
+                    GUILayout.Label("    " + role, style);
+                    foreach (var row in rows)
+                    {
+                        if (!row.Unit.TryGetUnitData(out UnitData data) || data.roles == null || data.roles.Count == 0 || data.roles[0] != role) continue;
+                        aboardCounts.TryGetValue(row.Unit.InstanceId, out int aboard);
+                        string name = $"{row.Unit.UnitDisplayName} #{row.Unit.InstanceId}" + (aboard > 0 ? $" ({aboard} a bordo)" : "");
+                        GUILayout.BeginHorizontal();
+                        if (GUILayout.Button(new GUIContent(name, $"Posicao: {row.Position}; decisao: {row.PlannedDestination}; missao: {row.MissionDestination}; esperado: {row.Expected}"), GUILayout.Width(210f)))
+                        {
+                            GUI.FocusControl(null);
+                            FocusAIReviewCell(row.Position);
+                        }
+                        for (int column = 0; column < 3; column++)
+                        {
+                            string marker = (int)row.Location == column ? "●" : "";
+                            if (row.Destination.HasValue && (row.GoingToArea || row.DestinationLocation == RallyLocation.Outside)
+                                && (int)row.DestinationLocation == column) marker += " → " + (column == 0 ? "Core" : column == 1 ? "Approach" : "Fora");
+                            GUILayout.Label(marker, style, GUILayout.MinWidth(80f));
+                        }
+                        GUILayout.EndHorizontal();
+                    }
+                }
+            }
+            GUILayout.Space(12f);
         }
         GUILayout.EndScrollView();
         if (GUILayout.Button("Fechar relatorio (sem mudar pausa ou AI Step)")) SetRallyFormationVisible(false);
         GUILayout.EndArea();
         GUI.DragWindow(new Rect(0, 0, aiReviewWindowRect.width, 25f));
+    }
+
+    private static void DrawRallyReadinessBar(string label, (float atual, float exigido) values, bool ready, GUIStyle style)
+    {
+        GUILayout.BeginHorizontal();
+        GUILayout.Label(label, style, GUILayout.Width(90f));
+        Rect rect = GUILayoutUtility.GetRect(80f, 16f, GUILayout.ExpandWidth(true));
+        Color previous = GUI.color;
+        GUI.color = new Color(0.12f, 0.14f, 0.17f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        float ratio = values.exigido > 0f ? Mathf.Clamp01(values.atual / values.exigido) : 1f;
+        rect.width *= ratio;
+        GUI.color = ready ? new Color(0.2f, 0.75f, 0.35f) : new Color(0.8f, 0.6f, 0.15f);
+        GUI.DrawTexture(rect, Texture2D.whiteTexture);
+        GUI.color = previous;
+        GUILayout.Label($"{values.atual:0.#} / {values.exigido:0.#}", style, GUILayout.Width(85f));
+        GUILayout.EndHorizontal();
     }
 }

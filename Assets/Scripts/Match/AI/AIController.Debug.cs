@@ -179,10 +179,15 @@ public partial class AIController
     {
         var participant = pendingAIReview?.participants?.Find(x => x.unitId == unitId);
         if (!HasPendingAIReview || participant == null) return false;
+        return FocusAIReviewCell(participant.cell);
+    }
+
+    private bool FocusAIReviewCell(Vector3Int cell)
+    {
         var map = boardTilemap != null ? boardTilemap : turnStateManager?.MovementTilemapRef;
         var camera = FindAnyObjectByType<CameraController>();
         if (map == null || camera == null) return false;
-        camera.FocusOn(HexCoordinates.GetCellCenterWorld(map, participant.cell), instant: false);
+        camera.FocusOn(HexCoordinates.GetCellCenterWorld(map, cell), instant: false);
         return true;
     }
 
@@ -1175,7 +1180,7 @@ public partial class AIController
             aiReviewWindowRect = new Rect(Screen.width - width - 12f, 12f, width, height);
             aiReviewWindowPositioned = true;
         }
-        width = Mathf.Clamp(aiReviewWindowRect.width, Mathf.Min(420f, Screen.width), Mathf.Max(1f, Screen.width));
+        width = Mathf.Clamp(aiReviewWindowRect.width, Mathf.Min(rallyFormationVisible ? 560f : 420f, Screen.width), Mathf.Max(1f, Screen.width));
         height = Mathf.Clamp(aiReviewWindowRect.height, Mathf.Min(460f, Screen.height), Mathf.Max(1f, Screen.height));
         aiReviewWindowRect.width = width;
         aiReviewWindowRect.height = height;
@@ -1213,7 +1218,7 @@ public partial class AIController
             {
                 Vector2 size = aiReviewResizeStartSize + resizeEvent.mousePosition - aiReviewResizeStartMouse;
                 aiReviewWindowRect.size = new Vector2(
-                    Mathf.Clamp(size.x, Mathf.Min(420f, Screen.width - windowRect.x), Screen.width - windowRect.x),
+                    Mathf.Clamp(size.x, Mathf.Min(rallyFormationVisible ? 560f : 420f, Screen.width - windowRect.x), Screen.width - windowRect.x),
                     Mathf.Clamp(size.y, Mathf.Min(460f, Screen.height - windowRect.y), Screen.height - windowRect.y));
                 windowRect = GetAIReviewWindowRect();
                 resizeEvent.Use();

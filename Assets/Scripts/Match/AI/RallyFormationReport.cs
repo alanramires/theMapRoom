@@ -8,6 +8,7 @@ public sealed class RallyReadinessReport
 {
     public string Status, Missing;
     public bool Hold, Breakthrough, Artillery, Force;
+    public (float atual, float exigido) HoldValues, BreakthroughValues, ArtilleryValues, ForceValues;
 }
 
 public sealed class RallyFormationParticipant
