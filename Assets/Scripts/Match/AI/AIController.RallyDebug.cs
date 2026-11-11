@@ -92,7 +92,7 @@ public partial class AIController
         if (matchController == null) return new RallyReadinessReport { Status = "Sem partida", Missing = "-" };
         AIRallyReadiness current = EvaluateRallyReadiness(rally,
             matchController.GetVisualTeamForSlot(PlayerSlotId.FromIndex(slot)), matchController.CurrentTurn,
-            objective != null ? objective.RallyAssemblyStartedTurn : -1, null);
+            null);
         return new RallyReadinessReport { Status = current.Status, Missing = current.Missing,
             Hold = current.HoldReady, Breakthrough = current.BreakthroughReady,
             Artillery = current.ArtilleryReady, Force = current.ForceReady,

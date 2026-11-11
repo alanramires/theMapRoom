@@ -139,7 +139,7 @@ public partial class AIController
 
         // O tratamento continua no proximo turno. Segura: tiro parado, senao
         // recolhe pra retaguarda. Nunca avanca com paciente a bordo.
-        if (TryBuildStationaryHospitalAttack(
+        if (TryBuildStationaryDefensiveAttack(
                 unit, snapshot, fromCell, occupied, out PlayerAction attackAction, out string attackReason))
         {
             Debug.Log($"{TL("Hospital")} {unit.InstanceId} tiro parado com {patientTag} a bordo — {attackReason}");
@@ -330,7 +330,7 @@ public partial class AIController
     // Tiro sem sair do lugar: o mesmo gate de ataque dos outros papeis, mas com um
     // unico destino possivel — a celula atual. Nao vira perseguicao nem expoe o
     // ferido a um avanco.
-    private bool TryBuildStationaryHospitalAttack(
+    private bool TryBuildStationaryDefensiveAttack(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,

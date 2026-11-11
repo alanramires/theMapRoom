@@ -435,7 +435,6 @@ public partial class AIController
             if (isRallyAssemblySector)
             {
                 obj.RallyState = AIRallyAssemblyState.WaitHold;
-                obj.RallyAssemblyStartedTurn = snapshot.TurnNumber;
                 if (TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager newRally))
                     UpdateRallyObjectiveState(obj, newRally, aiTeam, snapshot.TurnNumber, intel);
                 if (IsRallyGoGreenObjective(obj))

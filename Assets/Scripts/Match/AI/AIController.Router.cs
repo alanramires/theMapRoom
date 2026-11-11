@@ -27,6 +27,12 @@ public partial class AIController
 
         if (IsRallyCaptainWaiting(unit, snapshot))
         {
+            if (TryBuildStationaryDefensiveAttack(unit, snapshot, unit.CurrentCellPosition, BuildOccupied(unit),
+                    out PlayerAction waitingAttack, out string waitingAttackReason))
+            {
+                Debug.Log($"{TL("Rally")} ESPERANDO: capitao #{unit.InstanceId} tiro parado — {waitingAttackReason}");
+                return waitingAttack;
+            }
             Debug.Log($"{TL("Rally")} ESPERANDO: capitao #{unit.InstanceId} aguarda participantes no Tatico proprio.");
             return BuildMoveBatch(unit, snapshot.AITeam, unit.CurrentCellPosition, unit.CurrentCellPosition);
         }

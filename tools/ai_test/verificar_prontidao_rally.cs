@@ -89,8 +89,8 @@ try{
         var unrelated=new System.Collections.Generic.List<UnitManager>();foreach(var u in UnitManager.AllActive)if(!units.Contains(u))unrelated.Add(u);foreach(var u in unrelated)UnitManager.AllActive.Remove(u);
         try{
             Set(main,"currentAmmo",100);Set(extra,"currentAmmo",100);Set(carrier,"currentAmmo",100);
-            var evaluate=typeof(AIController).GetMethod("EvaluateRallyReadiness",stat,null,new[]{typeof(ConstructionManager),typeof(TeamId),typeof(int),typeof(int),typeof(AIIntelReport)},null);
-            object Eval(int turn=1){Clear();return evaluate.Invoke(null,new object[]{rally,TeamId.Blue,turn,0,null});}
+            var evaluate=typeof(AIController).GetMethod("EvaluateRallyReadiness",stat,null,new[]{typeof(ConstructionManager),typeof(TeamId),typeof(int),typeof(AIIntelReport)},null);
+            object Eval(int turn=1){Clear();return evaluate.Invoke(null,new object[]{rally,TeamId.Blue,turn,null});}
             T Value<T>(object r,string field){return(T)r.GetType().GetField(field).GetValue(r);}
             var before=new System.Collections.Generic.Dictionary<int,(UnityEngine.Vector3Int cell,int hp,bool embarked)>();foreach(var u in units)before[u.InstanceId]=(u.CurrentCellPosition,u.CurrentHP,u.IsEmbarked);
             var r=Eval();
@@ -121,6 +121,18 @@ try{
             // Progresso real reinicia estagnacao, mas nao o relogio desde o piso.
             var growing=new SectorObjective();for(int t=1;t<=5;t++)observe.Invoke(null,new object[]{growing,t,true,2f+t,10+3*t});
             Check(growing.RallyStagnantTurns==0&&(bool)saturated.Invoke(null,new object[]{growing,5,true}),"Crescimento real impediu limite de 4 turnos.");
+            // Mesmo piso com outro rally held: nenhum relogio antes de controlar este predio.
+            var otherRally=Building(939001,new UnityEngine.Vector3Int(4,3,0),ConstructionSector.Alpha);
+            otherRally.Apply(city);Set(otherRally,"slotIndex",ownSlot);Set(otherRally,"teamId",TeamId.Blue);Set(otherRally,"isRallyPoint",true);Set(otherRally,"rallyOwnerSlots",new System.Collections.Generic.List<int>{ownSlot});
+            var notHeld=new SectorObjective{Sector=ConstructionSector.Golf,ObjectiveType=AIObjectiveType.RallyAssembly};
+            var update=typeof(AIController).GetMethod("UpdateRallyObjectiveState",stat);
+            Set(rally,"slotIndex",ownSlot==0?1:0);
+            for(int t=1;t<=4;t++){var pending=Eval(t);Check(!Value<bool>(pending,"Held")&&Value<int>(pending,"Capturers")>=4&&Value<bool>(pending,"BreakthroughReady"),"Caso sem hold nao montou piso numerico para testar o relogio.");update.Invoke(null,new object[]{notHeld,rally,TeamId.Blue,t,null});}
+            Check(notHeld.RallyFloorTurn<0,"Saturacao comecou antes do hold.");
+            Set(rally,"slotIndex",ownSlot);Clear();update.Invoke(null,new object[]{notHeld,rally,TeamId.Blue,5,null});
+            Check(notHeld.RallyFloorTurn==5&&notHeld.RallyStagnantTurns==0&&notHeld.RallyReadinessReason.IndexOf("GO_GREEN(saturado)",System.StringComparison.Ordinal)<0,"Captura herdou quatro turnos de piso sem hold.");
+            ConstructionManager.AllActive.RemoveAll(b=>b==otherRally);otherRally.gameObject.SetActive(false);
+            plan.RallyAdvances.Clear();Clear();
             // Capitão congelado e historico sobrevivem ao roundtrip do objetivo.
             objective.RallyCaptainId=guard.InstanceId;objective.RallyParticipantIds.Add(attack.InstanceId);objective.RallyFloorTurn=2;objective.RallyPreviousForce=14;objective.RallyPreviousRupture=2f;objective.RallyLastObservedTurn=4;objective.RallyStagnantTurns=2;
             plan.RallyAdvances.Add(objective);plan.Objectives.Clear();
@@ -145,10 +157,23 @@ try{
             Check((bool)waiting.Invoke(null,new object[]{restored,TeamId.Blue})&&group.RallyWaiting,"Capitao nao esperou participante fora do Tatico.");
             var decide=typeof(AIController).GetMethod("DecideUnitAction",flags);
             var hold=(PlayerAction)decide.Invoke(ai,new object[]{guard,snapshot});Check(hold!=null&&hold.MoveTo==guard.CurrentCellPosition,"Capitao ESPERANDO continuou andando.");
+            // O capitao continua esperando, mas pode atirar sem sair da propria celula.
+            T Table<T>()where T:UnityEngine.Object{var ids=UnityEditor.AssetDatabase.FindAssets("t:"+typeof(T).Name);return UnityEditor.AssetDatabase.LoadAssetAtPath<T>(UnityEditor.AssetDatabase.GUIDToAssetPath(ids[0]));}
+            var stateHost=new UnityEngine.GameObject("RallyWaitingCombat");stateHost.SetActive(false);var state=stateHost.AddComponent<TurnStateManager>();
+            Set(state,"rpsDatabase",Table<RPSDatabase>());Set(state,"dpqMatchupDatabase",Table<DPQMatchupDatabase>());Set(state,"weaponPriorityData",Table<WeaponPriorityData>());Set(ai,"turnStateManager",state);Set(ai,"currentAISlotIndex",ownSlot);
+            var nearEnemy=units.Find(u=>u.SlotIndex!=ownSlot&&u.CurrentCellPosition==new UnityEngine.Vector3Int(8,2,0));
+            int enemyHp=nearEnemy.CurrentHP,captainHp=guard.CurrentHP,captainAmmo=guard.CurrentAmmo;
+            Set(nearEnemy,"currentHP",1);Set(guard,"currentHP",10);Set(guard,"currentAmmo",100);Clear();
+            var shot=(PlayerAction)decide.Invoke(ai,new object[]{guard,snapshot});
+            Check(shot!=null&&shot.SensorAction==SensorActionType.Attack&&shot.MoveTo==guard.CurrentCellPosition,"Capitao em espera nao tentou tiro parado legal.");
+            Set(nearEnemy,"currentHP",enemyHp);Set(guard,"currentHP",captainHp);Set(guard,"currentAmmo",captainAmmo);
             Set(guard,"currentCellPosition",captainOrigin);Clear();
             Check(!(bool)waiting.Invoke(null,new object[]{restored,TeamId.Blue})&&!group.RallyWaiting,"Grupo nao saiu da espera ao reunir.");
+            var stragglerOrigin=s2.CurrentCellPosition;Set(s2,"currentCellPosition",new UnityEngine.Vector3Int(44,2,0));Clear();
+            Check(!(bool)waiting.Invoke(null,new object[]{restored,TeamId.Blue})&&!group.RallyWaiting&&!group.RallyParticipantIds.Contains(s2.InstanceId),"Retardatario a 40h congelou a invasao ou permaneceu no grupo.");
+            Set(s2,"currentCellPosition",stragglerOrigin);Clear();
             foreach(var u in units)if(before.TryGetValue(u.InstanceId,out var old)&&u!=main&&u!=extra)Check(u.CurrentCellPosition==old.cell&&u.CurrentHP==old.hp&&u.IsEmbarked==old.embarked,"Prontidao alterou tabuleiro confirmado.");
-            return "PASS D2: Golf 36 inimigos/2 locais, captura 5, ruptura Apache+Caca B=2 sobre mar, suporte zero GO_GREEN; tres capturadores recusados; embarcado e Ocupacao; Bombardeiro suporte opcional; saturacao idempotente e limite de quatro turnos; capitao/saturacao persistidos; escolha entre grupos por Operacional; capitao espera e retoma; tela aerea apta/sem municao; sem mutacao da decisao. Play nao observado.";
+            return "PASS D2: Golf 36 inimigos/2 locais, captura 5, ruptura Apache+Caca B=2 sobre mar, suporte zero GO_GREEN; tres capturadores recusados; embarcado e Ocupacao; Bombardeiro suporte opcional; saturacao idempotente e limite de quatro turnos; capitao/saturacao persistidos; escolha entre grupos por Operacional; capitao espera, atira parado e retoma; retardatario 40h removido; piso sem hold nao satura; tela aerea apta/sem municao; sem mutacao da decisao. Play nao observado.";
         }finally{foreach(var u in unrelated)if(u!=null&&!UnitManager.AllActive.Contains(u))UnitManager.AllActive.Add(u);Clear();}
     }finally{typeof(ObjectiveManager).GetField("instance",stat).SetValue(null,oldObjective);}
 }finally{

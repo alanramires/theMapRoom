@@ -315,7 +315,6 @@ public class AIObjectiveSaveData
     public int rallyCaptainId = -1;
     public bool rallyWaiting;
     public List<int> rallyParticipantIds = new List<int>();
-    public int rallyAssemblyStartedTurn = -1;
     public int rallyGoGreenTurn = -1;
     public string rallyReadinessReason;
     public int budgetReserved;

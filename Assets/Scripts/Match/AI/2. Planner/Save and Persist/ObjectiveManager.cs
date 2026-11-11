@@ -63,7 +63,6 @@ public class SectorObjective
 
     [Header("Rally")]
     public AIRallyAssemblyState RallyState = AIRallyAssemblyState.None;
-    public int                 RallyAssemblyStartedTurn = -1;
     public int                 RallyGoGreenTurn = -1;
     public string              RallyReadinessReason;
     public int RallyFloorTurn = -1;
@@ -310,7 +309,6 @@ public class ObjectiveManager : MonoBehaviour
                         objectiveType = (int)obj.ObjectiveType,
                         priority = obj.Priority,
                         rallyState = (int)obj.RallyState,
-                        rallyAssemblyStartedTurn = obj.RallyAssemblyStartedTurn,
                         rallyGoGreenTurn = obj.RallyGoGreenTurn,
                         rallyReadinessReason = obj.RallyReadinessReason,
                         rallyOperationHistory = plan.RallyAdvances.Contains(obj),
@@ -428,7 +426,6 @@ public class ObjectiveManager : MonoBehaviour
                         RallyState = System.Enum.IsDefined(typeof(AIRallyAssemblyState), savedObj.rallyState)
                             ? (AIRallyAssemblyState)savedObj.rallyState
                             : AIRallyAssemblyState.None,
-                        RallyAssemblyStartedTurn = savedObj.rallyAssemblyStartedTurn,
                         RallyGoGreenTurn = savedObj.rallyGoGreenTurn,
                         RallyReadinessReason = savedObj.rallyReadinessReason,
                         RallyFloorTurn = savedObj.rallyFloorTurn, RallyLastObservedTurn = savedObj.rallyLastObservedTurn,
