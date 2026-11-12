@@ -95,7 +95,7 @@ public partial class AIController : MonoBehaviour
     [SerializeField, Range(0.5f, 1f)] private float massacreUnitCapFillRatio = 0.85f;
     public float MassacreUnitCapFillRatio => massacreUnitCapFillRatio;
 
-    [Tooltip("Histerese do teto: uma vez cessada pelo teto, a conscricao so volta quando as unidades em campo caem abaixo desta fracao do limite por time (ou em defesa). Sem folga entre as duas, cada baixa alternaria soldado/elite.")]
+    [Tooltip("Histerese do teto: uma vez cessada pelo teto, a conscricao so volta quando as unidades em campo caem abaixo desta fracao do limite por time (defesa nao anula o teto). Sem folga entre as duas, cada baixa alternaria soldado/elite.")]
     [SerializeField, Range(0.3f, 1f)] private float massacreUnitCapExitFillRatio = 0.45f;
     public float MassacreUnitCapExitFillRatio => massacreUnitCapExitFillRatio;
 

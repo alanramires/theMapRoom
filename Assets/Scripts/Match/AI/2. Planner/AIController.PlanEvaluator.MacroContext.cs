@@ -27,8 +27,9 @@ public partial class AIController
         public int EnemyControlPoints;
         public int DisputedControlPoints;
         public float OwnedRatio;
-        public int OwnForce;       // minhas unidades
+        public int OwnForce;       // proprias, incluindo embarcados, mais projecao quando ativa
         public int EnemyForce;     // força inimiga usada no ratio (conhecidas + projeção Hard)
+        public int OwnProducersProjected;
         public int EnemyProducersProjected; // Hard: produtores inimigos somados como onda projetada (0 se normal/easy)
         public float ForceRatio;   // minhas / (minhas + EnemyForce)
         public int OffensiveCap;
@@ -46,8 +47,23 @@ public partial class AIController
         int defaultOffensiveCap,
         int ownForce,
         int enemyForce,
-        int enemyProducersProjected = 0)
+        int enemyProducersProjected = 0,
+        AIController projectionSource = null)
     {
+        int ownProducersProjected = 0;
+        if (projectionSource != null)
+        {
+            // O mesmo total do limite de unidades, inclusive carga embarcada.
+            if (projectionSource.Match != null)
+                projectionSource.Match.GetSlotUnitCounts(ResolveAISlotKey(aiTeam), out ownForce, out _);
+            if (projectionSource.ProjetaProducaoInimiga)
+            {
+                ownProducersProjected = CountMacroProductionBuildings(aiTeam, own: true);
+                enemyProducersProjected = CountMacroProductionBuildings(aiTeam, own: false);
+                ownForce += ownProducersProjected;
+                enemyForce += enemyProducersProjected;
+            }
+        }
         AIMacroTerritoryContext ctx = new AIMacroTerritoryContext
         {
             Phase = AIMacroTerritoryPhase.EarlyExpansion,
@@ -55,6 +71,7 @@ public partial class AIController
             OwnedRatio = 0.5f,
             OwnForce = ownForce,
             EnemyForce = enemyForce,
+            OwnProducersProjected = ownProducersProjected,
             EnemyProducersProjected = enemyProducersProjected,
             // Sem inimigo conhecido => 1.0 (não arrasta nada pra baixo); senão minhas/(minhas+deles).
             ForceRatio = (ownForce + enemyForce) > 0 ? ownForce / (float)(ownForce + enemyForce) : 0.5f
@@ -172,8 +189,9 @@ public partial class AIController
         public int EnemyControlPoints;
         public int DisputedControlPoints;
         public float OwnedRatio;
-        public int OwnForce;       // minhas unidades
+        public int OwnForce;       // proprias, incluindo embarcados, mais projecao quando ativa
         public int EnemyForce;     // força inimiga usada no ratio (conhecidas + projeção Hard)
+        public int OwnProducersProjected;
         public int EnemyProducersProjected; // Hard: parcela projetada (produtores inimigos); 0 se normal/easy
         public float ForceRatio;   // minhas / (minhas + EnemyForce)
         public string PhaseLabel;  // "Perdendo" / "Empatado" / "Ganhando" / "Início"
@@ -210,6 +228,7 @@ public partial class AIController
             OwnedRatio     = ctx.OwnedRatio,
             OwnForce       = ctx.OwnForce,
             EnemyForce     = ctx.EnemyForce,
+            OwnProducersProjected = ctx.OwnProducersProjected,
             EnemyProducersProjected = ctx.EnemyProducersProjected,
             ForceRatio     = ctx.ForceRatio,
             PhaseLabel     = label,

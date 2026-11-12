@@ -4199,11 +4199,11 @@ public partial class AIShoppingPlanner
         UnitData pick = null;
         foreach (UnitData u in building.OfferedUnits)
         {
-            // Massa do recrutamento forçado e SEMPRE do Exercito ("onde tiver
+            // Massa do recrutamento forçado e SEMPRE elite 0 do Exercito ("onde tiver
             // soldado"): aeroporto/porto nao viram fabrica de massa cara — o
             // elite comprometido (que pode ser aereo) continua no fluxo proprio.
             if (u == null || u.cost <= 0 || u.cost > remaining
-                || u.militaryForce != MilitaryForce.Army
+                || u.militaryForce != MilitaryForce.Army || u.eliteLevel != 0
                 || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                 continue;
             if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
@@ -4248,7 +4248,7 @@ public partial class AIShoppingPlanner
         bool wasActive = ai.MassacrePhaseActive;
         bool byRatio = macro.EnemyForce > 0 && macro.ForceRatio
             >= (wasActive ? ai.MassacreExitForceRatio : ai.MassacreEnterForceRatio);
-        // TETO COM FOLGA: a conscricao cessa cedo (ex.: 55% do limite) para sobrar manobra para
+        // TETO COM FOLGA: a conscricao cessa cedo (ex.: 50% do limite) para sobrar manobra para
         // o elite entrar — com o teto em 60 e a valvula em 85% ela so parava em 51 unidades, e
         // imposto + reserva seguravam o elite a partida toda (autor, 2026-11-06). Histerese:
         // so volta abaixo do piso de saida.
@@ -4262,17 +4262,19 @@ public partial class AIShoppingPlanner
             ai.Match.GetSlotUnitCounts(snapshot.AISlotIndex, out unitsInField, out _);
         bool byCap = unitCap > 0 && unitsInField
             >= Mathf.CeilToInt(unitCap * capRatio);
-        // DEFESA reativa a conscricao: base ameacada pede corpo agora, nao elite daqui a dois
-        // turnos. Mesmos sinais de defesa do resto do shopping (postura Defensiva, Perdendo).
+        // DEFESA so anula a vantagem por ratio, nunca o teto: base ameacada pede corpo, mas o limite
+        // de massa continua absoluto. Mesmos sinais do shopping (postura Defensiva, Perdendo).
         bool defense = snapshot.Stance == AIStance.Defensive || macro.Losing;
-        bool active = (byRatio || byCap) && !defense;
+        bool active = byCap || (byRatio && !defense);
+        if (byCap && defense)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] TETO DE CONSCRIÇÃO mantido em defesa ({unitsInField}/{unitCap})");
         ai.MassacrePhaseActive = active;
         if (active != wasActive)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                 + (active
                     // Dois gatilhos, uma consequencia (conscricao desliga), nomes diferentes:
                     // massacre e a vantagem de 2:1; o teto e so o exercito cheio.
-                    ? (byRatio
+                    ? (byRatio && !defense
                         ? $"FASE DE MASSACRE (vantagem {macro.ForceRatio:P0} >= {ai.MassacreEnterForceRatio:P0}): conscrição cessa "
                         : $"TETO DE CONSCRIÇÃO ({unitsInField}/{unitCap} >= {ai.MassacreUnitCapFillRatio:P0}): conscrição cessa ")
                         + $"(fr={macro.ForceRatio:P0} unidades={unitsInField}/{unitCap}) — caixa vira elite"
@@ -4320,7 +4322,7 @@ public partial class AIShoppingPlanner
                 // ninguem comprava e zerava o carrinho (Peixe Pequeno T1: imposto 16k contra
                 // caixa 12,5k, Chinook e Apache barrados, 8,5k parados).
                 if (u == null || u.cost <= 0 || u.militaryForce != MilitaryForce.Army
-                    || u.eliteLevel > 0
+                    || u.eliteLevel != 0
                     || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                     continue;
                 if (cheapest == 0 || u.cost < cheapest)

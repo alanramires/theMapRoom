@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -511,19 +511,19 @@ public partial class AIController
         return false;
     }
 
-    // Produtores INIMIGOS (ground-truth, igual à força macro que ignora névoa). Usado no Hard pra
-    // projetar a onda de produção inimiga do próximo turno na análise de força.
-    private static int CountEnemyProductionBuildings(TeamId aiTeam)
+    // Mesma pergunta para os dois lados: produtores controlados aptos a produzir para seu slot.
+    // A projecao macro usa esta regua simetrica, sem inventar um produtor minimo do lado proprio.
+    private static int CountMacroProductionBuildings(TeamId aiTeam, bool own)
     {
         int count = 0;
         if (ConstructionManager.AllActive == null)
             return 0;
+        int ownSlot = AIController.ResolveAISlotKey(aiTeam);
         foreach (ConstructionManager b in ConstructionManager.AllActive)
         {
             if (b == null)
                 continue;
-            if (b.SlotIndex < 0 ||
-                b.SlotIndex == AIController.ResolveAISlotKey(aiTeam))
+            if (b.SlotIndex < 0 || (b.SlotIndex == ownSlot) != own)
                 continue;
             if (b.CanProduceUnitsForSlot(b.SlotIndex))
                 count++;

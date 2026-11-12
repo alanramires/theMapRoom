@@ -280,7 +280,7 @@ public partial class AIController
         SectorObjective objective = FindRallyObjective(slot, rally.Sector);
         r.Saturated = IsRallySaturated(objective, turn, r.HoldReady && r.BreakthroughReady);
         bool macroDominating = BuildMacroTerritoryContext(aiTeam, SectorManager.GetAllSectorInfos(), 6,
-            CountLiveUnitsOfTeam(aiTeam), r.KnownEnemyForce).Phase == AIMacroTerritoryPhase.Dominating;
+            CountLiveUnitsOfTeam(aiTeam), r.KnownEnemyForce, projectionSource: context).Phase == AIMacroTerritoryPhase.Dominating;
         int friendlyForce = CountLiveUnitsOfTeam(aiTeam);
         bool numericalDominance = friendlyForce >= 2 * Mathf.Max(1, r.KnownEnemyForce);
         r.GoGreen = r.Held && ((r.HoldReady && r.BreakthroughReady && (r.ForceReady || r.Saturated))
