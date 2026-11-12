@@ -242,7 +242,7 @@ public partial class AIController
         {
             // A tertiary ground shot must not interrupt an interceptor's
             // reachable air mission. Tactical air attacks still win above.
-            if (!assembling && TryResolveInterceptorOperationalPursuit(
+            if (TryResolveInterceptorOperationalPursuit(
                     unit, target, fromCell, visibleEnemies, out UnitManager airPrey))
             {
                 Vector3Int pursuitCell = FindAirCombatAdvanceMove(
@@ -1693,6 +1693,23 @@ public partial class AIController
         int movedMaxRange = ResolveAirCombatMaxWeaponRange(
             unit,
             SensorMovementMode.MoveuAndando);
+        bool interceptor = unit.TryGetUnitData(out UnitData essence)
+            && essence?.roles != null && essence.roles.Count > 0
+            && UnitRoleCompatibility.MatchesLabel(essence.roles[0], UnitRole.Interceptador);
+        // Policy precedes PodeMirar; counterfire uses another flow.
+        var tertiaryTargets = new List<UnitManager>();
+        List<UnitManager> permittedTargets = null;
+        if (interceptor)
+        {
+            permittedTargets = new List<UnitManager>();
+            foreach (UnitManager enemy in visibleEnemies)
+            {
+                if (enemy == null || enemy.IsDead) continue;
+                if (ResolveAirCombatTargetPreference(unit, enemy) == BazookaTargetPriority.Tertiary)
+                    tertiaryTargets.Add(enemy);
+                else permittedTargets.Add(enemy);
+            }
+        }
         var visibleEnemyIds = new HashSet<int>();
         for (int i = 0; i < visibleEnemies.Count; i++)
         {
@@ -1732,8 +1749,12 @@ public partial class AIController
             int maxRange = movementMode == SensorMovementMode.MoveuParado
                 ? stationaryMaxRange
                 : movedMaxRange;
+            foreach (UnitManager tertiary in tertiaryTargets)
+                if (AIActionReachCoordinator.CubicDistance(cell, tertiary.CurrentCellPosition) <= maxRange)
+                    TraceAIReviewCandidate("Ataque.Policy", "Attack", cell, tertiary.InstanceId.ToString(),
+                        false, "interceptor_tertiary", "interceptador não inicia tiro terciário");
             if (!HasVisibleEnemyWithinCubicRange(
-                    visibleEnemies,
+                    permittedTargets ?? visibleEnemies,
                     cell,
                     maxRange))
             {
@@ -1763,7 +1784,8 @@ public partial class AIController
                     dpqAirHeightConfig: turnStateManager != null
                         ? turnStateManager.DpqAirHeightConfigRef
                         : null,
-                    fromCell: cell))
+                    fromCell: cell,
+                    targetCandidates: permittedTargets))
             {
                 continue;
             }

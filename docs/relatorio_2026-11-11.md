@@ -33,3 +33,12 @@ O fechamento anterior permanece no relatório versionado. Este documento registr
 - `verificar_carga_sem_tarefa_rally`: PASS fora do Play; captura já atendida e alcançável por outro capturador entrega dois no Core de Golf; sem vaga do transporte mantém hold; alvo válido preserva entrega em Hotel. Vagas e estado confirmado intactos.
 - Regressões PASS: `verificar_desembarque_rally_aereo`, `verificar_prontidao_rally`, `verificar_ar_no_rally`. O primeiro fixture só adapta a chamada por reflexão ao parâmetro opcional novo.
 - `bash tools/compilar.sh`: Assembly-CSharp e Assembly-CSharp-Editor verdes. Nada observado em Play nem batch executado. Um commit e parada para revisão.
+
+
+### Interceptador não inicia tiro terciário (decisão 2026-11-12)
+
+- Marca T12, Caça A #97 em Golf: ataque à AAA #38 por preferência terciária. Removido o `!assembling` que desativava `TryResolveInterceptorOperationalPursuit` durante a montagem.
+- Na coleta Tática de `AIController.AirCombat.cs`, essência é `MatchesLabel(roles[0], Interceptador)`, pelo catálogo. As preferências são classificadas uma vez por alvo; terciários ficam fora de `targetCandidates` do PodeMirar e da poda de alcance. A recusa próxima à célula candidata aparece como `Ataque.Policy`, blocked, gate `interceptor_tertiary`, razão `interceptador não inicia tiro terciário`. Não altera o sensor nem o fluxo de revide. Outros papéis conservam a coleta anterior.
+- `verificar_interceptador_terciario`: PASS fora do Play. Caça A e B com AAA a 1h não atacam e registram gate; com presa no Operacional perseguem; com vaga de montagem e AAA dentro da área não atacam e ficam na área. Apache mantém ataque. Nenhum batch executado.
+- Diferença do cenário literal solicitado: a ficha real do Caça B considera Jet terciário (Helicopter primário, Plane secundário). Sem modificar fichas, a perseguição do A usa Caça A inimigo e a do B usa Apache inimigo. Preservada a doutrina de presas existente.
+- Regressões PASS: `verificar_ar_no_rally`, `verificar_caca_a_controle_ceu`, `verificar_prontidao_rally`. `bash tools/compilar.sh`: ambos assemblies verdes. Nada observado em Play. Um commit; parada para revisão.
