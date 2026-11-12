@@ -23,3 +23,13 @@ O fechamento anterior permanece no relatório versionado. Este documento registr
 - `verificar_conscricao.cs`: PASS fora do Play. 34/60 Losing/Defensiva para; 30/60 também para; 28/60 mantém a histerese de saída 45%; 20/60 Losing conscreve; 20/60 com 2:1 e Defensiva conscreve. Fábrica Pesada só com Pesado/Campanha e aeroporto só de elite não emitem ordem de massa nem imposto; HQ emite Soldado elite 0. Hard: snapshot 30, total real 32 (dois embarcados), cinco produtores próprios contra 36 + 14: 37/87 = 42,53%, `Balanced`. Sem projeção: 32/36, `Balanced`. Produtores e MatchController do fixture são isolados da configuração visual da cena; slots e caches anteriores são restaurados.
 - Regressões PASS: `verificar_shopping_sem_qg`, `verificar_shopping_rally_acesso`, `verificar_demanda_parede_artilharia`, `verificar_caca_a_controle_ceu`, `verificar_prontidao_rally`.
 - `bash tools/compilar.sh`: Assembly-CSharp e Assembly-CSharp-Editor verdes. Nenhuma compra, batch ou partida executada em Play. Um commit de correção; parada para revisão do autor.
+
+
+### Carga sem tarefa — montinho do transporte (decisão 2026-11-12)
+
+- Marca T12, Chinook #72: passageiros comprometidos com Hotel, mas captura já atendida e sem alternativa. O courier agora consulta a vaga do próprio transporte antes de usar a posição atual como alvo.
+- Só com todos os passageiros sem alvo válido, transporte em RallyAssembly montando e rally próprio totalmente capturado: `TryBuildAirRallyAssemblyDelivery` recebe `fallbackRally`. Reutiliza Core, sensores, busca de LZ e matching; a vaga de rally própria do passageiro continua tendo precedência. Log identifica carga sem tarefa e o montinho de destino. Sem essa âncora, mantém o comportamento anterior.
+- Não altera planner, vagas dos passageiros, prontidão ou estado confirmado. Eles descem no Core; eventual recrutamento é responsabilidade do planner no turno seguinte.
+- `verificar_carga_sem_tarefa_rally`: PASS fora do Play; captura já atendida e alcançável por outro capturador entrega dois no Core de Golf; sem vaga do transporte mantém hold; alvo válido preserva entrega em Hotel. Vagas e estado confirmado intactos.
+- Regressões PASS: `verificar_desembarque_rally_aereo`, `verificar_prontidao_rally`, `verificar_ar_no_rally`. O primeiro fixture só adapta a chamada por reflexão ao parâmetro opcional novo.
+- `bash tools/compilar.sh`: Assembly-CSharp e Assembly-CSharp-Editor verdes. Nada observado em Play nem batch executado. Um commit e parada para revisão.
