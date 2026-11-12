@@ -7,9 +7,17 @@ Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ## Estado
 
-`v10.9.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
-v9.2.0. Relatórios: [`relatorio_v10.9.0.md`](relatorio_v10.9.0.md),
-[`relatorio_v10.8.0.md`](relatorio_v10.8.0.md), [`relatorio_v10.7.0.md`](relatorio_v10.7.0.md).
+`v10.9.1` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.9.1.md`](relatorio_v10.9.1.md),
+[`relatorio_v10.9.0.md`](relatorio_v10.9.0.md), [`relatorio_v10.8.0.md`](relatorio_v10.8.0.md).
+
+**A noite da v10.9.1: o GoGreen de Golf disparou sozinho no T12** (`cap=7/4 ruptura=3/2`, sem
+artilharia), e cinco marcas viraram cinco réguas: aeronave com vaga em rally montando fica na
+área e faz **surtida** (sai se a área está no Tático da célula de tiro; medido sempre da área);
+interceptador **não inicia tiro terciário** (a Vulcan é defesa; "ar primeiro" era só adiar);
+conscrição com **teto absoluto** e massa elite 0; projeção do Hard dos **dois lados**; carga sem
+tarefa desembarca no montinho do transporte. A marcha não foi vista: capitão #10 a pé na ilha,
+monitor de invasão armado, Chinook contra o relógio de 3 turnos.
 
 **A descoberta da v10.9.0: a conta, a vaga e o gate têm de ler a mesma régua.** O rally de
 Golf esperava 3 de artilharia num mapa sem artilharia, com 33 mil parados, enquanto o autor
@@ -429,6 +437,23 @@ Sem HQ, os dois lados do Q3 e do Q4 são facção sem QG (v8.6.1, Frente 4; desd
 ---
 
 ## Onde eu parei
+
+### O que a v10.9.1 deixou — ver a marcha
+
+1. **A onda de Golf andando:** no save do slot 3 a partir do T13, logs `[AI Rally]` `ESPERANDO`,
+   `solta retardatário`, capitão #10 retomando. Risco nomeado: capitão a pé sem Chinook em 3
+   turnos = `invasão FRACASSOU` e remontagem (`UpdateInvasionMonitor`).
+2. **`pergunte-me` da invasão por ilha**, quadro do autor: Ruptura e Dissuasão atacam; Chinooks
+   buscam primeiro quem já está no montinho (o `Transportador.Shuttle.cs` não sabe o que é
+   rally); aeronaves novas vão direto ao combate (já é assim). Régua candidata: capitão é quem
+   alcança o alvo, o primeiro a embarcar; grupo "com o capitão" enquanto ele está a bordo. Quem
+   segura o capitão no ESPERANDO continua aberto.
+3. **Teto de unidades:** dump do T12 deu 9 de 25 a mais de 6 PM do objetivo com 4 embarcados.
+   Repetir por dois ou três turnos; se "longe" crescer com "embarcados" parado, 60 é alto para a
+   logística do mapa. `MaxUnitsPerTeam` vive no `Match`; candidato a ir para o quadrante.
+4. **Marca não lida:** 2026-11-12 00:45, T11 slot 1, "a compra veio pra fechar o rally né?".
+5. **Planner:** passageiros segurando vaga de setor já atendido (Hotel, handoff); eixo forte e
+   fraco (`strongWeakSidePolitic`, só fire support, desligado) contra a pulverização.
 
 ### O que a v10.9.0 deixou — ver o rally sair
 
@@ -976,6 +1001,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **guarda nova que desliga a antiga** | o commit do ar no rally pôs `!assembling &&` na frente de `TryResolveInterceptorOperationalPursuit` e o Caça A perdeu a proteção contra o terciário; a revisão deixou passar. Todo `&&` novo numa condição existente é lido como "o que isto tira", não só "o que isto põe" |
+| **doutrina lembrada ≠ doutrina escrita** | o autor lembrava "interceptador não ataca solo"; o código dizia "adia se há presa aérea". Antes de responder "isso já existe", leia a condição da regra, não o nome dela. `Tertiary` é o padrão para classe não listada na ficha, não uma linha apagável |
+| **a barra da tela é o fato do turno** | `EvaluateRallyReadiness` é cacheada por rally, slot e turno; a tela lê o mesmo fato de propósito. Unidade que entra na área no meio do turno só muda a prontidão no próximo planner. Para ver "agora", dump de presença (`IsRallyParticipantPresent`), não a tela |
 | **a conta diz uma coisa, o gate ou a vaga diz outra** | artilharia "opcional" na doutrina e obrigatória no gate; Caça B somado como Ruptura e vaga pedindo `UnitRole.Assalto`. Quem gateia, quem conta e quem abre vaga leem o mesmo dono (`EvaluateRallyReadiness`, `EnsureRallyRoleSlots` byForce) |
 | **alcance de aeronave tomado por presença** | "rally no meu Tático" dá o Apache no hangar como presente: a banda de um avião é meio mapa. Aéreo é presente pela **célula** na área do rally (`IsRallyParticipantPresent`); a banda própria só para terrestre e para o que é relativo ao capitão |
 | **tabela de doutrina vivendo em `switch`** | família, Força e "satisfaz" em `UnitRole.cs` obrigavam commit para o autor mudar uma flag. Catálogo é asset (`UnitRoleCatalog`); o código lê, não decide. Sem fallback para tabela em código |
