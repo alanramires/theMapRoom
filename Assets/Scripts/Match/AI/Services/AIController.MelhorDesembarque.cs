@@ -1305,6 +1305,12 @@ public partial class AIController
                 if (passenger == null)
                     continue;
 
+                if (TryGetAirCourierDecisionTarget(passenger, out Vector3Int decisionTarget))
+                {
+                    targets[passenger.InstanceId] = decisionTarget;
+                    continue;
+                }
+
                 // O desembarque so distingue duas coisas: o passageiro trouxe
                 // um endereco (Mission Intent) ou precisa que a propria LZ
                 // encontre uma oportunidade. Quem publicou a missao nao muda
@@ -1418,6 +1424,12 @@ public partial class AIController
         for (int i = 0; i < ordered.Count; i++)
         {
             UnitManager passenger = ordered[i];
+
+            if (TryGetAirCourierDecisionTarget(passenger, out Vector3Int decisionTarget))
+            {
+                targets[passenger.InstanceId] = decisionTarget;
+                continue;
+            }
 
             // Passageiros combatentes carregam a propria missao. O courier
             // entrega na direcao dessa agenda em vez de inventar uma

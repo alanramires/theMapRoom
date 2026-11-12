@@ -64,6 +64,7 @@ try{
     var hotelObjective=new SectorObjective{Sector=ConstructionSector.Hotel,ObjectiveType=AIObjectiveType.CaptureSector,Status=ObjectiveStatus.PartialReadyForHandoff,Slots=new System.Collections.Generic.List<SlotNeed>{objective.Slots[0],objective.Slots[1]}};
     objective.Slots.RemoveRange(0,2);plan.Objectives.Add(hotelObjective);plan.SlotIndex=ownSlot;plan.Team=TeamId.Blue;
     var server=Unit(920201,soldier,hotel.CurrentCellPosition,false);server.gameObject.SetActive(true);server.Apply(soldier);Set(server,"boardTilemap",map);Set(server,"slotIndex",ownSlot);Set(server,"teamId",TeamId.Blue);Set(server,"isDead",false);Set(server,"isUnderRepair",false);Set(server,"hasActed",false);Set(server,"remainingMovementPoints",soldier.movement);Set(server,"currentCellPosition",hotel.CurrentCellPosition);server.transform.position=HexCoordinates.GetCellCenterWorld(map,hotel.CurrentCellPosition);if(!UnitManager.AllActive.Contains(server))UnitManager.AllActive.Add(server);snapshot.MyUnits.Add(server);
+    UnitOccupancyRules.NotifyUnitOccupancyChanged(server,server.CurrentCellPosition,server.CurrentCellPosition);
     hotelObjective.Slots.Add(new SlotNeed{Role=UnitRole.Capturador,Filled=true,AssignedUnitId=server.InstanceId});
     var manager=(ObjectiveManager)typeof(ObjectiveManager).GetMethod("EnsureInstance",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static).Invoke(null,null);
     var plansField=typeof(ObjectiveManager).GetField("plans",flags);var savedPlans=plansField.GetValue(manager);
@@ -72,8 +73,31 @@ try{
         var courier=typeof(AIController).GetMethod("DecideAirCourierAction",flags);
         var targetMethod=typeof(AIController).GetMethod("TryResolveCourierPassengerTarget",flags);
         bool HasTarget(UnitManager p){object[] args={p,plan,snapshot,UnityEngine.Vector3Int.zero,carrier.CurrentCellPosition,null};return(bool)targetMethod.Invoke(ai,args);}
+        main.SetAIDesignatedMission(AIPlanRuntimeIntent.Capture,hotel.CurrentCellPosition,targetConstructionInstanceId:hotel.InstanceId);extra.SetAIDesignatedMission(AIPlanRuntimeIntent.Capture,hotel.CurrentCellPosition,targetConstructionInstanceId:hotel.InstanceId);
         if(HasTarget(main)||HasTarget(extra))throw new System.Exception("Fixture nao reproduziu captura ja atendida.");
         PlayerAction Decide(){return(PlayerAction)courier.Invoke(ai,new object[]{carrier,snapshot,UnityEngine.Vector3Int.zero});}
+        // A served passenger task does not inherit the transporter's also-served sector.
+        for(int x=10;x<22;x++)for(int y=0;y<6;y++)map.SetTile(new UnityEngine.Vector3Int(x,y,0),plain.paletteTile);
+        var india=Building(920210,new UnityEngine.Vector3Int(9,2,0),ConstructionSector.India);india.Apply(city);Set(india,"slotIndex",-1);
+        var indiaGuard=Unit(920052,soldier,india.CurrentCellPosition,false);indiaGuard.gameObject.SetActive(true);indiaGuard.Apply(soldier);Set(indiaGuard,"boardTilemap",map);Set(indiaGuard,"slotIndex",ownSlot);Set(indiaGuard,"teamId",TeamId.Blue);Set(indiaGuard,"isDead",false);Set(indiaGuard,"isUnderRepair",false);Set(indiaGuard,"hasActed",false);Set(indiaGuard,"currentCellPosition",india.CurrentCellPosition);indiaGuard.transform.position=HexCoordinates.GetCellCenterWorld(map,india.CurrentCellPosition);if(!UnitManager.AllActive.Contains(indiaGuard))UnitManager.AllActive.Add(indiaGuard);snapshot.MyUnits.Add(indiaGuard);
+        UnitOccupancyRules.NotifyUnitOccupancyChanged(indiaGuard,indiaGuard.CurrentCellPosition,indiaGuard.CurrentCellPosition);
+        var openCity=Building(920220,new UnityEngine.Vector3Int(17,2,0),ConstructionSector.Juliet);openCity.Apply(city);Set(openCity,"slotIndex",-1);
+        var carrierNeed=objective.Slots.Find(n=>n.AssignedUnitId==carrier.InstanceId);objective.Slots.Remove(carrierNeed);
+        var indiaObjective=new SectorObjective{Sector=ConstructionSector.India,ObjectiveType=AIObjectiveType.CaptureSector,Slots=new System.Collections.Generic.List<SlotNeed>{carrierNeed}};plan.Objectives.Add(indiaObjective);
+        var captureTarget=typeof(AIController).GetMethod("FindNearestPlanlessCaptureTarget",flags);
+        var picked=(ConstructionManager)captureTarget.Invoke(ai,new object[]{main,snapshot,carrier.CurrentCellPosition,false});if(picked!=openCity)throw new System.Exception("Buscador nao excluiu Hotel/India ocupadas: "+picked?.InstanceId+" "+picked?.CurrentCellPosition);
+        if(SectorManager.HexDistance(india.CurrentCellPosition,openCity.CurrentCellPosition)!=8f)throw new System.Exception("Cidade nao esta a 8h de India.");
+        var delivery=Decide();if(delivery==null||delivery.MoveTo==carrier.CurrentCellPosition)throw new System.Exception("Carga com tarefa atendida ficou parada em vez de Delivery: "+delivery?.DebugLabel);
+        if(SectorManager.HexDistance(delivery.MoveTo,openCity.CurrentCellPosition)>=SectorManager.HexDistance(carrier.CurrentCellPosition,openCity.CurrentCellPosition))throw new System.Exception("Delivery nao aproximou da cidade desatendida.");
+        if(typeof(AIController).GetField("airCourierDecisionTargets",flags).GetValue(ai)!=null)throw new System.Exception("Endereco temporario vazou da decisao.");
+        // Once nearer, use the same selected address through matching and disembark filters.
+        var originalCarrierCell=carrier.CurrentCellPosition;var near=new UnityEngine.Vector3Int(13,2,0);
+        Set(carrier,"currentCellPosition",near);carrier.transform.position=HexCoordinates.GetCellCenterWorld(map,near);UnitOccupancyRules.NotifyUnitOccupancyChanged(carrier,originalCarrierCell,near);MovementReachCache.ClearAll();
+        delivery=Decide();if(delivery==null||delivery.SensorAction!=SensorActionType.Disembark)throw new System.Exception("Endereco alternativo nao chegou ao desembarque conjunto: "+delivery?.DebugLabel);
+        foreach(var step in delivery.SubSteps)if(!FaixaDeEntregaService.PassageiroChegaAoAlvo(main,step.TargetHex,openCity.CurrentCellPosition,map,terrain,2))throw new System.Exception("Desembarque voltou a missao ja atendida.");
+        Set(carrier,"currentCellPosition",originalCarrierCell);carrier.transform.position=HexCoordinates.GetCellCenterWorld(map,originalCarrierCell);UnitOccupancyRules.NotifyUnitOccupancyChanged(carrier,near,originalCarrierCell);MovementReachCache.ClearAll();
+        openCity.gameObject.SetActive(false);ConstructionManager.AllActive.Remove(openCity);
+        plan.Objectives.Remove(indiaObjective);objective.Slots.Add(carrierNeed);
         var action=Decide();
         var area=(RallyArea)typeof(AIController).GetMethod("GetRallyArea",System.Reflection.BindingFlags.NonPublic|System.Reflection.BindingFlags.Static).Invoke(null,new object[]{rally,TeamId.Blue});
         if(action==null||action.SensorAction!=SensorActionType.Disembark||action.SubSteps.Count!=2)throw new System.Exception("Carga sem tarefa nao entregou dois no rally: "+action?.DebugLabel);
@@ -87,8 +111,9 @@ try{
         action=Decide();if(action==null||action.SensorAction!=SensorActionType.Disembark)throw new System.Exception("Alvo valido em Hotel nao recebeu entrega: "+action?.DebugLabel);
         foreach(var step in action.SubSteps)if(!FaixaDeEntregaService.PassageiroChegaAoAlvo(main,step.TargetHex,hotel.CurrentCellPosition,map,terrain,1))throw new System.Exception("Entrega desviada de Hotel.");
         if(!main.IsEmbarked||!extra.IsEmbarked||carrier.HasActed||carrier.CurrentCellPosition!=new UnityEngine.Vector3Int(1,1,0))throw new System.Exception("Decisao alterou tabuleiro confirmado.");
+        if(main.AIDesignatedMissionTargetCell!=hotel.CurrentCellPosition||extra.AIDesignatedMissionTargetCell!=hotel.CurrentCellPosition)throw new System.Exception("Alterou missao persistida dos passageiros.");
         if(!hotelObjective.Slots.Exists(n=>n.AssignedUnitId==main.InstanceId)||!hotelObjective.Slots.Exists(n=>n.AssignedUnitId==extra.InstanceId))throw new System.Exception("Alterou vagas dos passageiros.");
-        return "PASS: carga sem tarefa entrega dois no Core de Golf; sem vaga do transporte mantem hold; alvo valido preserva Hotel; vagas e estado confirmado intactos.";
+        return "PASS: carga com tarefa atendida busca cidade a 8h de India atendida, aproxima e desembarca nela; sem alternativa entrega dois no Core de Golf; sem vaga do transporte mantem hold; alvo valido preserva Hotel; vagas e estado confirmado intactos.";
     }finally{plansField.SetValue(manager,savedPlans);}
 
 }finally{

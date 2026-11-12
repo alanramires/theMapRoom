@@ -49,8 +49,27 @@ public partial class AIController
     //   • No conservative FireSupport tow logic.
     // -------------------------------------------------------------------------
 
+    // Delivery addresses live only for this decision; never rewrite the plan or Mission Intent.
+    private Dictionary<UnitManager, Vector3Int> airCourierDecisionTargets;
+
+    private bool TryGetAirCourierDecisionTarget(UnitManager passenger, out Vector3Int target)
+    {
+        target = default;
+        return passenger != null && airCourierDecisionTargets != null
+            && airCourierDecisionTargets.TryGetValue(passenger, out target);
+    }
+
     private PlayerAction DecideAirCourierAction(UnitManager unit, AIWorldSnapshot snapshot,
         Vector3Int assignedSectorTarget = default)
+    {
+        var previousTargets = airCourierDecisionTargets;
+        airCourierDecisionTargets = new Dictionary<UnitManager, Vector3Int>();
+        try { return DecideAirCourierActionCore(unit, snapshot, assignedSectorTarget); }
+        finally { airCourierDecisionTargets = previousTargets; }
+    }
+
+    private PlayerAction DecideAirCourierActionCore(UnitManager unit, AIWorldSnapshot snapshot,
+        Vector3Int assignedSectorTarget)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
@@ -84,6 +103,33 @@ public partial class AIController
         UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);
         bool targetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot,
             assignedSectorTarget, fromCell, out Vector3Int primaryTarget);
+        if (!targetFound)
+        {
+            var unservedCargo = new List<string>();
+            UnitManager alternativePrimary = null;
+            foreach (UnitManager passenger in OrderPassengersForDelivery(unit, passengers))
+            {
+                if (!IsAirCapturePassenger(passenger)
+                    || TryResolveCourierPassengerTarget(passenger, plan, snapshot,
+                        assignedSectorTarget, fromCell, out _)) continue;
+                unservedCargo.Add($"#{passenger.InstanceId}");
+                ConstructionManager available = FindNearestPlanlessCaptureTarget(passenger, snapshot, fromCell);
+                if (available == null) continue;
+                Vector3Int cell = available.CurrentCellPosition; cell.z = 0;
+                airCourierDecisionTargets[passenger] = cell;
+                if (alternativePrimary == null) alternativePrimary = passenger;
+            }
+            if (alternativePrimary != null)
+            {
+                primaryPassenger = alternativePrimary;
+                primaryTarget = airCourierDecisionTargets[primaryPassenger];
+                airDeliveryPrimary[unit] = primaryPassenger;
+                targetFound = true;
+                Debug.Log($"{TL("Transporte")} heli #{unit.InstanceId} courier — carga sem tarefa ("
+                    + string.Join(",", unservedCargo)
+                    + $"): capturável desatendido mais perto ({primaryTarget.x},{primaryTarget.y})");
+            }
+        }
         if (!targetFound)
         {
             SectorObjective carrierObjective = ResolveAnyAssignedObjective(unit, plan);

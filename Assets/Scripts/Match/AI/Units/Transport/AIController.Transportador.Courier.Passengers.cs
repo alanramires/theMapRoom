@@ -79,6 +79,7 @@ public partial class AIController
     private bool TryResolveCourierPassengerTarget(UnitManager passenger, TeamObjectivePlan plan,
         AIWorldSnapshot snapshot, Vector3Int assignedSectorTarget, Vector3Int fallbackCell, out Vector3Int target)
     {
+        if (TryGetAirCourierDecisionTarget(passenger, out target)) return true;
         if (IsAirCapturePassenger(passenger) && TryResolvePassengerDesignatedMissionTarget(passenger, out target))
             return TryResolveUnservedAirCapture(passenger, target, plan, snapshot, null, out target);
         if (!TryResolveCourierPassengerTargetCore(passenger, plan, snapshot, assignedSectorTarget, fallbackCell, out target)) return false;
