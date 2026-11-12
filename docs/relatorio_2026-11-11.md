@@ -42,3 +42,13 @@ O fechamento anterior permanece no relatório versionado. Este documento registr
 - `verificar_interceptador_terciario`: PASS fora do Play. Caça A e B com AAA a 1h não atacam e registram gate; com presa no Operacional perseguem; com vaga de montagem e AAA dentro da área não atacam e ficam na área. Apache mantém ataque. Nenhum batch executado.
 - Diferença do cenário literal solicitado: a ficha real do Caça B considera Jet terciário (Helicopter primário, Plane secundário). Sem modificar fichas, a perseguição do A usa Caça A inimigo e a do B usa Apache inimigo. Preservada a doutrina de presas existente.
 - Regressões PASS: `verificar_ar_no_rally`, `verificar_caca_a_controle_ceu`, `verificar_prontidao_rally`. `bash tools/compilar.sh`: ambos assemblies verdes. Nada observado em Play. Um commit; parada para revisão.
+
+
+### Surtida aérea a partir da formação do rally (decisão 2026-11-12)
+
+- Marca T13, Caça A #101/Papa: o gate de montagem só aceitava célula de tiro em Core ou Vanguarda, impedindo surtidas contra presas próximas da formação.
+- `CollectAirCombatTacticalCandidates` em `AIController.AirCombat.cs`: mantém presença direta e, fora dela, aceita a célula quando `GetRallyReach(unit, Tactical, origin: cell).MovementCells` intersecta Core ou Vanguarda de `GetRallyArea`. Área lida uma vez na coleta; alcance usa o cache existente. A medida parte da célula de tiro e volta à área, nunca à posição anterior da aeronave. Sem raio novo, sem mudança de âncora de movimento e sem alteração de presença/prontidão.
+- Para qualquer aeronave com vaga em montagem, inclusive Apache e Bombardeiro; mantém o filtro independente de terciários dos interceptadores. Recusa continua `rally_area`, com razão `fora da área e sem volta no Tático`.
+- `verificar_ar_no_rally`: PASS fora do Play. Célula a 4h da área, Caça A com Tático 9 ataca fora da área; mesma célula com clone local Tático 3 é recusada; célula a 10h (dois turnos) é recusada com Tático 9. No turno seguinte, já fora da área, um tiro mais adiante é recusado pelo gate e o caça retorna à Vanguarda. Clone só no fixture, fichas intactas. Orçamento de retorno é potencial do turno seguinte, mesmo com MP atual zero.
+- O caso antigo do Bombardeiro foi afastado de 10h para 18h para continuar exercitando uma recusa real, agora sem retorno no Tático; demais casos da montagem preservados e aceitação de tiro nos outros papéis passa a conferir também o retorno à área.
+- Regressões PASS: `verificar_interceptador_terciario`, `verificar_prontidao_rally`, `verificar_caca_a_controle_ceu`. `bash tools/compilar.sh`: ambos assemblies verdes. Nenhum batch executado e nada observado em Play. Um commit; parada para revisão.

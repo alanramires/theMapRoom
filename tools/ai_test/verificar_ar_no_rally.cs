@@ -57,9 +57,9 @@ try{
         Set(u,"boardTilemap",map);Set(u,"slotIndex",slot);Set(u,"teamId",slot==ownSlot?TeamId.Blue:TeamId.Red);Set(u,"isDead",false);Set(u,"currentHP",10);Set(u,"currentAmmo",100);Set(u,"currentFuel",100);Set(u,"remainingMovementPoints",u.MaxMovementPoints);Set(u,"isUnderRepair",false);Set(u,"hasActed",false);Set(u,"isEmbarked",false);Set(u,"currentDomain",data.domain);Set(u,"currentHeightLevel",data.heightLevel);Set(u,"currentCellPosition",cell);u.transform.position=HexCoordinates.GetCellCenterWorld(map,cell);
         if(!UnitManager.AllActive.Contains(u))UnitManager.AllActive.Add(u);return u;
     }
-    var bomb=Spawn(940087,bomber,new UnityEngine.Vector3Int(10,8,0),ownSlot);
+    var bomb=Spawn(940087,bomber,new UnityEngine.Vector3Int(2,8,0),ownSlot);
     var guard=Spawn(940010,soldier,new UnityEngine.Vector3Int(20,8,0),ownSlot);
-    var enemy=Spawn(940036,soldier,new UnityEngine.Vector3Int(9,8,0),enemySlot);Set(enemy,"currentHP",1);
+    var enemy=Spawn(940036,soldier,new UnityEngine.Vector3Int(1,8,0),enemySlot);Set(enemy,"currentHP",1);
     var aiHost=new UnityEngine.GameObject("AirRallyAI");aiHost.SetActive(false);var ai=aiHost.AddComponent<AIController>();Set(ai,"boardTilemap",map);Set(ai,"terrainDatabase",terrain);Set(ai,"aiStep",true);Set(ai,"currentAISlotIndex",ownSlot);
     var matchHost=new UnityEngine.GameObject("AirRallyMatch");matchHost.SetActive(false);var match=matchHost.AddComponent<MatchController>();Set(match,"debugFogOfWarEnabled",false);Set(ai,"matchController",match);
     var stateHost=new UnityEngine.GameObject("AirRallyCombat");stateHost.SetActive(false);var state=stateHost.AddComponent<TurnStateManager>();Set(state,"rpsDatabase",Table<RPSDatabase>());Set(state,"dpqMatchupDatabase",Table<DPQMatchupDatabase>());Set(state,"weaponPriorityData",Table<WeaponPriorityData>());Set(ai,"turnStateManager",state);
@@ -81,9 +81,12 @@ try{
         PlayerAction Decide(UnitManager u){typeof(AIController).GetMethod("BeginAIReviewCapture",flags).Invoke(ai,null);try{return(PlayerAction)decide.Invoke(ai,new object[]{u,snapshot});}finally{typeof(AIController).GetMethod("EndAIReviewCapture",flags).Invoke(ai,null);}}
         (UnityEngine.Vector3Int cell,string tier) Anchor(UnitManager u){object[] args={u,snapshot,u.CurrentCellPosition,snapshot.EnemyUnits,null,false,null,null,null,false};var cell=(UnityEngine.Vector3Int)anchor.Invoke(ai,args);return(cell,(string)args[4]);}
         bool InArea(UnitManager u,UnityEngine.Vector3Int cell){return RallyFormationReport.LocateParticipant((RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue}),cell,u)==RallyLocation.Core;}
+        var rallyReach=typeof(AIController).GetMethod("GetRallyReach",stat);
+        UnitReachEnvelope ReturnReach(UnitManager u,UnityEngine.Vector3Int cell){return(UnitReachEnvelope)rallyReach.Invoke(null,new object[]{u,ReachBand.Tactical,(UnityEngine.Vector3Int?)cell});}
+        bool CanReturn(UnitManager u,UnityEngine.Vector3Int cell){var currentArea=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});var reach=ReturnReach(u,cell);return reach.MovementCells.Overlaps(currentArea.Core)||reach.MovementCells.Overlaps(currentArea.Vanguard);}
         var origin=bomb.CurrentCellPosition;var targetOrigin=enemy.CurrentCellPosition;
         int hp=bomb.CurrentHP,ammo=bomb.CurrentAmmo,fuel=bomb.CurrentFuel;bool acted=bomb.HasActed;
-        Check(SectorManager.HexDistance(origin,rally.CurrentCellPosition)==10f,"Bombardeiro nao esta a 10h do rally.");
+        Check(SectorManager.HexDistance(origin,rally.CurrentCellPosition)==18f,"Bombardeiro nao esta a 18h do rally.");
         Clear();var a=Anchor(bomb);var area=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});
         Check(a.tier=="Rally:Montagem@Golf"&&area.Vanguard.Contains(a.cell),"Vaga nao colocou a Vanguarda na frente da escada de ancoras.");
         float closest=float.MaxValue;foreach(var cell in area.Vanguard)closest=UnityEngine.Mathf.Min(closest,SectorManager.HexDistance(origin,cell));
@@ -92,7 +95,7 @@ try{
         Check(action!=null&&action.SensorAction!=SensorActionType.Attack&&action.MoveTo!=origin,"Bombardeiro em montagem atacou soldado fora da area ou nao foi atraido ao rally.");
         Check(SectorManager.HexDistance(action.MoveTo,a.cell)<SectorManager.HexDistance(origin,a.cell),"Movimento nao aproximou da Vanguarda.");
         var candidates=(System.Collections.Generic.List<AIController.AIReviewCandidate>)typeof(AIController).GetField("aiReviewCandidates",flags).GetValue(ai);
-        Check(candidates.Exists(c=>c.category=="Ataque.Policy"&&c.status=="blocked"&&c.gate=="rally_area"&&c.reason=="fora da área do montinho"),"Recusa de tiro externo nao apareceu em Ataque.Policy/rally_area.");
+        Check(candidates.Exists(c=>c.category=="Ataque.Policy"&&c.status=="blocked"&&c.gate=="rally_area"&&c.reason=="fora da área e sem volta no Tático"),"Recusa de tiro externo nao apareceu em Ataque.Policy/rally_area.");
         Check(bomb.CurrentCellPosition==origin&&bomb.CurrentHP==hp&&bomb.CurrentAmmo==ammo&&bomb.CurrentFuel==fuel&&bomb.HasActed==acted,"Decisao comprometeu estado confirmado.");
         // No local, PodeMirar e a politica de combate continuam escolhendo o tiro.
         Position(bomb,new UnityEngine.Vector3Int(20,7,0));Position(enemy,new UnityEngine.Vector3Int(19,7,0));
@@ -111,9 +114,48 @@ try{
             var u=Spawn(940100+units.Count,data,new UnityEngine.Vector3Int(10,10,0),ownSlot);snapshot.MyUnits.Add(u);
             var slot=new SlotNeed{Role=data==fighter?UnitRole.Interceptador:UnitRole.DisruptorDeCaptura,Filled=true,AssignedUnitId=u.InstanceId};objective.Slots.Add(slot);Clear();
             Check(Anchor(u).tier=="Rally:Montagem@Golf","Papel "+slot.Role+" nao reconheceu sua vaga.");
-            var result=Decide(u);Check(result!=null&&(result.SensorAction!=SensorActionType.Attack||InArea(u,result.MoveTo)),"Papel "+slot.Role+" atacou fora do montinho.");
+            var result=Decide(u);Check(result!=null&&(result.SensorAction!=SensorActionType.Attack||CanReturn(u,result.MoveTo)),"Papel "+slot.Role+" atacou fora do montinho.");
         }
-        Clear();return "PASS: Bombardeiro a 10h recusa tiro externo com gate rally_area e aproxima da Vanguarda mais proxima; tiro local permitido; presente sem alvo segura; sem vaga e GoGreen conservam ataque; vagas Interceptador/Disruptor reconhecidas; sem batch ou mutacao confirmada. Play nao observado.";
+        // Sorties are measured against the formation, not the fighter's previous position.
+        foreach(var n in objective.Slots)n.Filled=false;
+        foreach(var u in units)if(u.SlotIndex==enemySlot)Set(u,"isDead",true);
+        var fighterA=Asset<UnitData>("cacaA");
+        var slowData=UnityEngine.Object.Instantiate(fighterA);created.Add(slowData);slowData.id="sortieSlow";slowData.movement=3;
+        Set(unitDb,"units",new System.Collections.Generic.List<UnitData>{soldier,chinook,truck,bomber,fighter,apache,fighterA,slowData});
+        var sortie=Spawn(945101,fighterA,new UnityEngine.Vector3Int(10,8,0),ownSlot);
+        var slow=Spawn(945102,slowData,new UnityEngine.Vector3Int(10,8,0),ownSlot);
+        var airEnemy=Spawn(945085,apache,new UnityEngine.Vector3Int(1,8,0),enemySlot);Set(airEnemy,"currentHP",1);
+        var sortieSlot=new SlotNeed{Role=UnitRole.Interceptador,Filled=true,AssignedUnitId=sortie.InstanceId};objective.Slots.Add(sortieSlot);
+        snapshot.MyUnits=new System.Collections.Generic.List<UnitManager>{sortie,slow,guard};snapshot.EnemyUnits=new System.Collections.Generic.List<UnitManager>{airEnemy};
+        Clear();var sortieArea=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});
+        int AreaDistance(UnityEngine.Vector3Int cell){int distance=int.MaxValue;foreach(var c in sortieArea.Core)distance=UnityEngine.Mathf.Min(distance,(int)SectorManager.HexDistance(cell,c));foreach(var c in sortieArea.Vanguard)distance=UnityEngine.Mathf.Min(distance,(int)SectorManager.HexDistance(cell,c));return distance;}
+        UnityEngine.Vector3Int AtDistance(int distance){for(int x=1;x<19;x++){var cell=new UnityEngine.Vector3Int(x,8,0);if(AreaDistance(cell)==distance)return cell;}throw new System.Exception("Sem celula de tiro a "+distance+"h da area.");}
+        // Fix each scan to the current firing cell; remaining MP is zero but next-turn Tactical is potential.
+        var scan=typeof(AIController).GetMethod("CollectAirCombatTacticalCandidates",flags);
+        System.Collections.IList Scan(UnitManager u,UnityEngine.Vector3Int cell){
+            Position(u,cell);Set(u,"remainingMovementPoints",0);
+            var path=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>{{cell,new System.Collections.Generic.List<UnityEngine.Vector3Int>{cell}}};
+            typeof(AIController).GetMethod("BeginAIReviewCapture",flags).Invoke(ai,null);
+            try{return(System.Collections.IList)scan.Invoke(ai,new object[]{u,snapshot,cell,path,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),null,snapshot.EnemyUnits});}
+            finally{typeof(AIController).GetMethod("EndAIReviewCapture",flags).Invoke(ai,null);}
+        }
+        bool RallyBlocked(){var cs=(System.Collections.Generic.List<AIController.AIReviewCandidate>)typeof(AIController).GetField("aiReviewCandidates",flags).GetValue(ai);return cs.Exists(c=>c.gate=="rally_area"&&c.reason=="fora da área e sem volta no Tático");}
+        var firingCell=AtDistance(4);Position(airEnemy,new UnityEngine.Vector3Int(firingCell.x-1,8,0));
+        Position(sortie,firingCell);Set(sortie,"remainingMovementPoints",0);Clear();
+        sortieArea=(RallyArea)areaQuery.Invoke(null,new object[]{rally,TeamId.Blue});
+        Check(AreaDistance(firingCell)==4&&sortie.MaxMovementPoints==9&&CanReturn(sortie,firingCell),"Caso de surtida nao mede 4h/Tatico9.");
+        var sortieAction=Decide(sortie);Check(sortieAction!=null&&sortieAction.SensorAction==SensorActionType.Attack&&!InArea(sortie,sortieAction.MoveTo),"Surtida com volta no Tatico foi recusada.");
+        sortieSlot.AssignedUnitId=slow.InstanceId;
+        var refused=Scan(slow,firingCell);Check(slow.MaxMovementPoints==3&&!CanReturn(slow,firingCell)&&refused.Count==0&&RallyBlocked(),"Mesma celula com Tatico3 nao foi recusada.");
+        sortieSlot.AssignedUnitId=sortie.InstanceId;
+        var farCell=AtDistance(10);Position(airEnemy,new UnityEngine.Vector3Int(farCell.x-1,8,0));
+        refused=Scan(sortie,farCell);Check(!CanReturn(sortie,farCell)&&refused.Count==0&&RallyBlocked(),"Celula a dois turnos da area nao foi recusada.");
+        // Next turn: the fighter remains outside, and the next shot would move the chain farther out.
+        Position(sortie,firingCell);Set(sortie,"remainingMovementPoints",sortie.MaxMovementPoints);
+        Position(airEnemy,new UnityEngine.Vector3Int(farCell.x-1,8,0));Clear();
+        var backAnchor=Anchor(sortie);var returnAction=Decide(sortie);
+        Check(backAnchor.tier=="Rally:Montagem@Golf"&&RallyBlocked()&&returnAction!=null&&returnAction.SensorAction!=SensorActionType.Attack&&SectorManager.HexDistance(returnAction.MoveTo,backAnchor.cell)<SectorManager.HexDistance(firingCell,backAnchor.cell),"Depois da surtida nao voltou para Vanguarda.");
+        Clear();return "PASS: surtida com retorno a 4h/Tatico9 aceita; Tatico3 e tiro a dois turnos recusados; turno seguinte volta a Vanguarda; Bombardeiro a 18h recusa tiro externo com gate rally_area e aproxima da Vanguarda mais proxima; tiro local permitido; presente sem alvo segura; sem vaga e GoGreen conservam ataque; vagas Interceptador/Disruptor reconhecidas; sem batch ou mutacao confirmada. Play nao observado.";
     }finally{typeof(AIController).GetMethod("EndAIReviewCapture",flags).Invoke(ai,null);objectiveField.SetValue(null,oldObjective);foreach(var u in unrelated)if(u!=null&&!UnitManager.AllActive.Contains(u))UnitManager.AllActive.Add(u);}
 }finally{
     UnityEngine.Application.logMessageReceived-=captureLog;

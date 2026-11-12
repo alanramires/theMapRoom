@@ -1687,6 +1687,7 @@ public partial class AIController
         }
 
         bool assembling = TryResolveAirRallyAssembly(unit, snapshot, out ConstructionManager assemblyRally);
+        RallyArea assemblyArea = assembling ? GetRallyArea(assemblyRally, snapshot.AITeam) : null;
         int stationaryMaxRange = ResolveAirCombatMaxWeaponRange(
             unit,
             SensorMovementMode.MoveuParado);
@@ -1764,11 +1765,21 @@ public partial class AIController
 
             if (assembling && !IsRallyParticipantPresent(unit, assemblyRally, ReachBand.Tactical, cell))
             {
-                UnitManager policyTarget = visibleEnemies.Find(enemy => enemy != null && !enemy.IsDead
-                    && AIActionReachCoordinator.CubicDistance(cell, enemy.CurrentCellPosition) <= maxRange);
-                TraceAIReviewCandidate("Ataque.Policy", "Attack", cell, policyTarget?.InstanceId.ToString(),
-                    false, "rally_area", "fora da área do montinho");
-                continue;
+                // A sortie must be able to return to the formation next turn.
+                // Always measure from the firing cell to the rally area, never
+                // from the previous position (which would allow chained pursuit).
+                UnitReachEnvelope returnReach = GetRallyReach(unit, ReachBand.Tactical, origin: cell);
+                bool canReturn = assemblyArea != null && returnReach != null
+                    && (returnReach.MovementCells.Overlaps(assemblyArea.Core)
+                        || returnReach.MovementCells.Overlaps(assemblyArea.Vanguard));
+                if (!canReturn)
+                {
+                    UnitManager policyTarget = visibleEnemies.Find(enemy => enemy != null && !enemy.IsDead
+                        && AIActionReachCoordinator.CubicDistance(cell, enemy.CurrentCellPosition) <= maxRange);
+                    TraceAIReviewCandidate("Ataque.Policy", "Attack", cell, policyTarget?.InstanceId.ToString(),
+                        false, "rally_area", "fora da área e sem volta no Tático");
+                    continue;
+                }
             }
             sensorCalls++;
             sensorTargets.Clear();
