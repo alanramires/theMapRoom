@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using UnityEngine.SceneManagement;
 
 // Nivel de dificuldade escolhido na Tela de Entrada. Mapeia direto para os flags
 // easyMode/hardMode/conscriptionWhenLosing/conscriptionDoctrine do AIController:
@@ -369,9 +370,54 @@ public partial class AIController : MonoBehaviour
             ? $"[AI {aiTeamTag}][T{aiTurnNumber}]"
             : $"[AI {aiTeamTag}][T{aiTurnNumber}][{category}]";
 
+    private static MatchController cachedMatchController;
+    private static bool cachedMatchControllerResolved;
+    private static bool matchControllerSceneHooked;
+
+    private static void InvalidateMatchControllerCache()
+    {
+        cachedMatchController = null;
+        cachedMatchControllerResolved = false;
+    }
+
+    private static void HandleMatchControllerSceneLoaded(Scene scene, LoadSceneMode mode)
+        => InvalidateMatchControllerCache();
+
+    private static void EnsureMatchControllerSceneHook()
+    {
+        if (matchControllerSceneHooked) return;
+        SceneManager.sceneLoaded -= HandleMatchControllerSceneLoaded;
+        SceneManager.sceneLoaded += HandleMatchControllerSceneLoaded;
+        matchControllerSceneHooked = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetMatchControllerCache()
+    {
+        // Also works with domain reload disabled: do not accumulate scene handlers.
+        SceneManager.sceneLoaded -= HandleMatchControllerSceneLoaded;
+        matchControllerSceneHooked = false;
+        InvalidateMatchControllerCache();
+        EnsureMatchControllerSceneHook();
+    }
+
+    private static MatchController GetMatchController()
+    {
+        if (_instance != null && _instance.Match != null) return _instance.Match;
+        EnsureMatchControllerSceneHook();
+        if (!cachedMatchControllerResolved)
+        {
+            if (cachedMatchController == null)
+                cachedMatchController = UnityEngine.Object.FindAnyObjectByType<MatchController>();
+            // Cache absence too; there is no reason to scan every call in an empty scene.
+            cachedMatchControllerResolved = true;
+        }
+        return cachedMatchController;
+    }
+
     internal static int ResolveAISlotKey(TeamId visualTeam)
     {
-        MatchController match = UnityEngine.Object.FindAnyObjectByType<MatchController>();
+        MatchController match = GetMatchController();
         if (match == null)
             return -1;
         PlayerSlotId activeSlot = match.ActiveSlotId;

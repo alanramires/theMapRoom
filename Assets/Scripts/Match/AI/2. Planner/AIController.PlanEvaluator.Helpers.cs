@@ -577,11 +577,4 @@ public partial class AIController
         return Mathf.Max(0, RecentlyCapturedGarrisonTurns - (safeTurn - capturedTurn));
     }
 
-    private static MatchController cachedMatchController;
-    private static MatchController GetMatchController()
-    {
-        if (cachedMatchController == null)
-            cachedMatchController = Object.FindAnyObjectByType<MatchController>();
-        return cachedMatchController;
-    }
 }

@@ -178,7 +178,7 @@ public partial class AIController
         else if (!hasAppliedDifficulty)
             ResolveActivePreset(InferDifficultyFromFlags());
 
-        if (matchController == null)  matchController  = FindAnyObjectByType<MatchController>();
+        if (matchController == null)  matchController  = GetMatchController();
 
         if (replayManager == null)    replayManager    = FindAnyObjectByType<ReplayManager>();
 
@@ -245,6 +245,7 @@ public partial class AIController
     private void OnDestroy()
 
     {
+        InvalidateMatchControllerCache();
 
         SetRallyFormationVisible(false);
         InvalidateAIReview();
@@ -299,7 +300,7 @@ public partial class AIController
 
         postLoadResumeRoutine = null;
         if (matchController == null)
-            matchController = FindAnyObjectByType<MatchController>();
+            matchController = GetMatchController();
         if (replayManager == null)
             replayManager = FindAnyObjectByType<ReplayManager>();
         if (turnStateManager == null)

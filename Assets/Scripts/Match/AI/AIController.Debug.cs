@@ -1577,7 +1577,7 @@ public partial class AIController
         }
 
         if (matchController == null)
-            matchController = FindAnyObjectByType<MatchController>();
+            matchController = GetMatchController();
         if (replayManager == null)
             replayManager = FindAnyObjectByType<ReplayManager>();
         if (turnStateManager == null)

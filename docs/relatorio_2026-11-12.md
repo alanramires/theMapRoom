@@ -51,3 +51,32 @@ Continuação do trabalho registrado em `relatorio_2026-11-11.md`.
 - Regressões PASS: `verificar_reserva_pouso_reparo`, `verificar_recuperacao_aerea_ocupada`, `verificar_desembarque_rally_aereo`, `verificar_carga_sem_tarefa_rally`. `bash tools/compilar.sh`: ambos assemblies verdes. Não observado na partida em Play; o teste executou somente objetos isolados no Editor e os destruiu/restaurou ao terminar.
 
 **Docs de doutrina:** `docs/manual/07_logistica_e_servicos.md`, atendimento do primeiro nível de carga, e doutrina de transporte: registrar acesso pelo transportador e retorno ao voo ao fim da família. Apontamento para `consolidar-doutrina` quando o autor chamar; sem ampliar recursão de atendimento nesta correção.
+
+
+### Desempenho — ResolveAISlotKey sem busca de cena por chamada
+
+- Pedido do revisor, medido no T14 slot 1: `ResolveAISlotKey` fazia `FindAnyObjectByType<MatchController>` em cada acesso, inclusive dentro de laços construção × inimigo. A medição inicial informada pelo revisor foi 799 ms/1.000 resoluções, planner perto de 8,9 s e pré-shopping de 7.967 ms.
+- `AIController.cs`: `ResolveAISlotKey` passa pelo `GetMatchController` que já existia em `PlanEvaluator.Helpers`, movido para junto do resolvedor. Prioridade para `AIController.Instance.Match`; sem referência da instância, fallback estático preenchido por uma busca e com ausência também cacheada. Retorno continua: slot ativo da cor pedida; senão único slot da cor; senão -1. Os chamadores de ResolveAISlotKey não foram alterados.
+- Cache invalidado em `SceneManager.sceneLoaded` e no `OnDestroy` da IA. Inicialização de subsistema remove/reinstala o handler sem duplicar, inclusive sem domain reload. O fallback instala o mesmo gancho quando consultado em contexto de Editor. Nenhum cache global sem invalidação de cena foi acrescentado.
+- Outras buscas substituídas neste commit: `AIController.Start` (Lifecycle), `ResumeActiveAITurnAfterLoad` e `TryStartDebugStage` (Debug) usam o mesmo `GetMatchController`. Permanecem as buscas independentes de `InvasionAxisMap.Build`, `ObjectiveManager.TryResolveSlot` e `MelhorCapturaService` — não houve mudança nesses consumidores ou nas regras da IA.
+
+**Medições reproduzidas em Play com os scripts do revisor, 44 construções e 84 unidades:**
+
+| Medida | Antes | Depois |
+|---|---:|---:|
+| `medir_slotkey`: ResolveAISlotKey ×1.000 | 593 ms | 0 ms (resolução inteira em ms do script) |
+| Controle: FindAnyObjectByType ×1.000 | 664 ms | 752 ms |
+| `medir_planner`: BuildObjectivePlan, primeira chamada | 9.643 ms | 505 ms |
+| BuildObjectivePlan, segunda chamada | 8.521 ms | 167 ms |
+| Analyzer.Rebuild, primeira / segunda | 29 / 27 ms | 10 / 9 ms |
+| Pré-shopping real após a última unidade, `[AI Commit Heavy]` | 7.951 ms | 1.581 ms |
+| FrameSpike correspondente ao pré-shopping | 7.979,15 ms | 1.602,97 ms |
+| `medir_shopping`: demandas slot 1 | 6.625 ms | 365 ms |
+| `medir_shopping`: fila de carona slot 1 | 224 ms | 291 ms |
+
+- O antes real foi coletado após o autor executar a última decisão da unidade e parar antes da primeira compra. Console: T14 slot 1, 37 unidades próprias e 39 inimigas no snapshot, boardRev 450; Sync1/2, FogBarrier, SectorRebuild e snapshot em 0 ms. Só então o autor saiu do Play para salvar C#. Depois recarregou o mesmo save, avançou até a primeira compra (Caça B) e os logs foram coletados antes dos benchmarks, evitando confundir FrameSpikes das medições com o fluxo real.
+- A meta do planner (<1 s) foi atingida. **A meta do pré-shopping real (<1 s) não foi atingida na primeira transição após carregar: ficou em 1,581 s, redução de aproximadamente 80%.** O quadro seguinte consumiu 6.425,02 ms ao montar a compra; isso explica o autor ainda observar perto de 8 s até a loja. Não declarar a espera total resolvida nem atribuir o custo residual a uma causa não medida neste bloco.
+- O script de shopping mede ambos os lados: slot 0 teve demandas 10.059 → 9.449 ms; roster 1 → 2 ms, operacional 2 → 2 ms, counter 3 → 4 ms, fila 213 → 387 ms. Slot 1: snapshot 0 → 0 ms, roster 1 → 1 ms, operacional 0 → 0 ms e counter 3 → 3 ms. A grande variação entre primeira execução real e consultas seguintes exige perfil específico do carrinho/demandas; não foi mascarada com um cache de decisões.
+- Scripts do revisor preservados em `tools/perf/medir_slotkey.cs`, `medir_planner.cs`, `medir_shopping.cs`. O planner equivale a dois replans; os outros não compram nem movem unidades.
+
+**Validação:** `verificar_cache_match_ia` PASS fora do Play: Match da instância vence fallback global, cor repetida usa ativo, único não ativo é preservado, cor ambígua retorna -1, mil leituras reutilizam fallback, ausência cacheada não busca; handlers de sceneLoaded e OnDestroy invalidam. Regressões solicitadas PASS: `verificar_frota_chinook`, `verificar_prontidao_rally`, `verificar_shopping_sem_qg`. `bash tools/compilar.sh`: ambos assemblies verdes. Comparação de desempenho acima foi observada em Play; fixtures de semântica foram executados fora do Play. Um commit de correção; parada para revisão com o limite residual explicitado.
