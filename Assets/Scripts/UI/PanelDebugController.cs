@@ -576,6 +576,25 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log($"[Debug Command] PanelRodada {(panelRodadaEnabled ? "ON" : "OFF")}.");
             }
         }
+        else if (command == "AI STEP ON" || command == "AI STEP OFF")
+        {
+            AIController aiController = FindAnyObjectByType<AIController>();
+            if (aiController == null)
+                Debug.Log("[Debug Command] AIController nao encontrado.");
+            else
+            {
+                bool enabled = command == "AI STEP ON";
+                executed = aiController.TrySetAIStepMode(enabled);
+                if (executed)
+                {
+                    cursorController?.PlayDoneSfx();
+                    Debug.Log(enabled
+                        ? "[Debug Command] AI Step ON: revisao das proximas decisoes ativada."
+                        : "[Debug Command] AI Step OFF: revisao desligada; IA continua automaticamente.");
+                }
+                else Debug.Log("[Debug Command] AI Step OFF recusado: decisao pendente nao pode ser aprovada agora. Confira a revisao ou feche o menu de pausa.");
+            }
+        }
         else if (command == "SHOW AI STEP" || command == "SHOW AI STEP ON" || command == "SHOW AI STEP OFF")
         {
             AIController aiController = FindAnyObjectByType<AIController>();
@@ -1125,6 +1144,7 @@ public class PanelDebugController : MonoBehaviour
             "landing | emerge | submerge | take off | fast take off\n" +
             "fow on|off|partial | set fow <0-100>\n" +
             "panelrodada on|off - controla somente a cortina de privacidade\n" +
+            "ai step on|off - ativa revisao / desliga e continua automaticamente\n" +
             "show ai step [on|off] | ai show step [on|off] - alterna/abre/fecha a revisao sem aprovar\n" +
             "ai show rally [on|off] [slot] | show rally [on|off] [slot] - formacao do montinho, somente leitura\n" +
             "show axis | show eixos [slot] - eixos da base ao rally (1 vermelho, 2 laranja, 3 grafite); sem slot segue a vez\n" +

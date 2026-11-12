@@ -827,6 +827,21 @@ public partial class AIController
         // Desligar a ferramenta nao aprova uma decisao que ja esta pendente.
     }
 
+    public bool TrySetAIStepMode(bool enabled)
+    {
+        if (enabled)
+        {
+            SetAIStepEnabled(true);
+            return true;
+        }
+        // Same approval gates as the review button; never bypass a stale decision.
+        if (HasPendingAIReview && !ApproveAIReview()) return false;
+        SetAIStepEnabled(false);
+        aiReviewVisible = false;
+        SetDebugPaused(false);
+        return true;
+    }
+
     public bool AIReviewVisible => aiReviewVisible && (aiStep || HasPendingAIReview);
     public void ShowAIReview() => SetAIReviewVisible(true);
 
@@ -1341,12 +1356,7 @@ public partial class AIController
         if (GUILayout.Button("Executar decisao")) ApproveAIReview();
         if (GUILayout.Button("Continuar automaticamente"))
         {
-            if (ApproveAIReview())
-            {
-                GUI.FocusControl(null);
-                SetAIStepEnabled(false);
-                SetDebugPaused(false);
-            }
+            if (TrySetAIStepMode(false)) GUI.FocusControl(null);
         }
         GUI.enabled = true;
         if (GUILayout.Button("Fechar e manter pausada"))
