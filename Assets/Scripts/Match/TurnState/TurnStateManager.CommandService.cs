@@ -426,6 +426,7 @@ public partial class TurnStateManager
         HashSet<UnitManager> hiddenEmbarkedSuppliers = new HashSet<UnitManager>();
         HashSet<UnitManager> touchedSupplierUnits = new HashSet<UnitManager>();
         HashSet<UnitManager> touchedTargetUnits = new HashSet<UnitManager>();
+        var pendingAirReturns = new Dictionary<UnitManager, (Tilemap map, int fuel)>();
 
         try
         {
@@ -460,6 +461,10 @@ public partial class TurnStateManager
 
         for (int i = 0; i < commandServiceQueuedOrders.Count; i++)
         {
+            // The queue is already normalized into contiguous families. Flush the
+            // previous one even if its last cargo had no stock/budget and was skipped.
+            yield return CompleteCommandServiceAirFamilies(pendingAirReturns,
+                ResolveCommandServiceFamily(commandServiceQueuedOrders[i]));
             if (stopByEconomy)
                 break;
 
@@ -505,6 +510,35 @@ public partial class TurnStateManager
 
             Tilemap boardMap = terrainTilemap != null ? terrainTilemap : (target != null ? target.BoardTilemap : null);
 
+            if (fromConstruction)
+            {
+                if (!TryGetCommandConstructionAccess(order, boardMap, out UnitManager accessUnit,
+                        out bool landAccess, out Domain accessDomain, out HeightLevel accessHeight, out string accessReason))
+                {
+                    CommandServiceLog($"[ServicoComando] familia de {target.name} ignorada: {accessReason}.");
+                    continue;
+                }
+                if (landAccess)
+                {
+                    Vector3Int accessCell = sourceConstruction.CurrentCellPosition; accessCell.z = 0;
+                    if (!CanApplyPlannedAirTransitionBeforeSupply(accessUnit, boardMap, accessCell, true, false,
+                            accessDomain, accessHeight, out accessReason)
+                        || !CanUseSupplyServiceLayer(accessUnit, boardMap, accessCell, accessDomain, accessHeight, out accessReason))
+                    {
+                        CommandServiceLog($"[ServicoComando] pouso da familia recusado: {accessReason}.");
+                        continue;
+                    }
+                    int fuelBefore = accessUnit.CurrentFuel;
+                    yield return ApplySupplyLayerTransitionIfNeeded(accessUnit, accessDomain, accessHeight);
+                    if (accessUnit.GetDomain() != accessDomain || accessUnit.GetHeightLevel() != accessHeight)
+                    {
+                        CommandServiceLog($"[ServicoComando] familia ignorada: pouso de {accessUnit.name} nao se concretizou.");
+                        continue;
+                    }
+                    pendingAirReturns[accessUnit] = (boardMap, fuelBefore);
+                }
+            }
+
             Vector3Int targetCell;
             if (isEmbarkedPassenger)
             {
@@ -526,7 +560,7 @@ public partial class TurnStateManager
                 if (cursorFocusDelay > 0f)
                     yield return new WaitForSeconds(cursorFocusDelay);
 
-                if (!isEmbarkedPassenger && (order.forceLandBeforeSupply || order.forceTakeoffBeforeSupply))
+                if (!fromConstruction && !isEmbarkedPassenger && (order.forceLandBeforeSupply || order.forceTakeoffBeforeSupply))
                 {
                     if (!CanApplyPlannedAirTransitionBeforeSupply(
                             target,
@@ -722,16 +756,6 @@ public partial class TurnStateManager
                 if (fuelGain <= 0)
                     CommandServiceLog($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
 
-                if (!isEmbarkedPassenger && order.forceLandBeforeSupply)
-                {
-                    yield return ExecuteReturnToFlightAfterSupply(
-                        target,
-                        boardMap,
-                        order.aircraftFuelBeforeSupply,
-                        AirGoAroundOperation.CommandService,
-                        "[ServicoComando]");
-                }
-
                 NotifyUnitSupplied(sourceSupplierUnit, target);
                 MarkUnitServedByCommandThisTurn(target);
 
@@ -769,6 +793,8 @@ public partial class TurnStateManager
                 }
             }
         }
+
+        yield return CompleteCommandServiceAirFamilies(pendingAirReturns, null);
 
         if (hiddenEmbarkedSuppliers.Count > 0)
             RestoreTransporterHudVisibility(hiddenEmbarkedSuppliers);
@@ -1009,6 +1035,10 @@ public partial class TurnStateManager
             List<ServiceData> services = BuildDistinctServiceList(offered);
             if (services == null || services.Count <= 0)
                 continue;
+
+            Tilemap accessMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
+            if (order.sourceConstruction != null && !TryGetCommandConstructionAccess(order, accessMap,
+                    out _, out _, out _, out _, out _)) continue;
 
             Dictionary<SupplyData, int> sourceStock = null;
             if (order.sourceConstruction != null)
@@ -2484,5 +2514,41 @@ public partial class TurnStateManager
         // IsCommandServiceExecutionRunning já esteja true antes de IsAutoCommandServiceBusy
         // retornar false — sem janela de race condition para a IA escapar.
         autoCommandServiceRoutine = null;
+    }
+
+    private static UnitManager ResolveCommandServiceFamily(ServicoDoComandoOption order)
+    {
+        if (order?.targetUnit == null) return null;
+        return order.targetUnit.IsEmbarked ? order.targetUnit.EmbarkedTransporter : order.targetUnit;
+    }
+
+    private bool TryGetCommandConstructionAccess(ServicoDoComandoOption order, Tilemap map,
+        out UnitManager accessUnit, out bool land, out Domain domain, out HeightLevel height, out string reason)
+    {
+        accessUnit = ResolveCommandServiceFamily(order);
+        land = false; domain = Domain.Land; height = HeightLevel.Surface;
+        reason = "Contexto de acesso a construcao invalido.";
+        var construction = order?.sourceConstruction;
+        if (construction == null || accessUnit == null || accessUnit.IsEmbarked
+            || construction.SlotIndex != accessUnit.SlotIndex
+            || accessUnit.CurrentCellPosition != construction.CurrentCellPosition
+            || !construction.TryResolveConstructionData(out ConstructionData data)) return false;
+        return ServicoDoComandoSensor.IsDomainCompatibleForConstructionCommandService(construction, data,
+            accessUnit, map, terrainDatabase, out land, out _, out _, out domain, out height, out reason);
+    }
+
+    private IEnumerator CompleteCommandServiceAirFamilies(
+        Dictionary<UnitManager, (Tilemap map, int fuel)> pending, UnitManager keep)
+    {
+        foreach (UnitManager aircraft in new List<UnitManager>(pending.Keys))
+        {
+            if (aircraft == keep) continue;
+            var context = pending[aircraft];
+            pending.Remove(aircraft);
+            if (aircraft == null) continue;
+            CommandServiceLog($"[ServicoComando] familia de {aircraft.name} encerrada; restaura voo apos os passageiros.");
+            yield return ExecuteReturnToFlightAfterSupply(aircraft, context.map, context.fuel,
+                AirGoAroundOperation.CommandService, "[ServicoComando]");
+        }
     }
 }

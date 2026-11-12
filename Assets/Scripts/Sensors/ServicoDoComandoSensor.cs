@@ -533,6 +533,15 @@ public static class ServicoDoComandoSensor
                     transporterData.isSupplier)
                     continue;
 
+                // Access is a property of the carrier, even when only cargo needs service.
+                if (!IsDomainCompatibleForConstructionCommandService(construction, data, transporter,
+                        map, terrainDatabase, out _, out _, out _, out _, out _, out string accessReason))
+                {
+                    AppendInvalid(invalidOutput, construction, transporter, transporter, constructionCell,
+                        "Transportador sem acesso ao atendimento: " + accessReason);
+                    continue;
+                }
+
                 IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
                 if (seats == null || seats.Count <= 0)
                     continue;
@@ -718,7 +727,7 @@ public static class ServicoDoComandoSensor
         return false;
     }
 
-    private static bool IsDomainCompatibleForConstructionCommandService(
+    public static bool IsDomainCompatibleForConstructionCommandService(
         ConstructionManager sourceConstruction,
         ConstructionData sourceData,
         UnitManager target,
@@ -752,7 +761,8 @@ public static class ServicoDoComandoSensor
 
         Domain targetDomain = target.GetDomain();
         HeightLevel targetHeight = target.GetHeightLevel();
-        if (ConstructionSupportsOperationDomain(sourceData, targetDomain, targetHeight))
+        if ((targetDomain != Domain.Air || target.IsEmbarked)
+            && ConstructionSupportsOperationDomain(sourceData, targetDomain, targetHeight))
         {
             plannedServiceDomain = targetDomain;
             plannedServiceHeight = targetHeight;
@@ -840,7 +850,7 @@ public static class ServicoDoComandoSensor
                 return true;
             }
 
-            if (PodeSuprirSensor.IsAirFamilyUnit(target))
+            if (target.IsEmbarked && PodeSuprirSensor.IsAirFamilyUnit(target))
             {
                 PodeDecolarReport takeoff = PodeDecolarSensor.Evaluate(target, boardMap, terrainDatabase);
                 HeightLevel takeoffHeight = PodeSuprirSensor.ResolveTakeoffServiceHeight(target);
