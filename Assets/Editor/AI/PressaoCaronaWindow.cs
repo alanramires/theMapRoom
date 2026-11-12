@@ -45,9 +45,10 @@ public sealed class PressaoCaronaWindow : EditorWindow
 
     internal static string Summary(PressaoCaronaLeitura l)
     {
-        int stranded = l.Count(PressaoCaronaCategoria.IlhadoComPlano);
-        return $"ilhados do plano {stranded} · bancos aéreos livres {l.AirSeatsFree}/{l.AirSeatsTotal}"
-            + $" · falta {l.StrandedAirSeatShortage} banco(s)";
+        return $"fila útil {l.UsefulAirWaiting} · persistente {l.PersistentAirWaiting}"
+            + $" · capacidade operacional/viagem {l.AirOperationalSeats}"
+            + $" · sem entrega conhecida {l.UnserviceableAirWaiting}"
+            + $" · congestionada={l.AirCongested}";
     }
 
     private void DrawSlot(PressaoCaronaLeitura l)
@@ -80,6 +81,7 @@ public sealed class PressaoCaronaWindow : EditorWindow
             foreach (PressaoCaronaOnibus b in l.Buses)
                 DrawRow(b.Unit,
                     $"{Label(b.Unit)}  {b.Used}/{b.Capacity}  {(b.Air ? "ar" : "terra")}"
+                    + (!b.Operational ? "  (indisponivel)" : "")
                     + (b.Unit != null && b.Unit.HasActed ? "  (agiu)" : ""),
                     null);
 
@@ -88,7 +90,7 @@ public sealed class PressaoCaronaWindow : EditorWindow
             {
                 QueroCaronaResult r = p.Result;
                 DrawRow(p.Unit,
-                    $"[{p.Categoria}] {Label(p.Unit)}  alcance={r.reach}  espera={r.rideWaitTurns}",
+                    $"[{p.Categoria}] {Label(p.Unit)}  alcance={r.reach}  espera={r.rideWaitTurns}  entrega aerea={p.UsefulAirDelivery}",
                     r.reason);
             }
         }

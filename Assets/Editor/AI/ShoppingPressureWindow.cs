@@ -958,7 +958,7 @@ public class ShoppingPressureWindow : EditorWindow
                 $"fila de carona: {PressaoCaronaWindow.Summary(pressure.RideQueue)}  →  "
                 + (pressure.RideAirBusesShort > 0
                     ? $"faltam {pressure.RideAirBusesShort} ônibus aéreo(s) ({pressure.RideSeatsPerAirBus} bancos cada), "
-                      + $"teto +{AIShoppingPlanner.RideQueueMaxExtraAirBuses} acima das operações"
+                      + $"reforço gradual até {AIShoppingPlanner.RideQueueMaxExtraAirBuses}/turno; compra de operação já atende"
                     : "sem falta")
                 + "  (Tools/Transporte/Pressao Carona)",
                 _subtle);

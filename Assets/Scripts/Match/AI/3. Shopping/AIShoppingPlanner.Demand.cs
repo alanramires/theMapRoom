@@ -1336,6 +1336,8 @@ public partial class AIShoppingPlanner
         if (snapshot == null)
             return orders;
 
+        shoppingRideSnapshot = null;
+        shoppingRideQueue = null;
         s_lastBuiltRoster = null;
         s_lastBuiltCounter = null;
         s_lastBuiltOperational = null;
@@ -1788,7 +1790,9 @@ public partial class AIShoppingPlanner
                     for (int demandIndex = 0; demandIndex < demands.Count; demandIndex++)
                     {
                         AIShoppingDemand demand = demands[demandIndex];
-                        if (state.RemainingDemand[demandIndex] <= 0
+                        if ((demand.IsRideQueueReinforcement && state.Items.Exists(item => IsAirBus(item.Unit)))
+                            || (IsExpansionCapturerBlocked(snapshot, unit) && !demand.IsConcreteDefense)
+                            || state.RemainingDemand[demandIndex] <= 0
                             || !IsRolePurchaseAllowed(unit, snapshot.Stance,
                                 IsEmergencyShoppingDemand(demand))
                             || !DoesUnitMeetShoppingDemand(unit, demand)
@@ -1833,6 +1837,18 @@ public partial class AIShoppingPlanner
         bool firstCoverage = !cart.CoveredDemand[demandIndex];
         cart.Items.Add(candidate);
         cart.RemainingDemand[demandIndex]--;
+        if (IsAirBus(candidate.Unit))
+        {
+            // A hull bought by another door covers the queue. A queue hull also covers
+            // one normal air-transport slot, so the reinforcement is never additive.
+            for (int i = 0; i < demands.Count; i++)
+                if (i != demandIndex && cart.RemainingDemand[i] > 0
+                    && (demands[i].IsRideQueueReinforcement
+                        || (candidate.Demand.IsRideQueueReinforcement
+                            && DoesUnitMeetShoppingDemand(candidate.Unit, demands[i])
+                            && MatchesWallOffer(demands[i], candidate.Unit, candidate.Building))))
+                { cart.RemainingDemand[i]--; if (candidate.Demand.IsRideQueueReinforcement) break; }
+        }
         // O produtor taxado que o carrinho usa devolve a parcela do imposto: o corpo de massa
         // que ela garantia nao vai mais ser comprado ali.
         cart.RemainingBudget -= candidate.Unit.cost - candidate.TaxRefund;
@@ -3103,6 +3119,7 @@ public partial class AIShoppingPlanner
                 "capture-opportunity", $"capturaveis alcancaveis sem destinatario={uncovered}");
             AppendRideQueueTransportDemand(demands, snapshot, log);
             AddCounterPressureDemands(snapshot, demands, counterPressure, roster, log);
+            ApplyRideQueueCapturerBrake(snapshot, demands, log);
             demands.Sort(CompareShoppingDemandPriority);
             if (log)
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
@@ -3540,6 +3557,7 @@ public partial class AIShoppingPlanner
             s_lastBuiltOperational = operational;
         AddOperationalPressureDemands(snapshot, demands, operational);
 
+        ApplyRideQueueCapturerBrake(snapshot, demands, log);
         ApplyHardModeArmorFirst(snapshot, demands);
 
         demands.Sort(CompareShoppingDemandPriority);
@@ -3780,6 +3798,7 @@ public partial class AIShoppingPlanner
 
         demand = NewRoleDemand(role, deficit.Count, urgent ? priority : priority + 10,
             "operation", reason, urgent, exact);
+        demand.IsConcreteDefense = deficit.Operation != null && deficit.Operation.Type == AITacticalNeedType.SectorDefense;
         demand.Domain = domain;
         demand.MinEliteLevel = minElite;
         demand.MaxEliteLevel = maxElite;
@@ -3811,10 +3830,15 @@ public partial class AIShoppingPlanner
         // A fila e a mesma leitura do shopping operacional e do painel de
         // transporte, inclusive para passageiro sem plano. Nao recontar flags
         // de espera: elas podem carregar o retrato de uma decisao anterior.
-        PressaoCaronaLeitura queue = PressaoCaronaService.Read(
-            AIController.Instance, snapshot.AISlotIndex);
-        int waiting = queue.Pedidos.Count;
-        int transporters = queue.Buses.Count;
+        PressaoCaronaLeitura queue = GetShoppingRideQueue(snapshot);
+        if (queue.AirCongested)
+        {
+            var pressure = new OperationalPressureInspection { RideQueue = queue,
+                RideSeatsPerAirBus = ResolveCheapestAirTransportSeats(snapshot) };
+            AddOperationalPressureDemands(snapshot, demands, pressure);
+        }
+        int waiting = queue.Pedidos.FindAll(p => !p.Result.isStranded && p.Categoria != PressaoCaronaCategoria.Emergencia).Count;
+        int transporters = queue.Buses.FindAll(b => !b.Air && b.Operational).Count;
         int oldestWait = 0;
         foreach (PressaoCaronaPedido pedido in queue.Pedidos)
             if (pedido.Unit != null)
@@ -3836,10 +3860,10 @@ public partial class AIShoppingPlanner
         // na fila, a carona vira o gargalo e passa na frente.
         int priority = oldestWait >= 3 ? 34 : 26;
 
-        EnsureRoleDemand(demands, UnitRole.Transportador, gap, priority,
-            "ride-queue",
-            $"fila de carona: {waiting} esperando, {transporters} em campo, "
-            + $"espera mais antiga {oldestWait} turno(s)");
+        var groundRide = NewRoleDemand(UnitRole.Transportador, gap, priority, "ride-queue-land",
+            $"fila terrestre: {waiting} esperando, {transporters} em campo", false);
+        groundRide.Domain = Domain.Land;
+        MergeRoleDemand(demands, groundRide, false);
 
         if (log)
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
@@ -3867,6 +3891,8 @@ public partial class AIShoppingPlanner
                 continue;
             if (current.ArtilleryWallGroup != incoming.ArtilleryWallGroup) continue;
             if (current.IsPreventiveAirControl != incoming.IsPreventiveAirControl) continue;
+            if (current.IsConcreteDefense != incoming.IsConcreteDefense
+                || current.IsRideQueueReinforcement != incoming.IsRideQueueReinforcement) continue;
             if (current.RallyResponseOffers != null || incoming.RallyResponseOffers != null) continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
                 || current.RequiredFamily != incoming.RequiredFamily
@@ -4204,6 +4230,7 @@ public partial class AIShoppingPlanner
             // elite comprometido (que pode ser aereo) continua no fluxo proprio.
             if (u == null || u.cost <= 0 || u.cost > remaining
                 || u.militaryForce != MilitaryForce.Army || u.eliteLevel != 0
+                || IsExpansionCapturerBlocked(snapshot, u)
                 || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                 continue;
             if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
@@ -4323,6 +4350,7 @@ public partial class AIShoppingPlanner
                 // caixa 12,5k, Chinook e Apache barrados, 8,5k parados).
                 if (u == null || u.cost <= 0 || u.militaryForce != MilitaryForce.Army
                     || u.eliteLevel != 0
+                    || IsExpansionCapturerBlocked(snapshot, u)
                     || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                     continue;
                 if (cheapest == 0 || u.cost < cheapest)
@@ -4362,6 +4390,7 @@ public partial class AIShoppingPlanner
             foreach (UnitData u in building.OfferedUnits)
             {
                 if (u == null || u.cost <= 0 || u.cost > spendable
+                    || (IsExpansionCapturerBlocked(snapshot, u) && !HasAnyVisibleEnemyNearOwnedBase(snapshot, DefensiveBaseThreatRange))
                     || (armyMassOnly ? u.militaryForce != MilitaryForce.Army : u.militaryForce == MilitaryForce.Navy)
                     || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true)
                     || ShouldYieldGenericFireSupportToAntiInfantry(

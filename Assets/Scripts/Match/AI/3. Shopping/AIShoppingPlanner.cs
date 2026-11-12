@@ -78,6 +78,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(1, 20)] public int EliteRepairLogisticsPriority = 7;
 
     [Header("Economia Aeronáutica")]
+    [Tooltip("Referencia da frota inicial. Fila util persistente pode pedir reforco gradual alem deste valor.")]
     [Range(1, 8)]    public int   MaxAirTransporters               = 3;
     [Range(1, 12)]   public int   MinTurnForInterceptador          = 4;
     [Range(1, 6)]    public int   HelicopterosPorCacaB             = 3;

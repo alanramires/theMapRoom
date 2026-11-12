@@ -4,6 +4,20 @@ using UnityEngine.Tilemaps;
 
 public static class PodeDesembarcarSensor
 {
+    // Planning a future delivery does not require actually embarking the passenger.
+    public static bool CanDeliverPassengerFromCell(UnitManager transporter, UnitManager passenger,
+        Vector3Int from, Vector3Int drop, Tilemap map, TerrainDatabase terrain, out string reason)
+    {
+        reason = "Contexto invalido para entrega planejada.";
+        if (transporter == null || passenger == null || map == null
+            || !transporter.TryGetUnitData(out UnitData data) || data == null || !data.isTransporter)
+            return false;
+        if (!CanTransporterDisembarkAtCellContext(transporter, data, from, map, terrain, out reason))
+            return false;
+        if (!BuildDisembarkCandidateCells(transporter, data, map, from).Contains(drop)) return false;
+        return CanDisembarkAtCell(transporter, data, passenger, map, terrain, from, drop, out _, out reason);
+    }
+
     // Consulta pura para ferramentas/planejamento: avalia o transportador como se
     // estivesse em transporterCell sem alterar UnitManager, ocupacao, FOW ou revisoes.
     public static bool CollectOptionsFromCell(

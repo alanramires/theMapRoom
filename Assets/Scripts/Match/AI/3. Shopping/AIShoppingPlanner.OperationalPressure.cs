@@ -191,7 +191,7 @@ public partial class AIShoppingPlanner
     // Teto da fila de carona: no maximo +N onibus aereos ACIMA do que as operacoes ja pedem
     // por turno. 15 ilhados contra 4 bancos dariam ~6 Chinooks de uma vez; sem teto a compra
     // trocava o vicio da AAA pelo do Chinook.
-    public const int RideQueueMaxExtraAirBuses = 2;
+    public const int RideQueueMaxExtraAirBuses = 1;
 
     private static void BuildRideQueuePressure(
         AIWorldSnapshot snapshot,
@@ -199,7 +199,7 @@ public partial class AIShoppingPlanner
     {
         if (AIController.Instance == null)
             return;
-        result.RideQueue = PressaoCaronaService.Read(AIController.Instance, snapshot.AISlotIndex);
+        result.RideQueue = GetShoppingRideQueue(snapshot);
         result.RideSeatsPerAirBus = ResolveCheapestAirTransportSeats(snapshot);
         int shortage = result.RideQueue.StrandedAirSeatShortage;
         result.RideAirBusesShort = shortage > 0 && result.RideSeatsPerAirBus > 0
@@ -527,31 +527,18 @@ public partial class AIShoppingPlanner
             MergeRoleDemand(demands, transport, false);
         }
 
-        // FILA DE CARONA: PISO, nao soma. As operacoes de airlift ja pedem Chinook por
-        // objetivo (origem "operation"); a fila so sobe esse numero quando ha mais ilhados do
-        // plano que bancos aereos livres, e no maximo +RideQueueMaxExtraAirBuses. O merge sem
-        // somar (Max) faz o piso: demanda de operacao maior que a fila fica como esta.
-        if (pressure.RideAirBusesShort > 0)
+        // One normal-priority reinforcement; every air transport purchase can cover it.
+        if (pressure.RideQueue != null && pressure.RideQueue.AirCongested && pressure.RideSeatsPerAirBus > 0)
         {
-            int planAir = 0;
+            pressure.RideAirPlanDemand = 0;
             foreach (AIShoppingDemand d in demands)
-                if (d != null && d.Count > 0 && d.Role == UnitRole.Transportador && d.Domain == Domain.Air)
-                    planAir += d.Count;
-            int floor = Mathf.Min(pressure.RideAirBusesShort, planAir + RideQueueMaxExtraAirBuses);
-            pressure.RideAirPlanDemand = planAir;
-            pressure.RideAirFloor = floor;
-            if (floor > planAir)
-            {
-                PressaoCaronaLeitura q = pressure.RideQueue;
-                AIShoppingDemand ride = NewRoleDemand(UnitRole.Transportador, floor, 15,
-                    "fila-carona",
-                    $"ilhados do plano={q.Count(PressaoCaronaCategoria.IlhadoComPlano)} "
-                    + $"bancos aereos livres={q.AirSeatsFree}/{q.AirSeatsTotal} "
-                    + $"faltam {pressure.RideAirBusesShort} onibus ({pressure.RideSeatsPerAirBus} bancos cada), "
-                    + $"operacoes pediam {planAir}, piso {floor}", false);
-                ride.Domain = Domain.Air;
-                MergeRoleDemand(demands, ride, false);
-            }
+                if (d.Role == UnitRole.Transportador && d.Domain == Domain.Air) pressure.RideAirPlanDemand += d.Count;
+            pressure.RideAirFloor = 1;
+            AIShoppingDemand ride = NewRoleDemand(UnitRole.Transportador, 1, 12, "ride-queue",
+                $"fila persistente util={pressure.RideQueue.PersistentAirWaiting} capacidade/viagem={pressure.RideQueue.AirOperationalSeats}; reforco gradual", false);
+            ride.Domain = Domain.Air;
+            ride.IsRideQueueReinforcement = true;
+            demands.Add(ride);
         }
 
         // TANQUE AEREO pelo vaivem. Trilho proprio (Domain.Air): o teto Hard de logistica e a
@@ -588,5 +575,33 @@ public partial class AIShoppingPlanner
                 + $"elite_ferido={pressure.EliteUnitsUnderRepair}{(eliteRepairBoost ? " (BOOST)" : "")} "
                 + $"memória={pressure.RememberedRepairUnits} cobertura={pressure.ActiveLogistics}/{pressure.DesiredLogistics}");
         }
+    }
+
+    private static AIWorldSnapshot shoppingRideSnapshot;
+    private static PressaoCaronaLeitura shoppingRideQueue;
+    private static PressaoCaronaLeitura GetShoppingRideQueue(AIWorldSnapshot snapshot)
+    {
+        if (!object.ReferenceEquals(snapshot, shoppingRideSnapshot) || shoppingRideQueue == null)
+        {
+            shoppingRideSnapshot = snapshot;
+            shoppingRideQueue = PressaoCaronaService.Read(AIController.Instance, snapshot.AISlotIndex, snapshot.TurnNumber);
+        }
+        return shoppingRideQueue;
+    }
+
+    private static bool IsAirBus(UnitData unit) => unit != null && unit.domain == Domain.Air
+        && UnitRoleCompatibility.IsOperationalTransporter(unit);
+    private static bool IsExpansionCapturerBlocked(AIWorldSnapshot snapshot, UnitData unit)
+        => unit != null && UnitRoleCompatibility.ResolveCompositionRole(unit) == UnitRole.Capturador
+            && GetShoppingRideQueue(snapshot).AirCongested;
+
+    private static void ApplyRideQueueCapturerBrake(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands, bool log)
+    {
+        var queue = GetShoppingRideQueue(snapshot);
+        if (!queue.AirCongested) return;
+        foreach (AIShoppingDemand demand in demands)
+            if (demand.Role == UnitRole.Capturador && !demand.IsConcreteDefense) demand.Count = 0;
+        if (log) Debug.Log($"[AI Shopping][T{snapshot.TurnNumber}][slot {snapshot.AISlotIndex}] fila congestionada: "
+            + $"persistentes={queue.PersistentAirWaiting} capacidade/viagem={queue.AirOperationalSeats}; freia capturadores de expansao e massa, preserva defesa concreta");
     }
 }

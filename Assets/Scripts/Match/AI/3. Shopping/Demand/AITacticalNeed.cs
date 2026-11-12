@@ -138,6 +138,8 @@ public class AIShoppingDemand
     public float MinRallyArtilleryWeight;
     public bool RequireRallyBreakthrough;
     public bool IsPreventiveAirControl;
+    public bool IsRideQueueReinforcement;
+    public bool IsConcreteDefense;
     public Dictionary<string, HashSet<int>> RallyResponseOffers;
     // Decision-local wall response: 0 normal demand, 1 ground support, 2 AA.
     // Producer sets preserve actual ground access even with identical catalogs.
