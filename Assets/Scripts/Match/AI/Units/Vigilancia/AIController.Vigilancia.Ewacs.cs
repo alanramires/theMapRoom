@@ -97,11 +97,13 @@ public partial class AIController
         // Normalmente a autoridade global de reparo já interceptou a unidade
         // no Router. Esta proteção local mantém a prioridade correta mesmo se
         // a Vigilância Aérea for consultada isoladamente por debug/ferramenta.
+        HashSet<Vector3Int> airOccupied = BuildAirOccupied(ewacs);
         if (TryBuildAircraftRecoveryApproachAction(
                 ewacs,
                 world,
                 fromCell,
                 paths,
+                airOccupied,
                 out action))
         {
             reason =
@@ -112,7 +114,6 @@ public partial class AIController
             return true;
         }
 
-        HashSet<Vector3Int> airOccupied = BuildAirOccupied(ewacs);
         if (TryBuildAircraftEmergencyHoverAction(
                 ewacs,
                 world,

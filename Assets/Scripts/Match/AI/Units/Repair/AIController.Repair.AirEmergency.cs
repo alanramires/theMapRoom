@@ -36,10 +36,11 @@ public partial class AIController
         UnitManager aircraft,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
-        Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths)
+        Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths,
+        HashSet<Vector3Int> occupied)
     {
         return EvaluateAircraftRecoveryReach(
-            aircraft, snapshot, fromCell, tacticalPaths).Found;
+            aircraft, snapshot, fromCell, tacticalPaths, occupied).Found;
     }
 
     private AIReachDecisionResult<AircraftRecoveryAnchor>
@@ -47,7 +48,8 @@ public partial class AIController
             UnitManager aircraft,
             AIWorldSnapshot snapshot,
             Vector3Int fromCell,
-            Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths)
+            Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths,
+            HashSet<Vector3Int> occupied)
     {
         if (aircraft == null || snapshot == null
             || aircraft.GetAircraftType() == AircraftType.None)
@@ -65,10 +67,10 @@ public partial class AIController
             CurrentMovementBudget = Mathf.Max(0, aircraft.RemainingMovementPoints),
             EvaluateTactical = (int budget, out AIReachDecisionCandidate<AircraftRecoveryAnchor> candidate) =>
                 TryEvaluateAircraftRecoveryAnchor(
-                    anchors, snapshot, fromCell, tacticalPaths, budget, tactical: true, out candidate),
+                    anchors, snapshot, fromCell, tacticalPaths, occupied, budget, tactical: true, out candidate),
             EvaluateOperational = (int budget, out AIReachDecisionCandidate<AircraftRecoveryAnchor> candidate) =>
                 TryEvaluateAircraftRecoveryAnchor(
-                    anchors, snapshot, fromCell, null, budget, tactical: false, out candidate),
+                    anchors, snapshot, fromCell, null, occupied, budget, tactical: false, out candidate),
             DiagnosticLog = showAILogs ? (System.Action<string>)Debug.Log : null
         };
         return AIActionReachCoordinator.Evaluate(request);
@@ -79,12 +81,13 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
         out PlayerAction action)
     {
         action = null;
         AIReachDecisionResult<AircraftRecoveryAnchor> recovery =
             EvaluateAircraftRecoveryReach(
-                aircraft, snapshot, fromCell, paths);
+                aircraft, snapshot, fromCell, paths, occupied);
         if (!recovery.Found || recovery.Decision == null
             || paths == null || paths.Count == 0)
         {
@@ -122,6 +125,8 @@ public partial class AIController
             {
                 Vector3Int cell = rawCell;
                 cell.z = 0;
+                if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                    continue;
                 float score = -AIActionReachCoordinator.CubicDistance(
                     cell, target) * 1000f
                     - CalculateThreatLevel(cell, snapshot.AITeam)
@@ -178,6 +183,7 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths,
+        HashSet<Vector3Int> occupied,
         int budget,
         bool tactical,
         out AIReachDecisionCandidate<AircraftRecoveryAnchor> candidate)
@@ -205,6 +211,8 @@ public partial class AIController
             {
                 Vector3Int cell = rawCell;
                 cell.z = 0;
+                if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                    continue;
                 if (AIActionReachCoordinator.CubicDistance(cell, anchor.Cell) > anchor.ServiceRadius
                     || (isSupplier && !anchor.ServiceCells.Contains(cell)))
                     continue;

@@ -64,7 +64,7 @@ try{
     object Collect(){return collect.Invoke(ai,new object[]{aircraft,snapshot});}
     System.Collections.IList Filter(object anchors,System.Func<object,bool> accept){var result=(System.Collections.IList)System.Activator.CreateInstance(anchors.GetType());foreach(var a in(System.Collections.IEnumerable)anchors)if(accept(a))result.Add(a);return result;}
     System.Collections.IList Suppliers(object anchors){return Filter(anchors,a=>(string)Member(a,"Kind")=="supridor");}
-    object Decide(object anchors,System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>> paths,bool tactical=true){object[] args={anchors,snapshot,aircraft.CurrentCellPosition,paths,20,tactical,null};return(bool)evaluate.Invoke(ai,args)?args[6]:null;}
+    object Decide(object anchors,System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>> paths,bool tactical=true){object[] args={anchors,snapshot,aircraft.CurrentCellPosition,paths,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>(),20,tactical,null};return(bool)evaluate.Invoke(ai,args)?args[7]:null;}
     var neighbors=new System.Collections.Generic.List<UnityEngine.Vector3Int>();UnitMovementPathRules.GetImmediateHexNeighbors(map,supplier.CurrentCellPosition,neighbors);
     var bad=neighbors[0];var good=neighbors[1];map.SetTile(bad,forest.paletteTile);
     if(CanServe(bad)||!CanServe(good))throw new System.Exception("Consulta nao distinguiu floresta de planicie futura.");

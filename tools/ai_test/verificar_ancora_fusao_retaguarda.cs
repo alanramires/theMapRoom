@@ -87,7 +87,7 @@ try{
     if(rejections.Count!=1||!rejections[0].Contains("célula sob ameaça"))throw new System.Exception("Recusa nao registrada uma unica vez com motivo.");
     object Member(object value,string name){return value.GetType().GetField(name)?.GetValue(value)??value.GetType().GetProperty(name)?.GetValue(value);}
     var paths=UnitMovementPathRules.CalcularCaminhosValidos(map,receiver,receiver.RemainingMovementPoints,terrain);
-    var recovery=typeof(AIController).GetMethod("EvaluateAircraftRecoveryReach",flags).Invoke(ai,new object[]{receiver,snapshot,receiver.CurrentCellPosition,paths});
+    var recovery=typeof(AIController).GetMethod("EvaluateAircraftRecoveryReach",flags).Invoke(ai,new object[]{receiver,snapshot,receiver.CurrentCellPosition,paths,new System.Collections.Generic.HashSet<UnityEngine.Vector3Int>()});
     if((bool)Member(recovery,"Found")){
         var decision=Member(recovery,"Decision");if((string)Member(decision,"Reason")=="fusao")throw new System.Exception("Recuperacao escolheu parceiro cercado.");
     }else{

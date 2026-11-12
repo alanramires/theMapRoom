@@ -432,7 +432,7 @@ public partial class AIController
             : occupied;
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
         bool aircraftHasRecoveryInTacticalOrOperationalReach = !aircraftRepair
-            || HasAircraftRecoveryWithinReach(unit, snapshot, fromCell, paths);
+            || HasAircraftRecoveryWithinReach(unit, snapshot, fromCell, paths, occupied);
         int aircraftMovementAllowance = 0;
         int aircraftNextUpkeep = 0;
         int aircraftCriticalThreshold = 0;
@@ -886,7 +886,7 @@ public partial class AIController
         if (aircraftRepair
             && aircraftHasRecoveryInTacticalOrOperationalReach
             && TryBuildAircraftRecoveryApproachAction(
-                unit, snapshot, fromCell, paths,
+                unit, snapshot, fromCell, paths, occupied,
                 out PlayerAction recoveryApproach))
         {
             return recoveryApproach;
