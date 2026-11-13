@@ -1,15 +1,30 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-10, **depois** da tag `v10.8.0`.
+Ponto de retomada. Atualizado em 2026-11-12, **depois** da tag `v10.10.0`.
 Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.9.1` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
-v9.2.0. Relatórios: [`relatorio_v10.9.1.md`](relatorio_v10.9.1.md),
-[`relatorio_v10.9.0.md`](relatorio_v10.9.0.md), [`relatorio_v10.8.0.md`](relatorio_v10.8.0.md).
+`v10.10.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.10.0.md`](relatorio_v10.10.0.md),
+[`relatorio_v10.9.1.md`](relatorio_v10.9.1.md), [`relatorio_v10.9.0.md`](relatorio_v10.9.0.md).
+
+**A descoberta da v10.10.0: o turno da IA congelava o frame por 14 s, e ninguém tinha
+medido.** Plano 6,5 s, pré-compra 1,5 s, compra 6,5 s, num mapa de 86 unidades; o jogador via
+tela morta. Nenhum era algoritmo: eram **três utilitários com nome de consulta e corpo de
+varredura, chamados em laço por célula** — `ResolveAISlotKey` (`FindAnyObjectByType` em 264
+sítios), `GetStructureAtCell` (`FindObjectsByType<RoadNetworkManager>` por célula da linha de
+tiro, por célula do envelope, por aeronave inimiga) e `CalcularCaminhosValidos` com orçamento 30
+(o estado é `(célula, passos exatos)`, então **enumera passeios, não caminhos**: 57 células em
+1,7 s). Fechou em **3 s** com cache por cena, registro `RoadNetworkManager.AllActive` e matriz
+do plano por `CalculateMovementCostMap`. A hipótese do autor ("o AI Step tá rastreando tudo") e
+duas minhas (solver, recrutamento do rally) caíram pelo número; os oito scripts de
+`tools/perf/` são o método. Também entraram: frota de Chinooks pela **fila persistente** (visto
+em Play: "parou de spamar soldadinhos"), **acesso do Serviço do Comando é do transportador** e a
+família pousa uma vez, recuperação aérea em célula livre, carga com tarefa atendida. E o
+`docs/checklist_logs_publicacao.md`: `showAILogs` desligado gateia 12 das 541 linhas `[AI …]`.
 
 **A noite da v10.9.1: o GoGreen de Golf disparou sozinho no T12** (`cap=7/4 ruptura=3/2`, sem
 artilharia), e cinco marcas viraram cinco réguas: aeronave com vaga em rally montando fica na
@@ -437,6 +452,28 @@ Sem HQ, os dois lados do Q3 e do Q4 são facção sem QG (v8.6.1, Frente 4; desd
 ---
 
 ## Onde eu parei
+
+### O que a v10.10.0 deixou — os 3 s que sobraram e os logs
+
+1. **Logs sem gate antes da versão:** `docs/checklist_logs_publicacao.md`, seção C. Decisão
+   do autor entre a chave do build (`Debug.unityLogger.filterLogType = Warning` fora do Editor,
+   recomendada) e flags novas na janela `Tools ▸ Publicação ▸ Checklist`. O
+   `[AI Turn Transition Timing]` (~15 linhas por turno) entrou hoje sem flag.
+2. **Commit pré-compra de 1,5 s:** `[AI Commit Heavy]` soma 1.504 ms com todos os parciais em
+   0 ms; o custo está fora dos trechos cronometrados de `CommitAIWorldHeavy`
+   (`AIController.WorldCommit.cs:193-256`). É a próxima tela morta visível. Depois dela,
+   `PressaoCaronaService.Read` (0,4 s por slot) e o setup do plano (870 ms antes do Passo 1).
+3. **`pergunte-me` da Correção 2:** `PodeMirarSensor.TryResolveCellVision`
+   (`PodeMirarSensor.cs:1868`) duplica `ObservationCellService.TryResolveCellVision` sem o cache
+   por refresh, e **não são idênticas** (sem ocupante: Land/Surface na cópia; camada por
+   `TryResolveObservationLayer` no serviço). O CLAUDE.md diz que o serviço é a base.
+4. **`CalcularCaminhosValidos` acima do MP** segue enumerando passeios para Handoff, Initiative,
+   Progression e Router. Podar estados dominados mexe no bônus de estrada: `pergunte-me`.
+   `TryGetLandMovementDistance` custa 1,8 ms por chamada; hoje não é gargalo.
+5. **Consolidar:** interceptador sem terciário e ar com vaga na área do rally cumprem os três
+   sinais (relatório v10.10.0, "Prontos para consolidar"). Primeiro item desde a v10.8.0.
+6. Carregados da v10.9.1 (abaixo): marcha de Golf, invasão por ilha, teto 60 vs 40, passageiro
+   segurando vaga, eixo forte/fraco. Nenhum andou hoje.
 
 ### O que a v10.9.1 deixou — ver a marcha
 
@@ -1001,6 +1038,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **o fix isolado passa e o turno real não** | `medir_planner` caiu de 8,9 s para 0,5 s e o `BuildObjectivePlan` do turno real seguiu em 6,4 s: o replay refaz o plano com os capturadores já atribuídos, e a matriz só roda para quem está livre. Custo que roda **uma vez por turno** só se mede no turno real (marcas do `[AI Perf]`), nunca por replay |
+| **caminho enumerado não é custo** | `CalcularCaminhosValidos(…, 30)` enumera passeios (estado por passos exatos): 57 células em 1,7 s, linear no orçamento mesmo com a malha saturada. Distância para decidir é `CalculateMovementCostMap` (3 ms); caminhos válidos só com o MP real da unidade |
+| **`showAILogs` não cala a IA** | gateia 12 das 541 linhas `[AI …]` do `TL()`; os `[AI Perf]`, `[AI Commit Heavy]`, `[AI Turn Transition Timing]` e `[SectorManager][Perf]` não têm flag. Ver `docs/checklist_logs_publicacao.md` antes de afirmar que um build está sem log |
 | **guarda nova que desliga a antiga** | o commit do ar no rally pôs `!assembling &&` na frente de `TryResolveInterceptorOperationalPursuit` e o Caça A perdeu a proteção contra o terciário; a revisão deixou passar. Todo `&&` novo numa condição existente é lido como "o que isto tira", não só "o que isto põe" |
 | **doutrina lembrada ≠ doutrina escrita** | o autor lembrava "interceptador não ataca solo"; o código dizia "adia se há presa aérea". Antes de responder "isso já existe", leia a condição da regra, não o nome dela. `Tertiary` é o padrão para classe não listada na ficha, não uma linha apagável |
 | **a barra da tela é o fato do turno** | `EvaluateRallyReadiness` é cacheada por rally, slot e turno; a tela lê o mesmo fato de propósito. Unidade que entra na área no meio do turno só muda a prontidão no próximo planner. Para ver "agora", dump de presença (`IsRallyParticipantPresent`), não a tela |
@@ -1264,3 +1304,15 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
     Antes de criar gate, contagem ou vaga, ache o dono (`EvaluateRallyReadiness`,
     `EnsureRallyRoleSlots`, `IsRallyParticipantPresent`) e faça os três lerem dele — e se a
     régua é doutrina configurável, ela mora em asset (`UnitRoleCatalog`), não em `switch`.
+
+14. **Serviço burro não busca a cena, e pergunta de distância não pede caminho.** A regra 2 já
+    dizia do `GetConstructionAtCell`; na v10.10.0 caíram os irmãos: `ResolveAISlotKey` fazia
+    `FindAnyObjectByType` em 264 sítios e `StructureOccupancyRules.GetStructureAtCell` fazia
+    `FindObjectsByType` por célula da linha de tiro — 14 s de frame congelado por turno. Um
+    `Find*` dentro de um serviço que outros chamam em laço é defeito mesmo que cada chamada seja
+    "só 0,8 ms"; o serviço lê um registro (`ConstructionManager.AllActive`,
+    `RoadNetworkManager.AllActive`, `AIController.Instance.Match`). E quem precisa de distância
+    pede custo a `CalculateMovementCostMap`, não caminhos a `CalcularCaminhosValidos` com
+    orçamento inventado: a busca de caminhos enumera passeios acima do MP real. Antes de otimizar,
+    **meça o turno real**: a hipótese "é o AI Step" e as hipóteses "é o solver" e "é o rally"
+    caíram pelo número, e o fix isolado que "passou" deixou 6,4 s no turno de verdade.
