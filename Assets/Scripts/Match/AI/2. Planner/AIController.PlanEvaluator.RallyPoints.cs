@@ -1307,6 +1307,7 @@ public partial class AIController
         if (centerObjs.Count == 0)
             return;
 
+        double rallyPerfStart = objectivePlanPerfClock?.Elapsed.TotalMilliseconds ?? 0;
         int recruited = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
@@ -1337,13 +1338,20 @@ public partial class AIController
             recruited++;
         }
 
+        objectivePlanPerfRallyRecruit += (objectivePlanPerfClock?.Elapsed.TotalMilliseconds ?? 0) - rallyPerfStart;
+        MarkObjectivePlanPerf("rally_recruit");
+
         // APC mínimo por centro (infantaria distante daquele centro).
         for (int i = 0; i < centerObjs.Count; i++)
         {
+            double rallyPerfDistant = objectivePlanPerfClock?.Elapsed.TotalMilliseconds ?? 0;
             int distantInfantry = CountDistantRallyInfantry(centerObjs[i], aiTeam, centerAnchors[i]);
+            objectivePlanPerfRallyDistant += (objectivePlanPerfClock?.Elapsed.TotalMilliseconds ?? 0) - rallyPerfDistant;
+            double rallyPerfLoaded = objectivePlanPerfClock?.Elapsed.TotalMilliseconds ?? 0;
             int desiredApcs = Mathf.Max(
                 Mathf.CeilToInt(distantInfantry / (float)RallyUsefulApcCapacity),
                 CountLoadedRallyTransporters(centerObjs[i], aiTeam));
+            objectivePlanPerfRallyLoaded += (objectivePlanPerfClock?.Elapsed.TotalMilliseconds ?? 0) - rallyPerfLoaded;
             EnsureRallyTransportMinimumSlots(centerObjs[i], desiredApcs);
         }
 

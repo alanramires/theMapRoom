@@ -9,6 +9,7 @@ public partial class AIController
 
     private IEnumerator Phase0_WaitForTurnReady()
     {
+        MarkAITurnTransition("stage0_start");
         if (ShouldStopAIForMatchEnd("phase0_start"))
             yield break;
 
@@ -32,6 +33,7 @@ public partial class AIController
             }
         }
 
+        MarkAITurnTransition("stage0_turn_effects_ready");
         if (turnStateManager != null)
         {
             yield return WaitUntilWatched(
@@ -39,6 +41,7 @@ public partial class AIController
                 "phase0_command_service");
             if (ShouldStopAIForMatchEnd("phase0_apos_command_service"))
                 yield break;
+            MarkAITurnTransition("stage0_auto_service_idle");
             yield return WaitUntilWatched(
                 () => turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral,
                 "phase0_neutral");
@@ -46,9 +49,11 @@ public partial class AIController
                 yield break;
         }
 
+        MarkAITurnTransition("stage0_neutral_ready");
         float batchDelay = GetBatchDelay();
         if (batchDelay > 0f) yield return new WaitForSeconds(batchDelay);
 
+        MarkAITurnTransition("stage0_end");
         Debug.Log($"{TL()} Fase0 concluída.");
     }
 }

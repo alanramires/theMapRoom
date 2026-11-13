@@ -1022,6 +1022,7 @@ public partial class AIController
         aiReviewVisualAction = action;
         aiReviewHistory.Add(pendingAIReview);
         if (aiReviewHistory.Count > 100) aiReviewHistory.RemoveAt(0);
+        MarkFirstShoppingDecisionReady(action, pendingAIReview.decision, reviewReady: true);
         Debug.Log($"[AI Review] #{pendingAIReview.id} pendente: {pendingAIReview.decision}");
         // Nao chama sensores de preview nem executa entradas. Tabuleiro permanece confirmado.
         yield return new WaitUntil(() => aiReviewApproved || pendingAIReview == null || IsMatchEnded());
@@ -1694,6 +1695,8 @@ public partial class AIController
         }
 
         bool reviewed = aiStep;
+        if (!reviewed && shoppingFirstDecisionTimer != null)
+            MarkFirstShoppingDecisionReady(action, BuildDebugStepDescription(action), reviewReady: false);
         if (reviewed)
         {
             yield return WaitForAIReview(action);
@@ -1720,6 +1723,8 @@ public partial class AIController
 
         if (reviewed && pendingAIReview != null) pendingAIReview.status = "executando";
         aiTurnBatchExecuting = true;
+        if (action.ActionType == PlayerActionType.EndTurn)
+            MarkAITurnTransition("end_turn_execute");
         replayManager.ExecuteLiveAIBatch(action, iaRapida);
         yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
         lastAIBatchSucceeded =

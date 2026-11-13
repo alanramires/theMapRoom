@@ -56,6 +56,7 @@ public partial class AIController
         TeamId aiTeam = matchController != null
             ? matchController.GetVisualTeamForSlot(aiSlot)
             : TeamId.Neutral;
+        MarkAITurnTransition("ai_turn_start");
         float turnStart = Time.realtimeSinceStartup;
         if (showAILogs)
             Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
@@ -104,11 +105,14 @@ public partial class AIController
             }
         }
 
+        MarkAITurnTransition("turn_start_commit_begin");
         float tCommit = Time.realtimeSinceStartup;
         yield return CommitAIWorldHeavy(aiSlot, "turn-start", rebuildPlan: false);
         Debug.Log($"[AI Perf] CommitAIWorldHeavy: {(Time.realtimeSinceStartup - tCommit) * 1000f:F0}ms");
 
+        MarkAITurnTransition("turn_start_commit_end");
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiSlot, matchController);
+        MarkAITurnTransition("turn_snapshot_ready");
         RememberAIReviewStance(snapshot, "turn_snapshot");
         yield return null;
         aiTurnNumber = snapshot.TurnNumber;
@@ -117,6 +121,7 @@ public partial class AIController
                   $"| {snapshot.MyUnits.Count} unidades | {snapshot.EnemyUnits.Count} inimigos visíveis " +
                   $"| R$ {snapshot.Budget}");
 
+        MarkAITurnTransition("turn_plan_begin");
         bool shouldReuseSavedPlan = resumeStage >= 2 && HasUsableSavedObjectivePlan(aiTeam);
         if (shouldReuseSavedPlan)
         {
@@ -139,7 +144,8 @@ public partial class AIController
             currentAIStage = Mathf.Max(1, resumeStage);
             float tPlan = Time.realtimeSinceStartup;
             BuildObjectivePlan(snapshot);
-            Debug.Log($"[AI Perf] BuildObjectivePlan: {(Time.realtimeSinceStartup - tPlan) * 1000f:F0}ms");
+            MarkAITurnTransition("turn_plan_ready");
+            Debug.Log($"[AI Perf] BuildObjectivePlan: {(Time.realtimeSinceStartup - tPlan) * 1000f:F0}ms{lastObjectivePlanPerf}");
             yield return null;
             float tAnalyzer = Time.realtimeSinceStartup;
             AITacticalAnalyzer.Instance.Rebuild(snapshot, ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam))));
@@ -147,6 +153,7 @@ public partial class AIController
             yield return null;
         }
 
+        MarkAITurnTransition("turn_plan_analyzer_ready");
         if (emulateStage1 && resumeStage <= 1)
         {
             currentAIStage = 1;

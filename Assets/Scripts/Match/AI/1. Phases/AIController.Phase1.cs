@@ -8,6 +8,7 @@ public partial class AIController
 {
     private IEnumerator Phase1_CommandService(AIWorldSnapshot snapshot)
     {
+        MarkAITurnTransition("stage1_start");
         if (ShouldStopAIForMatchEnd("phase1_start"))
             yield break;
 
@@ -25,6 +26,7 @@ public partial class AIController
             if (u != null && u.SlotIndex == snapshot.AISlotIndex && !u.IsDead)
                 UpdateRepairState(u, repairPlan);
 
+        MarkAITurnTransition("stage1_repair_states_ready");
         if (replayManager == null)
         {
             Debug.LogWarning($"{TL()} Fase1 — replayManager é null, abortando.");
@@ -39,6 +41,7 @@ public partial class AIController
         }
 
         Debug.Log($"{TL()} Fase1 — enviando batch CommandService.");
+        MarkAITurnTransition("command_service_ready", finish: true);
         yield return ExecuteAIBatchWithDebugStep(BuildCommandServiceBatch(snapshot.AITeam));
         if (ShouldStopAIForMatchEnd("phase1_apos_batch"))
             yield break;

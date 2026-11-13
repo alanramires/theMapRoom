@@ -83,7 +83,41 @@ public partial class AIController
         }
     }
 
+    private System.Diagnostics.Stopwatch objectivePlanPerfClock;
+    private System.Text.StringBuilder objectivePlanPerfMarks;
+    private string lastObjectivePlanPerf = "";
+    private int objectivePlanPerfFree, objectivePlanPerfObjectives, objectivePlanPerfNu;
+    private double objectivePlanPerfRallyRecruit, objectivePlanPerfRallyDistant, objectivePlanPerfRallyLoaded;
+
+    private void MarkObjectivePlanPerf(string step)
+    {
+        if (objectivePlanPerfClock == null) return;
+        objectivePlanPerfMarks.Append(' ').Append(step).Append('=')
+            .Append(objectivePlanPerfClock.ElapsedMilliseconds).Append("ms");
+    }
+
     private void BuildObjectivePlan(AIWorldSnapshot snapshot)
+    {
+        objectivePlanPerfClock = System.Diagnostics.Stopwatch.StartNew();
+        objectivePlanPerfMarks = new System.Text.StringBuilder();
+        objectivePlanPerfFree = objectivePlanPerfObjectives = objectivePlanPerfNu = 0;
+        objectivePlanPerfRallyRecruit = objectivePlanPerfRallyDistant = objectivePlanPerfRallyLoaded = 0;
+        try { BuildObjectivePlanCore(snapshot); }
+        finally
+        {
+            MarkObjectivePlanPerf("fim");
+            lastObjectivePlanPerf = objectivePlanPerfMarks.ToString()
+                + $" rally_recruit_cost={objectivePlanPerfRallyRecruit:F2}ms"
+                + $" rally_distant_cost={objectivePlanPerfRallyDistant:F2}ms"
+                + $" rally_loaded_cost={objectivePlanPerfRallyLoaded:F2}ms"
+                + $" livres={objectivePlanPerfFree} objetivos={objectivePlanPerfObjectives} nu={objectivePlanPerfNu}";
+            objectivePlanPerfClock.Stop();
+            objectivePlanPerfClock = null;
+            objectivePlanPerfMarks = null;
+        }
+    }
+
+    private void BuildObjectivePlanCore(AIWorldSnapshot snapshot)
     {
         TeamId aiTeam = snapshot.AITeam;
         PlayerSlotId aiSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
@@ -138,6 +172,7 @@ public partial class AIController
         // "nao existe rally meu neste mapa".
         bool rallyGateApplicableForDissolve = MapHasAnyRallyPointForSlot(snapshot.AISlotIndex);
 
+        MarkObjectivePlanPerf("setup");
         // Passo 1: valida objetivos existentes
         for (int i = plan.Objectives.Count - 1; i >= 0; i--)
         {
@@ -270,6 +305,7 @@ public partial class AIController
             }
         }
 
+        MarkObjectivePlanPerf("passo1");
         // Passo 2: adiciona objetivos para setores ainda n�o cobertos.
         // CÓPIA defensiva: GetAllSectorInfos/GetAllBaseInfos retornam as LISTAS INTERNAS VIVAS do
         // SectorManager (não cópias). Criar objetivos dentro dos loops abaixo pode disparar um
@@ -516,6 +552,7 @@ public partial class AIController
             addedSectors++;
         }
 
+        MarkObjectivePlanPerf("passo2");
         // Passo 2b: cascata deferred
         foreach (SectorObjective obj in selectionCascadeDeferred)
         {
@@ -533,6 +570,7 @@ public partial class AIController
             addedSectors++;
         }
 
+        MarkObjectivePlanPerf("passo2b");
         // Passo 2c: base inimiga (invasao ">>")
         // A invasao SO e alocada quando um rally ja juntou massa (GoGreen) — nao porque a AI quer.
         // Sem isso, unidades soltas marcham 11-12h sozinhas ate a base inimiga (suicidas). O rally
@@ -709,6 +747,7 @@ public partial class AIController
             }
         }
 
+        MarkObjectivePlanPerf("passo2c");
         // Passo 3: recalcula prioridades e ordena
         foreach (SectorObjective obj in plan.Objectives)
         {
@@ -722,6 +761,7 @@ public partial class AIController
 
         SortPlanObjectivesByStrategicPriority(plan, aiTeam, priorityNumberAscending: false);
 
+        MarkObjectivePlanPerf("passo3");
         // Passo 3c: objetivos defensivos
         {
             int DefenseEnemyRange = defenseEnemyRange;
@@ -789,6 +829,7 @@ public partial class AIController
         plan.HandoffVacaterIds.Clear();
         plan.VacaterForwardSectors.Clear();
 
+        MarkObjectivePlanPerf("passo3c");
         // Passo 3b: handoff
         EvaluateCaptureHandoffs(plan, aiTeam);
 
@@ -806,12 +847,14 @@ public partial class AIController
         // Modelo multi-centro: cada rally held é um centro próprio (sem foco/feeder/dreno).
         // NÃO consolidar — unidades montam no rally mais próximo, e a prontidão é combinada.
 
+        MarkObjectivePlanPerf("passo3_handoffs");
         // Passo 4: coleta IDs j� atribu�dos
         var assignedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Filled) assignedIds.Add(slot.AssignedUnitId);
 
+        MarkObjectivePlanPerf("passo4");
         // Passo 5: atribui capturadores livres
         plan.RogueUnitIds.Clear();
         List<UnitManager> allCapturers  = GetAvailableCapturers(aiTeam);
@@ -876,6 +919,7 @@ public partial class AIController
             && freeCapturers.Count < openOffensiveObjCount;
         const float MaxCoArrivalGap = 5f;
         var cascadeCovered = new HashSet<ConstructionSector>();
+        MarkObjectivePlanPerf("passo5a");
         var assignableObjs = new List<(SectorObjective obj, Vector3Int cell)>();
 
         // Hard Mode — distribuição em largura ENTRE turnos: as vagas dobradas (2ª+) de um setor só
@@ -977,7 +1021,11 @@ public partial class AIController
                 MarkCascadeNeighbor1(obj.Sector, cascadeCovered, aiTeam, plan.VacaterForwardSectors, rallyContext);
         }
 
+        objectivePlanPerfFree = freeCapturers.Count;
+        objectivePlanPerfObjectives = assignableObjs.Count;
         int nu = Mathf.Min(freeCapturers.Count, assignableObjs.Count);
+        objectivePlanPerfNu = nu;
+        MarkObjectivePlanPerf("5b_preparo");
         if (nu > 0)
         {
             int nObj = assignableObjs.Count;
@@ -1054,11 +1102,13 @@ public partial class AIController
                 }
             }
 
+            MarkObjectivePlanPerf("5b_matriz");
             int[] bestAssign = new int[nu];
             float bestCost   = float.MaxValue;
             SolveAssignment(freeCapturers, assignableObjs,
                 new bool[nObj], new int[nu],
                 0, nu, 0f, distMatrix, ref bestCost, ref bestAssign);
+            MarkObjectivePlanPerf("5b_solver");
 
             for (int i = 0; i < nu; i++)
             {
@@ -1071,10 +1121,12 @@ public partial class AIController
             freeCapturers.RemoveRange(0, nu);
         }
 
+        MarkObjectivePlanPerf("passo5b");
         // Passo 5b-2: troca pelo Tatico entre quem JA tem vaga (o plano persiste; a matriz
         // acima so ve capturador livre).
         SwapCapturersForTacticalCapture(plan, aiTeam);
 
+        MarkObjectivePlanPerf("5b2_troca");
         // Passo 5c: assaltos prim�rios
         {
             var assignedAfterCapturers = new HashSet<int>();
@@ -1269,6 +1321,7 @@ public partial class AIController
             }
         }
 
+        MarkObjectivePlanPerf("5c_assalto");
         // Passo 5d: rogues pr�ximos refor�am defesa
         {
             int maxDefenders  = 3;
@@ -1313,6 +1366,7 @@ public partial class AIController
             foreach (UnitManager u in rogueAssigned) freeCapturers.Remove(u);
         }
 
+        MarkObjectivePlanPerf("5d_rogue");
         // Passo 5e: rogues pr�ximos refor�am captura em desvantagem
         {
             const int MaxCaptureReinforcements = 2;
@@ -1372,6 +1426,7 @@ public partial class AIController
             plan.RogueUnitIds.Add(u.InstanceId);
         }
 
+        MarkObjectivePlanPerf("5e_rogue");
         // Passo 5h: endgame all-in — quando todos os setores regulares estão controlados,
         // absorve rogues e assaltos livres no plano de invasão da base inimiga.
         {
@@ -1418,13 +1473,16 @@ public partial class AIController
             }
         }
 
+        MarkObjectivePlanPerf("5h_endgame");
         // Passo 5g: artilharia livre acompanha o front
         {
             // Antes da distribuição genérica, concentra rogues próximos no melhor rally
             // ainda incompleto. Um único assembly completo já libera massa de invasão.
             // Rally assegurado inicia a concentracao final: toda unidade operacional realmente
             // livre entra sem teto; infantaria distante ainda gera backlog minimo de APC.
+            MarkObjectivePlanPerf("rally_recruit_inicio");
             RecruitFreeUnitsForRally(plan, aiTeam, assignedIds);
+            MarkObjectivePlanPerf("rally_apc");
             RecruitNearbyRogueArtilleryForRally(plan, aiTeam, assignedIds);
 
             List<UnitManager> freeFireSupports = GetAvailablePrimaryFireSupports(aiTeam);
@@ -1498,6 +1556,7 @@ public partial class AIController
             }
         }
 
+        MarkObjectivePlanPerf("5g_suporte");
         // Passo 5f: atribui transportadores livres
         {
             List<UnitManager> freeTransporters = GetAvailableTransporters(aiTeam);
@@ -1643,6 +1702,7 @@ public partial class AIController
             }
         }
 
+        MarkObjectivePlanPerf("5f_transportes");
         // Passo 6: reaplica HUD + libera suporte sem capturador
         ReleaseOffensiveSupportWithoutCapturer(plan, aiTeam);
 
@@ -1661,6 +1721,7 @@ public partial class AIController
                     if (u != null) ApplyPlanHUD(u, obj, slot.Role);
                 }
 
+        MarkObjectivePlanPerf("passo6");
         // Passo 7: limpa badge de unidades fora de qualquer slot ativo
         var slottedIds = new HashSet<int>();
         foreach (SectorObjective obj in plan.Objectives)
@@ -1672,12 +1733,14 @@ public partial class AIController
             if (!slottedIds.Contains(u.InstanceId)) u.ClearAIAssignedPlan();
         }
 
+        MarkObjectivePlanPerf("passo7");
         // Passo 8: atualiza dist�ncias reais de cada slot at� seu objetivo
         RefreshSlotDistances(plan, aiTeam);
 
         // O planner ja distribuiu unidade + setor aos capturadores formais.
         // Publica essas ordens diretamente; MelhorCaptura fica reservado aos
         // capturadores SEM plano, que disputam apenas o resto da refeicao.
+        MarkObjectivePlanPerf("passo8_distancias");
         PublishPlannedCapturerMissionIntents(plan, aiTeam);
 
         // Atribuicao residual N rogues x M construcoes restantes. O solve
@@ -1691,6 +1754,7 @@ public partial class AIController
                 CapturerRideOperationalTurns,
                 plan);
 
+        MarkObjectivePlanPerf("capture_claims");
         int totalAssigned = 0;
         var planLog = new System.Text.StringBuilder();
         planLog.AppendLine($"{TL("Plan")} {aiTeam} � {plan.Objectives.Count} objetivos:");
@@ -1716,7 +1780,9 @@ public partial class AIController
             $" / {captureClaims.Unmatched.Count} sem par");
         Debug.Log(planLog.ToString());
 
+        MarkObjectivePlanPerf("plan_log");
         AISectorIntentAnalyzer.RebuildAndLog(snapshot, plan, intel, "Plan");
+        MarkObjectivePlanPerf("sector_intent");
     }
 
     private ConstructionSector ResolveUnitSectorForPlan(UnitManager unit)
