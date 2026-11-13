@@ -80,3 +80,54 @@ Continuação do trabalho registrado em `relatorio_2026-11-11.md`.
 - Scripts do revisor preservados em `tools/perf/medir_slotkey.cs`, `medir_planner.cs`, `medir_shopping.cs`. O planner equivale a dois replans; os outros não compram nem movem unidades.
 
 **Validação:** `verificar_cache_match_ia` PASS fora do Play: Match da instância vence fallback global, cor repetida usa ativo, único não ativo é preservado, cor ambígua retorna -1, mil leituras reutilizam fallback, ausência cacheada não busca; handlers de sceneLoaded e OnDestroy invalidam. Regressões solicitadas PASS: `verificar_frota_chinook`, `verificar_prontidao_rally`, `verificar_shopping_sem_qg`. `bash tools/compilar.sh`: ambos assemblies verdes. Comparação de desempenho acima foi observada em Play; fixtures de semântica foram executados fora do Play. Um commit de correção; parada para revisão com o limite residual explicitado.
+
+
+### Desempenho — registro de RoadNetworkManager em Play (Correção 1)
+
+- `RoadNetworkManager.AllActive` é mantido por OnEnable/OnDisable, sem busca da cena por consulta nem limpeza em sceneLoaded. `StructureOccupancyRules.GetStructureAtCell` lê o registro em Play, inclusive vazio; fora do Play mantém FindObjectsByType para ferramentas. Mantidos normalização z, atividade do objeto, IsCompatibleReference e TryGetStructureAtCell. A lista mantém a ordem de registro, sem ordenação nova; a busca anterior usava FindObjectsSortMode.None (ordem não garantida pela API). Não foi feita a unificação de visão do PodeMirarSensor com ObservationCellService (Correção 2 exige decisão posterior).
+- Cronômetro `[AI Shopping Timing]` condicionado a aiStep. Marcas da transição de turno já pendentes foram usadas para observar o planner sem alterar a decisão.
+
+| Medição em Play, mesmo save T14 slot 1 | Antes | Depois |
+|---|---:|---:|
+| `medir_anel_aereo`: nove envelopes, caches limpos pelo script | 7.513 ms | 253 ms |
+| `medir_linha_tiro`: linha de tiro com LoS, por chamada | 3,960084 ms | 0,066804 ms |
+| Linha de tiro sem LoS, por chamada | 2,141780 ms | 0,055558 ms |
+| Controle: busca FindObjectsByType de RoadNetworkManager | 0,924944 ms | 0,750111 ms |
+| `medir_los`: GetStructureAtCell, por chamada | não medido nesta rodada | 0,0002141 ms |
+| Shopping real T14 slot 1: decide | 6.567 ms | 256 ms |
+| Shopping real: commit / snapshot / restante | 1.547 / 0 / 74 ms | 1.504 / 0 / 85 ms |
+| Shopping real: primeira compra pronta (Caça B em 13,3) | 8.188 ms | 1.845 ms |
+| Novo turno T15 slot 0: BuildObjectivePlan | 6.505 ms | 6.383 ms |
+| Novo turno: TacticalAnalyzer.Rebuild | 9 ms | 9 ms |
+| Fase 4 até antes de chamar Serviço do Comando | 8.210 ms | 8.035 ms |
+
+- Metas da consulta (<0,1 ms) e envelopes (<2 s) atingidas. Mesmas nove aeronaves, combustível e contagens de células de movimento/ataque nos dois benchmarks. Não prova equivalência de cada célula; somente das contagens observadas.
+- Limite da comparação do shopping real: os benchmarks foram executados antes da compra e aqueceram caches. Os envelopes foram medidos frios porque o script limpa os caches; o novo planner foi observado após a troca real de turno, sem executar medição prévia naquele turno.
+- **Ainda sobra mais de 1 s:** BuildObjectivePlan do novo turno continua em 6,383 s; pré-shopping continua em 1,504 s. A Correção 1 resolve o custo medido da consulta e dos envelopes, mas não resolve todo o planner. Não atribuir esse residual à cópia de TryResolveCellVision sem medir. Correção 2 não aplicada.
+- Transição depois: execução de passar a vez em 707 ms, Serviço do Comando pronto em 8.035 ms; a diferença é 7.328 ms. O total desde a entrada da Fase 4 inclui 685 ms entre Neutral e executar o batch, onde pode entrar aprovação do AI Step. Fase 0: 605 ms, commit inicial: 21 ms; snapshot <1 ms e estados de reparo <1 ms.
+- Validação: `bash tools/compilar.sh` verde (Assembly-CSharp e Editor); `verificar_frota_chinook`, `verificar_prontidao_rally` e `verificar_shopping_sem_qg` PASS fora do Play. Benchmark e transições acima observados em Play. Sem mudança em regras de visão, prontidão, compras ou ações transacionais.
+
+
+### Desempenho — matriz de atribuição por custo em MP (somente planner)
+
+- Instrumentação por passo confirmou no turno real T15 azul: BuildObjectivePlan 6.406 ms, setup 843 ms; passo 5b entre 872 e 6.253 ms = 5.381 ms na matriz, solver <1 ms, livres=4, objetivos atribuíveis=5, nu=4. Recrutamento de 15 no rally custou 0,96 ms, contagens de infantaria distante/carregados 0,43/0,31 ms; não eram a causa. Treze objetivos totais não significavam treze candidatos ao solver.
+- Correção em `AIController.PlanEvaluator.cs`: matriz 5b e `PlanAssignmentDistance` do swap substituem CalcularCaminhosValidos por CalculateMovementCostMap, origem da unidade, orçamento 30. O valor disponível passa a ser custo em MP; preservados fallback TryGetLandMovementDistance/HexDistance, PlanBudget, solver, pesos e envelope tático de captura. `UnitMovementPathRules` não foi alterado.
+- `medir_atribuicao.cs` passou a medir a mesma consulta de custo em MP do planner; antes foi executado com CalcularCaminhosValidos. Não comparar os nomes como se fossem a mesma função: a substituição é justamente a correção.
+
+| Medição | Antes | Depois |
+|---|---:|---:|
+| Benchmark slot 0, 26 capturadores, consulta com orçamento 30 | 31.284 ms (caminhos) | 68 ms (custos) |
+| Benchmark slot 1, 23 capturadores, consulta com orçamento 30 | 20.555 ms (caminhos) | 73 ms (custos) |
+| Maior malha slot 0 / slot 1 | 57 / 82 células | 57 / 82 células |
+| Envelope captura frio slot 0 / slot 1 | 420 / 71 ms | 56 / 227 ms |
+| Envelope captura quente slot 0 / slot 1 | 26 / 24 ms | 25 / 23 ms |
+| Controle distância terrestre, por chamada | 1,285321 ms | 1,303214 ms |
+| Turno real T15 slot 0: matriz 5b | 5.381 ms | 62 ms |
+| Turno real: solver | <1 ms | <1 ms |
+| Turno real: BuildObjectivePlan | 6.406 ms | 1.124 ms |
+| Turno real: setup | 843 ms | 870 ms |
+| Fase 4 até antes de chamar Serviço do Comando | 8.139 ms | 2.974 ms |
+
+- Meta da matriz <100 ms atingida no turno real, antes de rodar o benchmark do depois (sem aquecimento por esse script). A linha foi `5b_preparo=900ms 5b_matriz=962ms 5b_solver=962ms ... livres=4 objetivos=5 nu=4`; são marcos acumulados, portanto matriz=62 ms. Setup permanece com 870 ms, distâncias finais ~133 ms; nenhuma correção extra neste bloco.
+- Atribuições: comparação dos JSONs de AI Review do Serviço do Comando T15 azul antes/depois, `stateBeforeDecision.planJson`, mostrou os mesmos 28 pares preenchidos de papel Capturador (InstanceId/setor), incluindo duplicações de vagas em rally já existentes. Não foi só comparação visual. Console depois mostrou #94→Echo, #103→Juliet, #127→Golf, #125→Mike e #58→Papa, seguidos das publicações de Papa para os participantes do rally; o planner não foi reexecutado para essa leitura.
+- Validação: compilação Assembly-CSharp e Editor verde; `verificar_prontidao_rally`, `verificar_frota_chinook`, `verificar_shopping_sem_qg` PASS fora do Play. Desempenho e plano final comparados em Play no mesmo save T14 slot 1 avançado até T15 slot 0. Benchmark do depois foi executado só após ler o turno real. Sem alteração do solver ou dos sensores de movimento.
