@@ -10527,7 +10527,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 376536317023229975, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4287493887
+      value: 4288388095
       objectReference: {fileID: 0}
     - target: {fileID: 3803312006916396853, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Pivot.x
@@ -10615,7 +10615,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4287493887
+      value: 4288388095
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -10964,8 +10964,1464 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::JogadasManager
   showJogadasLogs: 0
   log:
-    jogadas: []
-    proximoId: 1
+    jogadas:
+    - jogadaId: 1
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 360
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $360 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 2
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 3
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 4
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 5
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 6
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 360
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $360 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 7
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 8
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 9
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 360
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $360 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 10
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 11
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 12
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 13
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 14
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 180
+      serviceHpGain: 1
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $180 HP+1 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 15
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 360
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $360 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 16
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 17
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 18
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 360
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $360 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 19
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 20
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 21
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 22
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 23
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 180
+      serviceHpGain: 1
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $180 HP+1 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 24
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: CH
+      uid: 980056
+      uid2: 980010
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 360
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $360 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 25
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980003
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    - jogadaId: 26
+      turno: 15
+      team: 0
+      acao: ServicoLogistico
+      cx: 4
+      cy: 2
+      dx: 0
+      dy: 0
+      unidadeSigla: SD
+      uid: 980004
+      uid2: 980056
+      hasCombatResult: 0
+      hasHpState: 0
+      unidadeSigla2: 
+      team2: 0
+      hpAntes: 0
+      hpDepois: 0
+      hp2Antes: 0
+      hp2Depois: 0
+      hasAttackIntel: 0
+      attackWeaponCategory: 0
+      attackTrajectory: 0
+      attackerVisibleToDefender: 0
+      defenderCost: 0
+      defenderEliteLevel: 0
+      combatCargo: []
+      hasRepairState: 1
+      repairBefore: 0
+      repairAfter: 0
+      hasServiceResult: 1
+      serviceSource: ServicoComando
+      serviceId: Repair
+      serviceCost: 80
+      serviceHpGain: 2
+      serviceFuelGain: 0
+      serviceAmmoGain: 0
+      obs: 'ServicoComando Repair: $80 HP+2 AUT+0 MUN+0'
+      hasFuelState: 0
+      fuelAntes: 0
+      fuelDepois: 0
+      valor: 0
+      motivo: 
+      modo: 
+      dificuldade: 
+      regras: 
+      slotsTime: 
+      slotsIA: 
+      predioId: 
+      predioQG: 0
+      donoAnterior: -1
+      capturaConcluida: 0
+      hasDpq: 0
+      dpqAtacante: 0
+      dpqDefensor: 0
+      posicaoAtacante: 
+      posicaoDefensor: 
+    proximoId: 27
 --- !u!114 &1310407253
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11922,7 +13378,7 @@ MonoBehaviour:
   actionStack:
     Actions: []
   currentBuffer:
-    ActionType: 0
+    ActionType: 1
     TurnNumber: 0
     ActingTeam: 0
     ActingSlotIndex: -1
@@ -11944,14 +13400,14 @@ MonoBehaviour:
       heightLevel: 0
       spriteDefault: {fileID: 0}
       teamVariantSprites: []
-    SensorAction: 0
-    TargetInstanceId: 
-    TargetConstructionId: 
-    TargetHex: {x: 0, y: 0, z: 0}
-    HasTargetHex: 0
+    SensorAction: 6
+    TargetInstanceId: 980004
+    TargetConstructionId: 980010
+    TargetHex: {x: 4, y: 2, z: 0}
+    HasTargetHex: 1
     ShoppingSelectedIndex: -1
     ShoppingUnitTypeId: 
-    SubStepLabel: 
+    SubStepLabel: SupplyTargetConfirm
     SubSteps: []
     Confirmed: 0
     IsAIGenerated: 0
@@ -13322,47 +14778,47 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 240132599927167314, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 240132599927167314, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 240132599927167314, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 240132599927167314, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 61.665356
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 240132599927167314, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 252844868572324430, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 252844868572324430, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 252844868572324430, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 252844868572324430, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 63.929676
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 252844868572324430, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 252844868572324430, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -196.24614
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 811862437318767327, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -13414,27 +14870,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1007485288049742941, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1007485288049742941, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1007485288049742941, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1007485288049742941, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 54.722443
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1007485288049742941, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1007485288049742941, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -422.6388
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -13462,75 +14918,75 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1399108366590128675, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1399108366590128675, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1399108366590128675, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1399108366590128675, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 54.722443
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1399108366590128675, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1399108366590128675, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -99.02658
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 63.929676
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -418.0352
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2117147627945236213, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2117147627945236213, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2117147627945236213, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2117147627945236213, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 54.722443
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2117147627945236213, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2117147627945236213, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -357.91638
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -13582,27 +15038,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2854159010189189074, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2854159010189189074, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2854159010189189074, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2854159010189189074, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 54.722443
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2854159010189189074, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2854159010189189074, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -228.47147
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3265272143402930044, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -13630,99 +15086,99 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3295698870764613347, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3295698870764613347, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3295698870764613347, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3295698870764613347, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 54.722443
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3295698870764613347, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3295698870764613347, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -163.74902
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3361486934113665983, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3361486934113665983, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3361486934113665983, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3361486934113665983, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 63.929676
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3361486934113665983, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3361486934113665983, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -122.31645
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3416841980102676472, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3416841980102676472, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3416841980102676472, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3416841980102676472, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 63.929676
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3416841980102676472, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3416841980102676472, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -344.1055
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4729171986527897992, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4729171986527897992, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4729171986527897992, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4729171986527897992, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 54.722443
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4729171986527897992, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4729171986527897992, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -293.1939
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -13774,27 +15230,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6238178841353882673, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6238178841353882673, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6238178841353882673, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6238178841353882673, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 63.929676
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6238178841353882673, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 175
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6238178841353882673, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -270.1758
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6507900280305876854, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -13850,23 +15306,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6982103358776556859, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6982103358776556859, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6982103358776556859, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6982103358776556859, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 80.351616
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6982103358776556859, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 350
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7849784935024710869, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
