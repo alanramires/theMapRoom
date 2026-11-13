@@ -1028,17 +1028,16 @@ public partial class AIController
             {
                 UnitManager u   = freeCapturers[ui];
                 Vector3Int  uc  = u.CurrentCellPosition; uc.z = 0;
-                var planPaths   = UnitMovementPathRules.CalcularCaminhosValidos(
-                    boardTilemap, u, PlanBudget, terrainDatabase);
+                var planCosts = UnitMovementPathRules.CalculateMovementCostMap(
+                    boardTilemap, u, uc, PlanBudget, terrainDatabase);
                 UnitReachEnvelope captureTactical = BuildPlanCaptureTactical(u);
                 for (int oj = 0; oj < nObj; oj++)
                 {
                     Vector3Int tc = assignableObjs[oj].cell;
                     float rawDist;
-                    if (planPaths != null
-                        && planPaths.TryGetValue(tc, out List<Vector3Int> path)
-                        && path.Count > 0)
-                        rawDist = path.Count;
+                    if (planCosts != null
+                        && planCosts.TryGetValue(tc, out int movementCost))
+                        rawDist = movementCost;
                     else if (SectorManager.TryGetLandMovementDistance(uc, tc, out int terrainCost))
                         rawDist = terrainCost;
                     else
@@ -1835,14 +1834,14 @@ public partial class AIController
         }
     }
 
-    // Mesma medida da matriz de atribuicao: passos do caminho valido, senao distancia
+    // Mesma medida da matriz de atribuicao: custo em MP, senao distancia
     // terrestre do SectorManager, senao hex.
     private float PlanAssignmentDistance(UnitManager unit, Vector3Int target)
     {
         Vector3Int uc = unit.CurrentCellPosition; uc.z = 0;
-        var paths = UnitMovementPathRules.CalcularCaminhosValidos(boardTilemap, unit, 30, terrainDatabase);
-        if (paths != null && paths.TryGetValue(target, out List<Vector3Int> path) && path.Count > 0)
-            return path.Count;
+        var costs = UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, uc, 30, terrainDatabase);
+        if (costs != null && costs.TryGetValue(target, out int movementCost))
+            return movementCost;
         if (SectorManager.TryGetLandMovementDistance(uc, target, out int cost))
             return cost;
         return SectorManager.HexDistance(uc, target);
