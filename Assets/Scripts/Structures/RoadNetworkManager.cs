@@ -8,6 +8,10 @@ using UnityEditor;
 [ExecuteAlways]
 public class RoadNetworkManager : MonoBehaviour
 {
+    // Registration order is preserved; lookups never search the scene in Play.
+    private static readonly List<RoadNetworkManager> activeNetworks = new List<RoadNetworkManager>();
+    public static IReadOnlyList<RoadNetworkManager> AllActive => activeNetworks;
+
     [Header("References")]
     [SerializeField] private StructureDatabase structureDatabase;
     [SerializeField] private Tilemap boardTilemap;
@@ -95,10 +99,17 @@ public class RoadNetworkManager : MonoBehaviour
 
     private void OnEnable()
     {
+        if (!activeNetworks.Contains(this))
+            activeNetworks.Add(this);
         EnsureDefaults();
         InvalidateRoutesLookup();
         TryAutoAssignBoardTilemap();
         RebuildRoadVisuals();
+    }
+
+    private void OnDisable()
+    {
+        activeNetworks.Remove(this);
     }
 
     private void Start()

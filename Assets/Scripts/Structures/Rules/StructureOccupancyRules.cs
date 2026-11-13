@@ -7,8 +7,11 @@ public static class StructureOccupancyRules
     {
         cell.z = 0;
 
-        RoadNetworkManager[] networks = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < networks.Length; i++)
+        // Editor tools query their scene; runtime reads the lifecycle registry, even when empty.
+        System.Collections.Generic.IReadOnlyList<RoadNetworkManager> networks = Application.isPlaying
+            ? RoadNetworkManager.AllActive
+            : Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < networks.Count; i++)
         {
             RoadNetworkManager network = networks[i];
             if (network == null || !network.gameObject.activeInHierarchy)
