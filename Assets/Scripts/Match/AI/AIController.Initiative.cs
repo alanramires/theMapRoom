@@ -228,6 +228,14 @@ public partial class AIController
 
     {
 
+        // Home repair waits even when the enemy-mass backline calls this position vanguard,
+        // including during invasion. This organizer rule precedes all initiative promotions.
+        if (unit.IsUnderRepair && !unit.IsEmbarked && IsWithinOwnHqRing(unit.CurrentCellPosition, _sortSnapshot))
+        {
+            Debug.Log($"{TL("Iniciativa")} #{unit.InstanceId} ferido no anel do HQ → último grupo");
+            return 5;
+        }
+
         if (plan != null && plan.HandoffVacaterIds.Contains(unit.InstanceId)) return 0;
 
         // Blocker: unidade está sobre o objetivo de captura de outro capturador designado.
