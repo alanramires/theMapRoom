@@ -384,6 +384,13 @@ public class PanelDebugController : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (command == "SET INFINITE SUPPLIES" || command.StartsWith("SET INFINITE SUPPLIES "))
+        {
+            executed = turnStateManager.TrySetInfiniteSuppliesFromDebug(
+                command.Substring("SET INFINITE SUPPLIES".Length).Trim(), out string message);
+            if (executed) cursorController?.PlayDoneSfx();
+            else if (!string.IsNullOrWhiteSpace(message)) Debug.Log($"[Debug Command] {message}");
+        }
         else if (TryParseSetSellingRulesCommand(command, out string sellingRuleToken, out int sellingOwnerSlot))
         {
             executed = turnStateManager.TrySetSellingRulesUnderCursorFromDebug(sellingRuleToken, sellingOwnerSlot, out string message);
@@ -1134,6 +1141,7 @@ public class PanelDebugController : MonoBehaviour
             "set active team <slot> (troca participante ativo sem avancar turno)\n" +
             "set capture points <v>\n" +
             "set selling rules <free|original [slot]|first [slot]|disabled> (prédio no cursor)\n" +
+            "set infinite supplies [setor[:slot]] [on|off] (sem setor: predio no cursor; padrao on)\n" +
             "spawn <unit> | ai spawn <unit>\n" +
             "spawn:<slot> <unit>\n" +
             "set money <v> | set money +<v> | set money:<slot> <v>\n" +

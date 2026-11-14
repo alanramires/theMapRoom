@@ -1343,6 +1343,93 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    public bool TrySetInfiniteSuppliesFromDebug(string arguments, out string message)
+    {
+        const string usage = "Use set infinite supplies [setor[:slot]] [on|off]. Sem setor: predio no cursor; padrao on.";
+        message = string.Empty;
+        string[] parts = (arguments ?? string.Empty).Split(
+            (char[])null, System.StringSplitOptions.RemoveEmptyEntries);
+        bool enabled = true;
+        int count = parts.Length;
+        if (count > 0 && (parts[count - 1].Equals("on", System.StringComparison.OrdinalIgnoreCase)
+            || parts[count - 1].Equals("off", System.StringComparison.OrdinalIgnoreCase)))
+        {
+            enabled = parts[count - 1].Equals("on", System.StringComparison.OrdinalIgnoreCase);
+            count--;
+        }
+        if (count > 1)
+        {
+            message = usage;
+            return false;
+        }
+
+        var targets = new List<ConstructionManager>();
+        string scope;
+        if (count == 0)
+        {
+            // Same owner as "set owner": a construction below the cursor, even under a unit.
+            if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cell, out message))
+                return false;
+            targets.Add(target);
+            scope = $"{target.name} em {FormatMapCellWithZ(cell)}";
+        }
+        else
+        {
+            string[] targetParts = parts[0].Split(':');
+            if (targetParts.Length > 2 || string.IsNullOrWhiteSpace(targetParts[0])
+                || !System.Enum.TryParse(targetParts[0], true, out ConstructionSector sector)
+                || !System.Enum.IsDefined(typeof(ConstructionSector), sector) || sector == ConstructionSector.None
+                || int.TryParse(targetParts[0], out _))
+            {
+                message = $"Setor invalido: '{parts[0]}'. {usage}";
+                return false;
+            }
+            int? ownerSlot = null;
+            if (targetParts.Length == 2)
+            {
+                if (!int.TryParse(targetParts[1], out int slot) || slot < -1
+                    || (slot >= 0 && (matchController == null
+                        || !matchController.IsValidPlayerSlot(PlayerSlotId.FromIndex(slot)))))
+                {
+                    message = $"Slot invalido: '{targetParts[1]}'. {usage}";
+                    return false;
+                }
+                ownerSlot = slot;
+            }
+            Tilemap boardMap = terrainTilemap != null ? terrainTilemap : cursorController?.BoardTilemap;
+            SectorManager.SectorInfo info;
+            bool found;
+            if (boardMap != null)
+                found = SectorManager.TryGetSectorInfo(boardMap, sector, out info)
+                    || SectorManager.TryGetBaseInfo(boardMap, sector, out info);
+            else
+                found = SectorManager.TryGetSectorInfo(gameObject.scene, sector, out info)
+                    || SectorManager.TryGetBaseInfo(gameObject.scene, sector, out info);
+            if (found && info != null)
+                foreach (SectorManager.SectorConstructionInfo member in info.Constructions)
+                {
+                    ConstructionManager target = member.Source;
+                    if (target == null || !target.gameObject.activeInHierarchy || target.IsFakeBuilding
+                        || (ownerSlot.HasValue && target.SlotIndex != ownerSlot.Value)) continue;
+                    targets.Add(target);
+                }
+            scope = ownerSlot.HasValue ? $"{sector}:{ownerSlot.Value}" : sector.ToString();
+            if (targets.Count == 0)
+            {
+                message = $"Nenhuma construcao em {scope}; nada alterado.";
+                return false;
+            }
+        }
+
+        foreach (ConstructionManager target in targets)
+            target.SetInfiniteSuppliesOverride(enabled);
+        // Rebuild once for the affected board, after applying every member's runtime override.
+        SectorManager.RebuildNowFromActiveConstructions(targets[0].gameObject.scene, "debug-infinite-supplies");
+        message = $"Suprimentos infinitos {(enabled ? "ON" : "OFF")}: {targets.Count} construcao(oes), {scope}.";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
     public bool TrySetConstructionCapturePointsUnderCursorFromDebug(int capturePointsValue, out string message)
     {
         message = string.Empty;
