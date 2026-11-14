@@ -1,15 +1,24 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-13, **depois** da tag `v10.11.0`.
+Ponto de retomada. Atualizado em 2026-11-14, **depois** da tag `v10.12.0`.
 Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.11.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
-v9.2.0. Relatórios: [`relatorio_v10.11.0.md`](relatorio_v10.11.0.md),
-[`relatorio_v10.10.0.md`](relatorio_v10.10.0.md), [`relatorio_v10.9.1.md`](relatorio_v10.9.1.md).
+`v10.12.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.12.0.md`](relatorio_v10.12.0.md),
+[`relatorio_v10.11.0.md`](relatorio_v10.11.0.md), [`relatorio_v10.10.0.md`](relatorio_v10.10.0.md).
+
+**A descoberta da v10.12.0: o Chinook leva 2 do soldado e 7 da AAA, e o EVAC não sabia.** A
+ameaça do EVAC era `CalculateThreatLevel`, proximidade de qualquer inimigo; agora é o HP que o
+`AICombatHpSimulator` (as tabelas da Matriz de HP) prevê contra **o transporte**, pelo envelope
+de combate de cada inimigo visível (`EvacThreatMap`). Na aproximação vale a régua do autor: sair
+da zona rumo à base, até a borda; sem saída, sobreviver e avançar. O segundo ferido prefere
+hospital, e o anel do HQ ficou como último recurso. O ferido no anel do HQ age por último.
+O soldado **atira** em helicóptero baixo (o Rifle tem Air/AirLow): o defeito era o peso igual,
+não quem atira. Visto em Play só o segundo ferido no hospital; o resto, fixture.
 
 **A descoberta da v10.11.0: a régua parecida não é a régua.** Duas entrevistas viraram duas
 regras (capitania da invasão por alcance, P1–P9; EVAC e reparo pela instalação do próprio ramo), e
@@ -462,6 +471,20 @@ Sem HQ, os dois lados do Q3 e do Q4 são facção sem QG (v8.6.1, Frente 4; desd
 ---
 
 ## Onde eu parei
+
+### O que a v10.12.0 deixou — ver o EVAC fugir da zona
+
+1. **Chinook #99 em Play** (save do T15 slot 1): esperado `EVAC hospital menor ameaca: aproxima
+   de HQ_T3_C6 ... dano previsto=X/10 HP, sobrevive=sim` ou o anel com "sai da zona", e nunca
+   mais um hex de lado.
+2. **AAA #38 em Play:** `[Iniciativa] #38 ferido no anel do HQ → último grupo`. Confirmar a causa
+   da vanguarda falsa com `ini_aaa38.cs` (scratchpad da sessão; refazer se sumir) num turno em
+   Play: a âncora do `Backline` pela média dos inimigos pode enganar outros leitores do
+   `IsWoundedInVanguard`.
+3. **`CalculateThreatLevel` dos outros papéis** ainda pesa todo inimigo igual. Adiado de
+   propósito (P4); o próximo caso deles diz onde a régua de dano entra.
+4. `verificar_evac_ameaca_dano`, parte C: compara zero com zero; fortalecer com inimigos em
+   `UnitManager.AllActive` visíveis ao slot.
 
 ### O que a v10.11.0 deixou — ver a invasão e o EVAC andando
 
@@ -1061,6 +1084,8 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **"já fiz" sem diff** | o Codex respondeu que a régua de ameaça estava feita; o `Transportador.Evac.cs` tinha a hora de antes do bloco e nenhum fixture novo existia. Antes de revisar, conferir no disco: hora do arquivo, função citada, fixture pedido |
+| **Editor não recarrega arquivo salvo por fora** | com o Editor aberto e parado, um `.cs` gravado pela linha de comando não entra sozinho: o fixture rodou com o código antigo ("EvacThreatMap ausente"). `unity recompile` deu 400; um `script eval` com `AssetDatabase.ImportAsset(..., ForceUpdate)` + `CompilationPipeline.RequestScriptCompilation()` resolve. Conferir o `codeLoadCount` subir |
 | **fixture pequeno aprova a régua errada** | o QG a 2 hexes num tabuleiro de 10×6 fazia o Operacional e a rota darem a mesma resposta, e o capitão "por Operacional" passou. Todo fixture de alcance tem um caso com o alvo **além** da banda (12+ hexes), porque é ali que régua e régua parecida divergem |
 | **flag por turno lida como capacidade** | `ReceivedSuppliesThisTurn` acende na Fase 1 quando o Serviço do Comando cura; a Fase 2 que perguntar "este prédio atende?" sem `ignoreTurnLimit: true` lê "não" para todo ferido já curado. "Atende de novo neste turno" e "atende esta unidade" são perguntas diferentes |
 | **o fix isolado passa e o turno real não** | `medir_planner` caiu de 8,9 s para 0,5 s e o `BuildObjectivePlan` do turno real seguiu em 6,4 s: o replay refaz o plano com os capturadores já atribuídos, e a matriz só roda para quem está livre. Custo que roda **uma vez por turno** só se mede no turno real (marcas do `[AI Perf]`), nunca por replay |
@@ -1350,3 +1375,12 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
     raio do HQ?" virou `HexDistance` e pulou os filtros do anel de `DecideAirEvacHqFallback`
     (`IsRepairHqFallbackCellAllowed`, névoa, seguro/contestado). Régua vizinha que dá a mesma
     resposta no caso pequeno é o defeito; o teste é um fixture com o caso **além** da régua.
+
+16. **Ameaça tem sujeito e tem unidade de medida; e "não sei" nunca é "seguro".** O EVAC aéreo
+    media ameaça com `CalculateThreatLevel`, que soma proximidade de qualquer inimigo visível: o
+    soldado pesava igual à AAA, e o Chinook #99 deu "um passinho pro lado" no meio deles. "Quanto
+    este inimigo tira desta unidade" já tem dono: `AICombatHpSimulator`, com as tabelas da Matriz
+    de HP (`RPSDatabase`, DPQ). A ferramenta que o autor usa para pensar o combate aponta o dono
+    de runtime. Duas armadilhas vieram junto: a mesma função media a LZ do **transporte** e a
+    célula do **passageiro**, perguntas com sujeitos diferentes; e a primeira versão devolvia
+    zero sem as tabelas, e zero é o valor que diz "seguro". Sem a régua, volte à anterior.
