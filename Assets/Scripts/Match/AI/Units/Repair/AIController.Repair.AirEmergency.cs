@@ -15,13 +15,15 @@ public partial class AIController
         public readonly int ServiceRadius;
         public readonly HashSet<Vector3Int> ServiceCells;
         public readonly UnitManager Transporter;
+        public readonly ConstructionManager Construction;
 
         public AircraftRecoveryAnchor(
             Vector3Int cell,
             string kind,
             int serviceRadius = 0,
             HashSet<Vector3Int> serviceCells = null,
-            UnitManager transporter = null)
+            UnitManager transporter = null,
+            ConstructionManager construction = null)
         {
             cell.z = 0;
             Cell = cell;
@@ -29,6 +31,7 @@ public partial class AIController
             ServiceRadius = Mathf.Max(0, serviceRadius);
             ServiceCells = serviceCells;
             Transporter = transporter;
+            Construction = construction;
         }
     }
 
@@ -67,9 +70,11 @@ public partial class AIController
             CurrentMovementBudget = Mathf.Max(0, aircraft.RemainingMovementPoints),
             EvaluateTactical = (int budget, out AIReachDecisionCandidate<AircraftRecoveryAnchor> candidate) =>
                 TryEvaluateAircraftRecoveryAnchor(
+                    aircraft,
                     anchors, snapshot, fromCell, tacticalPaths, occupied, budget, tactical: true, out candidate),
             EvaluateOperational = (int budget, out AIReachDecisionCandidate<AircraftRecoveryAnchor> candidate) =>
                 TryEvaluateAircraftRecoveryAnchor(
+                    aircraft,
                     anchors, snapshot, fromCell, null, occupied, budget, tactical: false, out candidate),
             DiagnosticLog = showAILogs ? (System.Action<string>)Debug.Log : null
         };
@@ -179,6 +184,7 @@ public partial class AIController
     }
 
     private bool TryEvaluateAircraftRecoveryAnchor(
+        UnitManager aircraft,
         List<AircraftRecoveryAnchor> anchors,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
@@ -191,9 +197,17 @@ public partial class AIController
         candidate = null;
         float bestScore = float.MinValue;
         bool bestIsSupplier = false;
+        // Facility affinity compares hospitals; a field supplier keeps its existing score.
+        bool hasPreferredConstruction = anchors.Exists(anchor => anchor.Construction != null
+            && IsPreferredRepairFacility(aircraft, anchor.Construction)
+            && AIActionReachCoordinator.CubicDistance(fromCell, anchor.Cell) <= budget
+            && (anchor.Cell == fromCell || occupied == null || !occupied.Contains(anchor.Cell))
+            && (!tactical || (tacticalPaths != null && tacticalPaths.ContainsKey(anchor.Cell))));
         for (int i = 0; i < anchors.Count; i++)
         {
             AircraftRecoveryAnchor anchor = anchors[i];
+            if (hasPreferredConstruction && anchor.Construction != null
+                && !IsPreferredRepairFacility(aircraft, anchor.Construction)) continue;
             int anchorDistance = Mathf.Max(0,
                 AIActionReachCoordinator.CubicDistance(fromCell, anchor.Cell) - anchor.ServiceRadius);
             if (anchorDistance > budget)
@@ -278,7 +292,7 @@ public partial class AIController
                 if (seenCells.Add(cell))
                 {
                     result.Add(new AircraftRecoveryAnchor(
-                        cell, "aerodromo/construcao de reparo"));
+                        cell, "aerodromo/construcao de reparo", construction: construction));
                     hasPrimaryLandingRecovery = true;
                 }
             }

@@ -503,8 +503,32 @@ public partial class AIController
             if (evacEmbark != null) return evacEmbark;
         }
 
+        bool relocateForRepairFacility = false;
+        if (currentBldg != null && !IsPreferredRepairFacility(unit, currentBldg))
+        {
+            bool currentCanServe = CanSurfaceRepairConstructionServe(currentBldg, unit, aiTeam, ignoreTurnLimit: true);
+            UnitReachEnvelope preferredTactical = currentCanServe
+                ? BuildRepairFacilityReach(unit, fromCell, ReachBand.Tactical) : null;
+            var alternatives = RankRepairConstructions(unit, fromCell, aiTeam,
+                repairDestinationOccupied, rejectBaseCluster, lineSnapshot: snapshot, log: false);
+            foreach (ConstructionManager alternative in alternatives)
+            {
+                Vector3Int cell = alternative.CurrentCellPosition; cell.z = 0;
+                if (alternative == currentBldg || !IsPreferredRepairFacility(unit, alternative)
+                    || (currentCanServe && !preferredTactical.MovementCells.Contains(cell))
+                    || repairDestinationOccupied.Contains(cell)
+                    || !CanSurfaceRepairConstructionServe(alternative, unit, aiTeam, ignoreTurnLimit: true)
+                    || !IsEvacDropCellSafe(cell, aiTeam)) continue;
+                if (!aircraftRepair && unit.GetDomain() == Domain.Land
+                    && !SectorManager.TryGetLandMovementDistance(fromCell, cell, out _)) continue;
+                relocateForRepairFacility = true;
+                Debug.Log($"{TL("Repair")} #{unit.InstanceId} libera {currentBldg.name}: alternativa do proprio ramo {alternative.name}@{cell}");
+                break;
+            }
+        }
+
         // 1. Prédio conquistado: verifica segurança e presença de substituto
-        if (currentBldg != null && currentBldg.IsCapturable
+        if (!relocateForRepairFacility && currentBldg != null && currentBldg.IsCapturable
             && currentBldg.SlotIndex == ResolveAISlotKey(aiTeam) && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
             && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg))
             && !(conscriptionBan && IsConscriptionClosedProducerConstruction(currentBldg, aiTeam))
@@ -514,9 +538,7 @@ public partial class AIController
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
             // VTOL não é empurrado pro aeroporto: se já está num prédio onde pousa
             // (cidade aliada), fica reparando ali como unidade regular.
-            bool aircraftShouldSeekPreferredRepair = aircraftRepair
-                && !IsVtolStyleAircraft(unit)
-                && !IsPreferredAircraftRepairConstruction(currentBldg, aiTeam);
+            bool aircraftShouldSeekPreferredRepair = aircraftRepair && relocateForRepairFacility;
             if (safe && !isBlockingCapTarget && !aircraftShouldSeekPreferredRepair)
             {
                 if (IsFireSupportUnit(unit)

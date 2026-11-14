@@ -580,6 +580,45 @@ public partial class AIController
         return best;
     }
 
+    private UnitReachEnvelope BuildRepairFacilityReach(UnitManager unit, Vector3Int from, ReachBand band)
+        => UnitReachEnvelopeService.Build(new UnitReachRequest {
+            Unit = unit, BoardMap = boardTilemap, TerrainDatabase = terrainDatabase,
+            OriginOverride = from, Intent = ReachIntent.Mobility,
+            SubStep = AIActionReachCoordinator.UsesCubicSectorReach(unit) ? ReachSubStep.Aereo : ReachSubStep.Terrestre,
+            Band = band, MovementBudget = band == ReachBand.Tactical ? Mathf.Max(0, unit.RemainingMovementPoints) : 0
+        });
+
+    // Doctrine: facility affinity follows the patient's force, never the carrier's.
+    // Actual services, landing, safety and conscription remain the caller's eligibility gates.
+    private static bool IsPreferredRepairFacility(UnitManager unit, ConstructionManager construction)
+    {
+        if (unit == null || construction == null || !unit.TryGetUnitData(out UnitData patient)
+            || patient == null || !construction.TryResolveConstructionData(out ConstructionData facility)
+            || facility == null) return false;
+        bool armyProducer = false, navalProducer = false;
+        bool hasMilitaryOffers = false;
+        foreach (UnitData offered in construction.OfferedUnits)
+        {
+            if (offered == null) continue;
+            hasMilitaryOffers = true;
+            armyProducer |= offered.militaryForce == MilitaryForce.Army;
+            navalProducer |= offered.militaryForce == MilitaryForce.Navy;
+        }
+        bool civilian = !construction.IsPlayerHeadQuarter && !facility.isAirport
+            && !facility.isHarbor && (!hasMilitaryOffers || facility.isCity || facility.isTransportTerminal);
+        switch (patient.militaryForce)
+        {
+            case MilitaryForce.Army:
+                return construction.IsPlayerHeadQuarter || civilian || armyProducer;
+            case MilitaryForce.Aeronautic:
+                return facility.isAirport || facility.isHarbor || navalProducer
+                    || (civilian && facility.allowAircraftTakeoffAndLanding);
+            case MilitaryForce.Navy:
+                return facility.isHarbor || navalProducer;
+            default: return false;
+        }
+    }
+
     private List<ConstructionManager> RankRepairConstructions(
         UnitManager unit,
         Vector3Int fromCell,
@@ -588,10 +627,11 @@ public partial class AIController
         bool rejectBaseCluster = false,
         Dictionary<Vector3Int, int> defenseReservedCells = null,
         AIWorldSnapshot lineSnapshot = null,
-        bool log = true)
+        bool log = true,
+        bool allowOccupiedDestinations = false)
     {
         AIDecisionPerf.AddCount("RepairConstructionRankings");
-        var scored = new List<(ConstructionManager building, float score, int order)>();
+        var scored = new List<(ConstructionManager building, float score, int order, int facilityTier)>();
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
         bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
         bool eliteRelaxSafety = EliteHoldsDangerousRepair(unit);
@@ -614,8 +654,8 @@ public partial class AIController
         bool needsPassengerRelease = IsAirTransporter(unit) && HasTransportCargo(unit);
         int passengerCount = needsPassengerRelease ? CollectPassengers(unit).Count : 0;
         bool vtolStyle = IsVtolStyleAircraft(unit);
-        bool restrictToPreferredAircraftFacility = preferAircraftFacility && !vtolStyle
-            && HasUsablePreferredAircraftRepairConstruction(unit, fromCell, aiTeam, occupied);
+
+        UnitReachEnvelope preferredReach = null;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
@@ -641,8 +681,6 @@ public partial class AIController
                 if (log) Debug.Log($"[Repair] {cc} base fechada pela conscrição, mas ELEGÍVEL p/ elite (último recurso) dist={dist:F1}");
             bool isAircraftFacility = IsAircraftRepairConstruction(c);
             bool isPreferredAircraftFacility = IsPreferredAircraftRepairConstruction(c, aiTeam);
-            if (restrictToPreferredAircraftFacility && !isPreferredAircraftFacility)
-                continue;
 
             if (c.SlotIndex != ResolveAISlotKey(aiTeam))
             {
@@ -675,8 +713,13 @@ public partial class AIController
             }
             if (!isHomeRepair && !hasRepairLine)
                 if (log) Debug.Log($"[Repair] sem linha aceita {cc} apesar do setor={c.Sector}; avaliando servico e ameaca local.");
+            if (!CanSurfaceRepairConstructionServe(c, unit, aiTeam, ignoreTurnLimit: true))
+            {
+                if (log) Debug.Log($"[Repair] skip {cc} sem servico necessario/disponivel");
+                continue;
+            }
             bool occupiedCell = occupied.Contains(cc) && cc != fromCell;
-            if (occupiedCell && !isHomeRepair)
+            if (occupiedCell && !isHomeRepair && !allowOccupiedDestinations)
             {
                 if (log) Debug.Log($"[Repair] skip {cc} ocupado dist={dist:F1}");
                 continue;
@@ -773,10 +816,21 @@ public partial class AIController
                     score += 7500f;
             }
 
-            scored.Add((c, score, scored.Count));
+            bool preferredNearby = false;
+            if (IsPreferredRepairFacility(unit, c))
+            {
+                preferredReach ??= BuildRepairFacilityReach(unit, fromCell, ReachBand.Operational);
+                preferredNearby = preferredReach.MovementCells.Contains(cc);
+            }
+            int facilityTier = conscriptionClosed || logisticsProducer || (occupiedCell && isHomeRepair)
+                || (defenseReservedCells != null && defenseReservedCells.ContainsKey(cc)) ? 2
+                : preferredNearby ? 0 : 1;
+            scored.Add((c, score, scored.Count, facilityTier));
         }
         // Keep traversal order on ties, matching the original single winner.
         scored.Sort((left, right) => {
+            int tierOrder = left.facilityTier.CompareTo(right.facilityTier);
+            if (tierOrder != 0) return tierOrder;
             int scoreOrder = right.score.CompareTo(left.score);
             return scoreOrder != 0 ? scoreOrder : left.order.CompareTo(right.order);
         });
@@ -867,41 +921,6 @@ public partial class AIController
         return best;
     }
 
-
-    private bool HasUsablePreferredAircraftRepairConstruction(
-        UnitManager unit,
-        Vector3Int fromCell,
-        TeamId aiTeam,
-        HashSet<Vector3Int> occupied)
-    {
-        foreach (ConstructionManager c in ConstructionManager.AllActive)
-        {
-            if (!IsPreferredAircraftRepairConstruction(c, aiTeam))
-                continue;
-            if (c.SlotIndex != ResolveAISlotKey(aiTeam))
-                continue;
-            if (c.CurrentCapturePoints < c.CapturePointsMax)
-                continue;
-
-            Vector3Int cc = c.CurrentCellPosition;
-            cc.z = 0;
-            bool occupiedCell = occupied != null && occupied.Contains(cc) && cc != fromCell;
-            if (occupiedCell)
-                continue;
-            if (!TryScoreRepairCandidateTakeoff(unit, cc, out _, out _, out _))
-                continue;
-            if (IsAirTransporter(unit)
-                && HasTransportCargo(unit)
-                && CountRepairPassengerDisembarkOptions(unit, fromCell, cc) <= 0)
-            {
-                continue;
-            }
-
-            return true;
-        }
-
-        return false;
-    }
 
     private int CountRepairPassengerDisembarkOptions(
         UnitManager transporter,
