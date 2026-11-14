@@ -493,7 +493,7 @@ public partial class AIController
         // se está numa, tem que sair pros arredores (loop abaixo já exclui essas células).
         // Conscrição comprando: mesmo tratamento pra produtor do exército, pra TODOS.
         bool safeNearHQ = IsSafeRepairHqFallbackPosition(
-            unit, fromCell, hqCell, aiTeam, avoidBaseClusterCells);
+            unit, fromCell, snapshot, avoidBaseClusterCells);
         if (safeNearHQ)
         {
             Debug.Log($"{TL("Repair")} {unit.InstanceId} aguarda nos arredores do HQ {hqCell} (sem ameaça)");
@@ -530,14 +530,18 @@ public partial class AIController
             && !(IsPrimaryLogisticsUnit(unit) && IsLogisticsProductionCell(team, cell));
     }
 
+    // Pure geometry shared by repair/EVAC and initiative; no safety or parking policy here.
+    private bool IsWithinOwnHqRing(Vector3Int cell, AIWorldSnapshot snapshot)
+        => snapshot?.MyHQ != null
+            && SectorManager.HexDistance(cell, snapshot.MyHQ.CurrentCellPosition) <= DefenseEnemyRange;
+
     private bool IsSafeRepairHqFallbackPosition(
-        UnitManager unit, Vector3Int cell, Vector3Int hqCell,
-        TeamId team, bool avoidBaseClusterCells)
+        UnitManager unit, Vector3Int cell, AIWorldSnapshot snapshot, bool avoidBaseClusterCells)
     {
-        return IsRepairHqFallbackCellAllowed(unit, cell, team, avoidBaseClusterCells)
-            && SectorManager.HexDistance(cell, hqCell) <= DefenseEnemyRange
-            && !HasNearbyVisibleEnemy(cell, team, DefenseEnemyRange)
-            && !HasNearbyVisibleEnemy(hqCell, team, DefenseEnemyRange);
+        return IsWithinOwnHqRing(cell, snapshot)
+            && IsRepairHqFallbackCellAllowed(unit, cell, snapshot.AITeam, avoidBaseClusterCells)
+            && !HasNearbyVisibleEnemy(cell, snapshot.AITeam, DefenseEnemyRange)
+            && !HasNearbyVisibleEnemy(snapshot.MyHQ.CurrentCellPosition, snapshot.AITeam, DefenseEnemyRange);
     }
 
     private float ScoreRepairHqFallbackCell(Vector3Int cell, Vector3Int hqCell, TeamId team)

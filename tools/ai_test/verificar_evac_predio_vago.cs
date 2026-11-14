@@ -354,9 +354,9 @@ try{
         {beyond,new System.Collections.Generic.List<UnityEngine.Vector3Int>{origin,hot,beyond}},
         {safeEnd,new System.Collections.Generic.List<UnityEngine.Vector3Int>{origin,safeEnd}}};
     var threats=new System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,float>{{origin,0},{hot,100},{beyond,0},{safeEnd,0}};
-    var safeRoutes=(System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,System.Collections.Generic.List<UnityEngine.Vector3Int>>)typeof(AIController).GetMethod("BuildSafeAirEvacPaths",flags).Invoke(ai,new object[]{origin,routeFixture,TeamId.Blue,threats});
-    if(safeRoutes.ContainsKey(hot)||safeRoutes.ContainsKey(beyond)||!safeRoutes.ContainsKey(safeEnd))
-        throw new System.Exception("Rota atravessou ameaca para chegar a destino seguro, ou perdeu alternativa segura.");
+    var routeRisks=(System.Collections.Generic.Dictionary<UnityEngine.Vector3Int,(float peak,float total)>)typeof(AIController).GetMethod("BuildEvacRouteThreats",flags).Invoke(ai,new object[]{origin,routeFixture,TeamId.Blue,threats});
+    if(routeRisks[hot].peak<=0||routeRisks[beyond].peak<=0||routeRisks[safeEnd].peak!=0)
+        throw new System.Exception("Risco da rota ignorou ameaca intermediaria, ou perdeu alternativa segura.");
     // Terrestrial EVAC: parking/selection share the entry-point repair map.
     snapshot.MyHQ=null;
     Set(first,"currentCellPosition",homeBefore);first.transform.position=HexCoordinates.GetCellCenterWorld(map,homeBefore);
