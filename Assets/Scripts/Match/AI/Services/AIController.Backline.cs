@@ -24,7 +24,7 @@ public partial class AIController
             return false;
 
         if (TryResolveRallyAdvanceCaptain(follower, snapshot, out capturer))
-        { anchor = capturer.CurrentCellPosition; return true; }
+        { anchor = capturer.IsEmbarked && capturer.EmbarkedTransporter != null ? capturer.EmbarkedTransporter.CurrentCellPosition : capturer.CurrentCellPosition; return true; }
         int bestDistance = int.MaxValue;
         for (int i = 0; i < snapshot.MyUnits.Count; i++)
         {

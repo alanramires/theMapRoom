@@ -164,7 +164,7 @@ public partial class AIController
 
         if (assigned.ObjectiveType == AIObjectiveType.InvasionAttack && follower != null
             && TryResolveRallyAdvanceCaptain(follower, new AIWorldSnapshot { AITeam = aiTeam, AISlotIndex = follower.SlotIndex }, out UnitManager captain))
-            return captain.CurrentCellPosition;
+            return captain.IsEmbarked && captain.EmbarkedTransporter != null ? captain.EmbarkedTransporter.CurrentCellPosition : captain.CurrentCellPosition;
         if (IsRallyAssemblyObjective(assigned))
             return ResolveRallyAssemblyAnchor(assigned, aiTeam, fallback);
 

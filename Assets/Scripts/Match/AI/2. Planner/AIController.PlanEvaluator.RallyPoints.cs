@@ -448,7 +448,8 @@ public partial class AIController
         ConstructionManager rally,
         TeamId aiTeam,
         int turnNumber,
-        AIIntelReport intel)
+        AIIntelReport intel,
+        AIWorldSnapshot snapshot = null)
     {
         if (obj == null || rally == null)
             return;
@@ -477,7 +478,7 @@ public partial class AIController
         if (readiness.GoGreen && obj.RallyGoGreenTurn < 0)
         {
             obj.RallyGoGreenTurn = turnNumber;
-            StartRallyAdvance(obj, rally, aiTeam);
+            StartRallyAdvance(obj, rally, aiTeam, snapshot);
             // O Go Green pertence a operacao, nao a um predio isolado. Suprime todos os
             // rallies DESIGNADOS para este slot, para que feeders nao iniciem uma segunda
             // montagem paralela.
@@ -529,7 +530,7 @@ public partial class AIController
                 continue;
             }
 
-            UpdateRallyObjectiveState(obj, rally, snapshot.AITeam, snapshot.TurnNumber, intel);
+            UpdateRallyObjectiveState(obj, rally, snapshot.AITeam, snapshot.TurnNumber, intel, snapshot);
             refreshed++;
         }
 
@@ -1040,6 +1041,7 @@ public partial class AIController
             return;
 
         int turn = snapshot.TurnNumber;
+        RefreshRallyAdvanceCaptains(plan, snapshot);
         bool rallyWaiting = UpdateRallyAdvanceWaiting(plan, aiTeam);
 
         // Operação em voo? (algum rally GoGreen registrado). Sem isso, não há o que monitorar.
@@ -1097,7 +1099,7 @@ public partial class AIController
         bool inContact = false;
         foreach (UnitManager u in force)
         {
-            if (!u.IsEmbarked && u.TryGetUnitData(out UnitData d) && d != null
+            if (u.TryGetUnitData(out UnitData d) && d != null
                 && UnitRoleCompatibility.ResolveForce(d) == UnitForce.Ruptura)
                 liveAssault++;
 
@@ -1114,6 +1116,30 @@ public partial class AIController
             ? prev
             : new InvasionMonitor { BestDistance = int.MaxValue, StallCounter = 0 };
 
+        bool waitingRide = false;
+        if (plan.RallyAdvances.Count > 0)
+        {
+            var pressure = PressaoCaronaService.Read(this, snapshot.AISlotIndex, turn);
+            if (pressure.PersistentAirWaiting > 0)
+                foreach (var request in pressure.Pedidos)
+                {
+                    if (!request.UsefulAirDelivery || request.WaitTurns < 1 || request.Unit == null
+                        || !request.Unit.AIIsWaitingForRide
+                        || !plan.RallyAdvances.Exists(group => group.RallyParticipantIds.Contains(request.Unit.InstanceId))) continue;
+                    bool reached = false;
+                    foreach (var bus in pressure.Buses)
+                    {
+                        if (!bus.Operational || bus.Used >= bus.Capacity || bus.Unit == null
+                            || !bus.Unit.TryGetUnitData(out UnitData busData)
+                            || !request.Unit.TryGetUnitData(out UnitData patientData)
+                            || FindFittingSlotIndex(bus.Unit, busData, request.Unit, patientData) < 0) continue;
+                        if (IsRallyParticipantInBand(bus.Unit, request.Unit.CurrentCellPosition, ReachBand.Tactical))
+                        { reached = true; break; }
+                    }
+                    if (!reached) { waitingRide = true; break; }
+                }
+        }
+
         if (cur != int.MaxValue)
         {
             bool atGate = cur <= InvasionAssaultGateRange;
@@ -1122,22 +1148,24 @@ public partial class AIController
                 mon.BestDistance = cur;     // progrediu -> zera estagnação
                 mon.StallCounter = 0;
             }
-            else if (!atGate && !inContact && !rallyWaiting)
+            else if (!atGate && !inContact && !rallyWaiting && !waitingRide)
             {
                 mon.StallCounter++;         // parado e fora de hold legítimo
             }
             // atGate (assaltando) ou inContact (lutando): hold legítimo, não conta estagnação.
         }
 
-        if (rallyWaiting) mon.StallCounter = 0;
+        if (rallyWaiting && !waitingRide) mon.StallCounter = 0;
         bool graceOver = turn - earliestGoGreen >= InvasionGraceTurns;
         bool collapse = graceOver && liveAssault == 0;
         bool stall = graceOver && mon.StallCounter >= InvasionStallTurns;
+        bool expired = turn - earliestGoGreen >= RallyGoGreenSuppressTurns;
+        if (waitingRide) Debug.Log($"{TL("Rally")} espera carona persistente: estagnacao congelada em {mon.StallCounter}T");
 
-        if (collapse || stall)
+        if (collapse || stall || expired)
         {
             Debug.Log($"{TL("Plan")} invasão FRACASSOU (" +
-                (collapse ? "colapso: 0 assalto vivo na força" : $"estagnação: {mon.StallCounter}T sem progresso, best={mon.BestDistance}h") +
+                (expired ? $"teto absoluto: {RallyGoGreenSuppressTurns}T apos GoGreen" : collapse ? "colapso: 0 assalto vivo na força" : $"estagnação: {mon.StallCounter}T sem progresso, best={mon.BestDistance}h") +
                 ") -> libera re-montagem (2ª onda); frente mantém posição");
             ReleaseGoGreenFallbackAssignments(plan, aiTeam);
             ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));   // solta supressão -> rallies reabrem montagem
@@ -1154,7 +1182,7 @@ public partial class AIController
         invasionMonitors[aiSlotKey] = mon;
     }
 
-    private Vector3Int ResolveInvasionTargetCell(SectorObjective baseObj, AIWorldSnapshot snapshot, TeamId aiTeam)
+    private static Vector3Int ResolveInvasionTargetCell(SectorObjective baseObj, AIWorldSnapshot snapshot, TeamId aiTeam)
     {
         ConstructionManager tgt = FindCapturableInSector(baseObj.Sector, aiTeam);
         if (tgt != null)
@@ -1979,11 +2007,108 @@ public partial class AIController
         => floor && obj != null && obj.RallyFloorTurn >= 0
             && (obj.RallyStagnantTurns >= 2 || turn - obj.RallyFloorTurn >= 4);
 
-    private static void StartRallyAdvance(SectorObjective objective, ConstructionManager rally, TeamId team)
+    private static bool TryResolveRallyInvasionTarget(TeamObjectivePlan plan, AIWorldSnapshot snapshot, out Vector3Int target)
+    {
+        target = Vector3Int.zero;
+        if (snapshot == null) return false;
+        foreach (SectorObjective objective in plan?.Objectives ?? new List<SectorObjective>())
+        {
+            if (objective == null || !ConstructionSectorHelper.IsBase(objective.Sector)
+                || FindHQTeamInSector(objective.Sector) == snapshot.AITeam
+                || objective.Status == ObjectiveStatus.Complete || objective.Status == ObjectiveStatus.Abandoned) continue;
+            target = ResolveInvasionTargetCell(objective, snapshot, snapshot.AITeam);
+            return true;
+        }
+        if (snapshot.EnemyHQ == null) return false;
+        target = snapshot.EnemyHQ.CurrentCellPosition; target.z = 0;
+        return true;
+    }
+
+    private static bool TryGetRallyRouteCost(UnitManager unit, Vector3Int target, out float cost)
+    {
+        cost = float.PositiveInfinity;
+        UnitManager mover = unit != null && unit.IsEmbarked ? unit.EmbarkedTransporter : unit;
+        if (mover == null || mover.IsDead || mover.IsUnderRepair) return false;
+        // Route existence has no turn horizon. Tactical/Operational still govern formation waiting.
+        return AIRouteDistance.TryGet(mover, mover.CurrentCellPosition, target, out cost);
+    }
+
+    private static void RefreshRallyAdvanceCaptains(TeamObjectivePlan plan, AIWorldSnapshot snapshot)
+    {
+        if (plan == null || snapshot == null || !TryResolveRallyInvasionTarget(plan, snapshot, out Vector3Int target)) return;
+        foreach (SectorObjective group in plan.RallyAdvances)
+        {
+            UnitManager best = null;
+            bool bestCapturer = false;
+            float bestCost = float.PositiveInfinity;
+            foreach (int id in group.RallyParticipantIds)
+            {
+                UnitManager unit = FindActiveUnit(id, snapshot.AITeam);
+                if (unit == null || unit.IsDead || unit.IsUnderRepair || !unit.TryGetUnitData(out UnitData data)) continue;
+                // Publish in this existing participant pass, before the waiting filter can
+                // drop an island-bound member. Same queue owner as Phase 2, no extra scan.
+                if (!TryGetRallyRouteCost(unit, target, out float cost))
+                {
+                    if (!unit.IsEmbarked && !data.IsAircraft())
+                        GetRallyContext(snapshot.AISlotIndex, unit.BoardTilemap)?.PublishRideNeed(unit, plan, snapshot);
+                    continue;
+                }
+                bool capturer = HasRallyCaptureSkill(data);
+                if (!capturer && UnitRoleCompatibility.ResolveForce(data) != UnitForce.Ruptura) continue;
+                if (best == null || (capturer && !bestCapturer)
+                    || (capturer == bestCapturer && (cost < bestCost || (cost == bestCost && unit.InstanceId < best.InstanceId))))
+                { best = unit; bestCapturer = capturer; bestCost = cost; }
+            }
+            int next = best != null ? best.InstanceId : -1;
+            if (group.RallyCaptainId != next)
+                Debug.Log($"[Rally] {group.Sector} capitao #{group.RallyCaptainId}->#{next} alvo={target} custo={(best != null ? bestCost.ToString() : "sem rota Operacional")}");
+            group.RallyCaptainId = next;
+        }
+    }
+
+    internal static bool TryResolveRallyRideTarget(UnitManager unit, TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot, out Vector3Int target)
+    {
+        target = Vector3Int.zero;
+        if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair
+            || !unit.TryGetUnitData(out UnitData data) || data.IsAircraft()
+            || plan == null || !plan.RallyAdvances.Exists(group => group.RallyParticipantIds.Contains(unit.InstanceId))) return false;
+        snapshot ??= new AIWorldSnapshot { AITeam = unit.TeamId, AISlotIndex = unit.SlotIndex };
+        if (!TryResolveRallyInvasionTarget(plan, snapshot, out target)) return false;
+        return !TryGetRallyRouteCost(unit, target, out _);
+    }
+
+    private static bool IsPublishedRallyRideWait(UnitManager unit, UnitManager captainMover,
+        TeamObjectivePlan plan, AIWorldSnapshot snapshot = null)
+        => unit != null && captainMover != null && unit.AIIsWaitingForRide
+            && !IsRallyParticipantInBand(unit, captainMover.CurrentCellPosition, ReachBand.Operational)
+            && TryResolveRallyRideTarget(unit, plan, snapshot, out _);
+
+    private static bool TryResolveRallyAdvanceHold(UnitManager unit, AIWorldSnapshot snapshot, out SectorObjective group)
+    {
+        group = null;
+        if (unit == null || snapshot == null || unit.IsUnderRepair || unit.IsEmbarked) return false;
+        var plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        var own = plan?.RallyAdvances.Find(candidate => candidate.RallyParticipantIds.Contains(unit.InstanceId));
+        if (own == null) return false;
+        var captain = FindActiveUnit(own.RallyCaptainId, snapshot.AITeam);
+        bool noCaptain = captain == null || captain.IsDead;
+        bool stayOnGround = captain != null && captain.IsEmbarked
+            && unit.TryGetUnitData(out UnitData data) && !data.IsAircraft() && unit.GetDomain() == Domain.Land
+            && TryResolveRallyRideTarget(unit, plan, snapshot, out _);
+        UnitManager mover = captain != null && captain.IsEmbarked ? captain.EmbarkedTransporter : captain;
+        bool preservedRideWait = IsPublishedRallyRideWait(unit, mover, plan, snapshot);
+        if (!noCaptain && !stayOnGround && !preservedRideWait) return false;
+        group = own;
+        return true;
+    }
+
+    private static void StartRallyAdvance(SectorObjective objective, ConstructionManager rally, TeamId team, AIWorldSnapshot snapshot = null)
     {
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(team)));
         if (plan == null) return;
         var participants = new HashSet<int>();
+        objective.RallyCaptainId = -1;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
             if (unit == null || unit.IsDead || unit.SlotIndex != ResolveAISlotKey(team)
@@ -1993,13 +2118,12 @@ public partial class AIController
             bool assigned = objective.Slots.Exists(need => need.Filled && need.AssignedUnitId == unit.InstanceId);
             if (!core && !assigned && !plan.RogueUnitIds.Contains(unit.InstanceId)) continue;
             participants.Add(unit.InstanceId);
-            if (unit.IsEmbarked || !unit.TryGetUnitData(out UnitData data) || !HasRallyCaptureSkill(data)
-                || !IsRallyParticipantPresent(unit, rally, ReachBand.Tactical)) continue;
-            if (objective.RallyCaptainId < 0 || unit.InstanceId < objective.RallyCaptainId) objective.RallyCaptainId = unit.InstanceId;
+
         }
         objective.RallyParticipantIds = new List<int>(participants);
         if (!plan.RallyAdvances.Exists(o => o.Sector == objective.Sector && o.RallyGoGreenTurn == objective.RallyGoGreenTurn))
             plan.RallyAdvances.Add(objective);
+        RefreshRallyAdvanceCaptains(plan, snapshot ?? new AIWorldSnapshot { AITeam = team, AISlotIndex = ResolveAISlotKey(team) });
         ReconcileRallyAdvanceParticipants(plan, team);
     }
 
@@ -2008,7 +2132,10 @@ public partial class AIController
     private static void ReconcileRallyAdvanceParticipants(TeamObjectivePlan plan, TeamId team)
     {
         var ids = new HashSet<int>();
-        foreach (SectorObjective group in plan.RallyAdvances) ids.UnionWith(group.RallyParticipantIds);
+        var previousGroups = new Dictionary<int, SectorObjective>();
+        foreach (SectorObjective group in plan.RallyAdvances)
+            foreach (int id in group.RallyParticipantIds)
+            { ids.Add(id); if (!previousGroups.ContainsKey(id)) previousGroups[id] = group; }
         foreach (SectorObjective group in plan.RallyAdvances) group.RallyParticipantIds.Clear();
         var snapshot = new AIWorldSnapshot { AITeam = team, AISlotIndex = ResolveAISlotKey(team) };
         foreach (int id in ids)
@@ -2017,7 +2144,8 @@ public partial class AIController
             if (unit == null || unit.IsDead) continue;
             SectorObjective own = plan.RallyAdvances.Find(g => g.RallyCaptainId == id);
             if (own != null) { own.RallyParticipantIds.Add(id); continue; }
-            if (!TryResolveRallyAdvanceCaptain(unit, snapshot, out UnitManager captain)) continue;
+            if (!TryResolveRallyAdvanceCaptain(unit, snapshot, out UnitManager captain))
+            { previousGroups[id].RallyParticipantIds.Add(id); continue; }
             plan.RallyAdvances.Find(g => g.RallyCaptainId == captain.InstanceId)?.RallyParticipantIds.Add(id);
         }
     }
@@ -2032,11 +2160,16 @@ public partial class AIController
         foreach (SectorObjective group in plan?.RallyAdvances ?? new List<SectorObjective>())
         {
             UnitManager candidate = FindActiveUnit(group.RallyCaptainId, snapshot.AITeam);
-            if (candidate == null || candidate.IsDead || candidate.IsEmbarked || candidate == follower) continue;
+            if (candidate == null || candidate.IsDead || candidate == follower) continue;
+            UnitManager mover = candidate.IsEmbarked ? candidate.EmbarkedTransporter : candidate;
+            if (mover == null) continue;
+            if (candidate.IsEmbarked && !IsRallyParticipantInBand(mover,
+                    follower.IsEmbarked && follower.EmbarkedTransporter != null ? follower.EmbarkedTransporter.CurrentCellPosition : follower.CurrentCellPosition,
+                    ReachBand.Tactical)) continue;
             operational ??= GetRallyReach(follower, ReachBand.Operational);
-            if (operational == null || !operational.MovementCells.Contains(candidate.CurrentCellPosition)) continue;
-            int cost = operational.CostByCell.TryGetValue(candidate.CurrentCellPosition, out int c) ? c
-                : operational.PathsByDestination.TryGetValue(candidate.CurrentCellPosition, out var path) && path != null ? path.Count - 1 : int.MaxValue - 1;
+            if (operational == null || !operational.MovementCells.Contains(mover.CurrentCellPosition)) continue;
+            int cost = operational.CostByCell.TryGetValue(mover.CurrentCellPosition, out int c) ? c
+                : operational.PathsByDestination.TryGetValue(mover.CurrentCellPosition, out var path) && path != null ? path.Count - 1 : int.MaxValue - 1;
             if (cost < bestCost || (cost == bestCost && (captain == null || candidate.InstanceId < captain.InstanceId)))
             { captain = candidate; bestCost = cost; }
         }
@@ -2050,19 +2183,41 @@ public partial class AIController
         {
             group.RallyWaiting = false;
             UnitManager captain = FindActiveUnit(group.RallyCaptainId, team);
-            if (captain == null || captain.IsDead || captain.IsEmbarked) continue;
+            if (captain == null || captain.IsDead)
+            { group.RallyWaiting = true; anyWaiting = true; continue; }
+            UnitManager captainMover = captain.IsEmbarked ? captain.EmbarkedTransporter : captain;
+            if (captainMover == null) { group.RallyWaiting = true; anyWaiting = true; continue; }
             for (int i = group.RallyParticipantIds.Count - 1; i >= 0; i--)
             {
                 int id = group.RallyParticipantIds[i];
                 UnitManager unit = FindActiveUnit(id, team);
                 if (unit == null || unit.IsDead || unit.IsUnderRepair || unit == captain) continue;
-                if (!IsRallyParticipantInBand(unit, captain.CurrentCellPosition, ReachBand.Operational))
+                Vector3Int participantCell = unit.IsEmbarked && unit.EmbarkedTransporter != null
+                    ? unit.EmbarkedTransporter.CurrentCellPosition : unit.CurrentCellPosition;
+                bool inOperational = captain.IsEmbarked
+                    ? IsRallyParticipantInBand(captainMover, participantCell, ReachBand.Operational)
+                    : IsRallyParticipantInBand(unit, captainMover.CurrentCellPosition, ReachBand.Operational);
+                if (!inOperational)
                 {
+                    // Author 2026-11-13: a published invasion ride preserves membership,
+                    // but never holds the captain. The absolute 12-turn limit still releases all.
+                    if (IsPublishedRallyRideWait(unit, captainMover, plan))
+                    {
+                        Debug.Log($"[Rally] preserva #{id}: carona da invasao publicada; espera na area de {group.Sector}, sem segurar capitao");
+                        continue;
+                    }
                     group.RallyParticipantIds.RemoveAt(i);
                     Debug.Log($"[Rally] solta retardatário #{id}: capitão fora do Operacional");
                     continue;
                 }
-                if (!IsRallyParticipantInBand(unit, captain.CurrentCellPosition, ReachBand.Tactical))
+                if (IsPublishedRallyRideWait(unit, captainMover, plan)) continue;
+                // Naval has no Ruptura force today; sea waiting belongs to step 7 (naval flag).
+                if (!unit.TryGetUnitData(out UnitData data) || data.IsAircraft()) continue;
+                UnitForce force = UnitRoleCompatibility.ResolveForce(data);
+                if (force != UnitForce.Ruptura && force != UnitForce.Ocupacao) continue;
+                if (!IsRallyParticipantInBand(captainMover,
+                    unit.IsEmbarked && unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.CurrentCellPosition : unit.CurrentCellPosition,
+                    ReachBand.Tactical))
                 { group.RallyWaiting = true; anyWaiting = true; }
             }
         }

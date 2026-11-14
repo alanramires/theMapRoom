@@ -94,6 +94,7 @@ public sealed class MelhorEmbarqueManifestScore
     public MelhorEmbarqueTier tier;
     public int transporterDistance;
     public int transporterRouteCost;
+    public int pickupPriority;
     public int emergencyCount;
     public int requestedCount;
     public int totalUnitsBrought;
@@ -367,6 +368,7 @@ public static class MelhorEmbarqueService
                 operationalBudget = evaluated?.operationalBudget ?? 0,
                 routeCost = evaluated?.routeCost ?? int.MaxValue,
                 rideNeedScore = evaluated?.rideNeedScore ?? 0,
+                pickupPriority = evaluated?.pickupPriority ?? 0,
                 captureClaimsBlocked =
                     evaluated?.captureClaimsBlocked ?? 0,
                 captureClaimOwnerUnitId =
@@ -1980,6 +1982,7 @@ public static class MelhorEmbarqueService
         for (int i = 0; i < manifest.passengers.Count; i++)
         {
             MelhorEmbarqueOption option = manifest.passengers[i];
+            manifest.pickupPriority = Mathf.Max(manifest.pickupPriority, option.rideNeed?.PickupPriority ?? 0);
             if (option.rideDisposition ==
                 MelhorEmbarqueRideDisposition.Emergency)
             {
@@ -2022,6 +2025,8 @@ public static class MelhorEmbarqueService
             ManifestDispositionPriority(b));
         if (byDisposition != 0)
             return byDisposition;
+        int byPriority = (b.rideNeed?.PickupPriority ?? 0).CompareTo(a.rideNeed?.PickupPriority ?? 0);
+        if (byPriority != 0) return byPriority;
         int byUnits = b.unitsBrought.CompareTo(a.unitsBrought);
         if (byUnits != 0)
             return byUnits;
@@ -2060,6 +2065,8 @@ public static class MelhorEmbarqueService
         int byEmergency = b.emergencyCount.CompareTo(a.emergencyCount);
         if (byEmergency != 0)
             return byEmergency;
+        int byPriority = b.pickupPriority.CompareTo(a.pickupPriority);
+        if (byPriority != 0) return byPriority;
         int byRequested = b.requestedCount.CompareTo(a.requestedCount);
         if (byRequested != 0)
             return byRequested;
@@ -2120,6 +2127,8 @@ public static class MelhorEmbarqueService
         int byTier = a.transporterTier.CompareTo(
             b.transporterTier);
         if (byTier != 0) return byTier;
+        int byPriority = (b.rideNeed?.PickupPriority ?? 0).CompareTo(a.rideNeed?.PickupPriority ?? 0);
+        if (byPriority != 0) return byPriority;
         int byScore = b.score.CompareTo(a.score);
         if (byScore != 0) return byScore;
         int byPassenger = a.passenger != null

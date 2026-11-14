@@ -155,9 +155,9 @@ try{
             var notHeld=new SectorObjective{Sector=ConstructionSector.Golf,ObjectiveType=AIObjectiveType.RallyAssembly};
             var update=typeof(AIController).GetMethod("UpdateRallyObjectiveState",stat);
             Set(rally,"slotIndex",ownSlot==0?1:0);
-            for(int t=1;t<=4;t++){var pending=Eval(t);Check(!Value<bool>(pending,"Held")&&Value<int>(pending,"Capturers")>=4&&Value<bool>(pending,"BreakthroughReady"),"Caso sem hold nao montou piso numerico para testar o relogio.");update.Invoke(null,new object[]{notHeld,rally,TeamId.Blue,t,null});}
+            for(int t=1;t<=4;t++){var pending=Eval(t);Check(!Value<bool>(pending,"Held")&&Value<int>(pending,"Capturers")>=4&&Value<bool>(pending,"BreakthroughReady"),"Caso sem hold nao montou piso numerico para testar o relogio.");update.Invoke(null,new object[]{notHeld,rally,TeamId.Blue,t,null,null});}
             Check(notHeld.RallyFloorTurn<0,"Saturacao comecou antes do hold.");
-            Set(rally,"slotIndex",ownSlot);Clear();update.Invoke(null,new object[]{notHeld,rally,TeamId.Blue,5,null});
+            Set(rally,"slotIndex",ownSlot);Clear();update.Invoke(null,new object[]{notHeld,rally,TeamId.Blue,5,null,null});
             Check(notHeld.RallyFloorTurn==5&&notHeld.RallyStagnantTurns==0&&notHeld.RallyReadinessReason.IndexOf("GO_GREEN(saturado)",System.StringComparison.Ordinal)<0,"Captura herdou quatro turnos de piso sem hold.");
             ConstructionManager.AllActive.RemoveAll(b=>b==otherRally);otherRally.gameObject.SetActive(false);
             plan.RallyAdvances.Clear();Clear();

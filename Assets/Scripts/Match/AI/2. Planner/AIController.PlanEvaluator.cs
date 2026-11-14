@@ -212,7 +212,7 @@ public partial class AIController
             if (IsRallyAssemblyObjective(obj)
                 && TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager existingRally))
             {
-                UpdateRallyObjectiveState(obj, existingRally, aiTeam, snapshot.TurnNumber, intel);
+                UpdateRallyObjectiveState(obj, existingRally, aiTeam, snapshot.TurnNumber, intel, snapshot);
                 Debug.Log($"{TL("Plan")} rally {obj.Sector}: rallyState={obj.RallyState} {obj.RallyReadinessReason}");
                 if (IsRallyGoGreenObjective(obj))
                 {
@@ -469,7 +469,7 @@ public partial class AIController
             {
                 obj.RallyState = AIRallyAssemblyState.WaitHold;
                 if (TryFindOwnedRallyForSector(obj.Sector, aiTeam, out ConstructionManager newRally))
-                    UpdateRallyObjectiveState(obj, newRally, aiTeam, snapshot.TurnNumber, intel);
+                    UpdateRallyObjectiveState(obj, newRally, aiTeam, snapshot.TurnNumber, intel, snapshot);
                 if (IsRallyGoGreenObjective(obj))
                 {
                     Debug.Log($"{TL("Plan")} rally {obj.Sector}: GO_GREEN imediato, nao cria montagem");
@@ -1781,6 +1781,7 @@ public partial class AIController
         Debug.Log(planLog.ToString());
 
         MarkObjectivePlanPerf("plan_log");
+        RefreshRallyAdvanceCaptains(plan, snapshot);
         AISectorIntentAnalyzer.RebuildAndLog(snapshot, plan, intel, "Plan");
         MarkObjectivePlanPerf("sector_intent");
     }

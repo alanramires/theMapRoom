@@ -25,6 +25,43 @@ public partial class AIController
 
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
+        if (TryResolveRallyAdvanceHold(unit, snapshot, out SectorObjective waitingGroup))
+        {
+            Vector3Int from = unit.CurrentCellPosition;
+            if (TryBuildStationaryDefensiveAttack(unit, snapshot, from, BuildOccupied(unit),
+                out PlayerAction rallyHoldAttack, out _)) return rallyHoldAttack;
+            if (unit.AIIsWaitingForRide)
+            {
+                var immediateBoarding = new System.Collections.Generic.List<PodeEmbarcarOption>();
+                PodeEmbarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, Mathf.Max(0, unit.RemainingMovementPoints), immediateBoarding);
+                if (immediateBoarding.Count > 0)
+                {
+                    var matching = MelhorEmbarqueService.EvaluateForPassenger(new MelhorEmbarquePassengerRequest {
+                        passenger = unit, map = boardTilemap, terrainDatabase = terrainDatabase,
+                        allowPassengerMeetingCell = cell => cell == from, includeStrategic = false,
+                        evaluateRideNeed = passenger => EvaluatePickupRideNeed(passenger, plan, 2, snapshot)
+                    });
+                    foreach (var option in matching.options)
+                    {
+                        if (option.transporter == null || option.lzCell != option.transporter.CurrentCellPosition) continue;
+                        var legal = immediateBoarding.Find(candidate => candidate.transporterUnit == option.transporter
+                            && candidate.transporterSlotIndex == option.slotIndex);
+                        if (legal != null)
+                            return BuildEmbarcarBatch(unit, snapshot.AITeam, from, legal.transporterUnit, legal.transporterSlotIndex);
+                    }
+                }
+            }
+            Vector3Int anchor = ResolveRallyAssemblyAnchor(waitingGroup, snapshot.AITeam, from);
+            Vector3Int move = from;
+            var rallyHoldPaths = UnitMovementPathRules.CalcularCaminhosValidos(boardTilemap, unit,
+                Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+            if (!TryFindOwnedRallyForSector(waitingGroup.Sector, snapshot.AITeam, out ConstructionManager rally)
+                || !IsRallyParticipantPresent(unit, rally, ReachBand.Tactical))
+                move = FindTransportMove(unit, from, anchor, rallyHoldPaths, BuildOccupied(unit), snapshot.AITeam);
+            Debug.Log($"{TL("Rally")} #{unit.InstanceId} espera na area de {waitingGroup.Sector}: capitao sem rota ou embarcado; ancora={anchor}");
+            return BuildMoveBatch(unit, snapshot.AITeam, from, move, rallyHoldPaths);
+        }
+
         if (IsRallyCaptainWaiting(unit, snapshot))
         {
             if (TryBuildStationaryDefensiveAttack(unit, snapshot, unit.CurrentCellPosition, BuildOccupied(unit),

@@ -72,6 +72,9 @@ public sealed class QueroCaronaResult
     public int operationalBudget;
     public int routeCost = int.MaxValue;
     public int rideNeedScore;
+    // Published policy tier, decorated by the AI; geometry and cache stay in this service.
+    public int pickupPriority;
+    public int PickupPriority => isEmergency ? 2 : pickupPriority;
     public int captureClaimsBlocked;
     public int captureClaimOwnerUnitId = -1;
     public string reason;
@@ -1223,6 +1226,7 @@ public static class QueroCaronaService
             captureQuestionInapplicable =
                 source.captureQuestionInapplicable,
             rideWaitTurns = source.rideWaitTurns,
+            pickupPriority = source.pickupPriority,
             reach = source.reach,
             evaluatedTarget = source.evaluatedTarget,
             evaluatedConstruction =

@@ -1660,6 +1660,9 @@ public partial class AIController
         int operationalTurns,
         AIWorldSnapshot snapshot)
     {
+        if (TryEvaluateRallyAdvanceRideNeed(passenger, plan, snapshot, operationalTurns, out QueroCaronaResult invasionRide))
+            return invasionRide;
+
         // ANTES do dono da pergunta: quem carrega tem coordenada propria, e a
         // coordenada dispensa a pergunta de captura inteira.
         if (!ClaimsGroundCaptureRideQuestion(passenger)

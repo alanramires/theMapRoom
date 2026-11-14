@@ -607,6 +607,14 @@ public partial class AIController
         UnitManager unit,
         SectorObjective assigned)
     {
+        var advancePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(unit.SlotIndex));
+        if (TryEvaluateRallyAdvanceRideNeed(unit, advancePlan, null, 2, out QueroCaronaResult advanceRide))
+        {
+            ApplyRideWaitStamp(unit, advanceRide);
+            Debug.Log($"{TL("Capturador")} #{unit.InstanceId} QueroCarona={(advanceRide.wantsRide ? "SIM" : "NAO")}: {advanceRide.reason}");
+            return advanceRide;
+        }
+
         QueroCaronaRequest request =
             BuildCapturerRideRequestWithTarget(unit, assigned);
 
@@ -645,6 +653,10 @@ public partial class AIController
         UnitManager unit,
         SectorObjective assigned)
     {
+        var advancePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(unit.SlotIndex));
+        if (TryResolveRallyRideTarget(unit, advancePlan, null, out Vector3Int invasionTarget))
+            return BuildRallyAdvanceRideRequest(unit, invasionTarget, 2);
+
         QueroCaronaRequest request =
             BuildCapturerRideRequest(unit, assigned);
 

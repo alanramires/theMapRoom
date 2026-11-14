@@ -92,6 +92,7 @@ public partial class AIController
 
         UnitManager best = null;
         float bestScore = float.MinValue;
+        int bestPickupPriority = -1;
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
@@ -105,12 +106,15 @@ public partial class AIController
 
             // Passageiro formal de outro casco continua visivel. Designacao e
             // farol de prioridade, nao propriedade da unidade.
+            QueroCaronaResult rideNeed = EvaluatePickupRideNeed(candidate, plan, 2, snapshot);
+            int pickupPriority = rideNeed != null ? rideNeed.PickupPriority : 0;
+
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
             bool followsAssignedBeacon = assignedSector != null
                 && candidateAssigned != null
                 && candidateAssigned.Sector == assignedSector.Sector;
 
-            if (IsPassengerAlreadyAtCaptureObjective(candidate, snapshot.AITeam)) continue;
+            if (pickupPriority == 0 && IsPassengerAlreadyAtCaptureObjective(candidate, snapshot.AITeam)) continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
             bool hasResolvedObjective = TryResolveCourierPassengerTarget(
@@ -122,11 +126,13 @@ public partial class AIController
                 out Vector3Int objectiveCell);
             if (!hasResolvedObjective)
                 objectiveCell = Vector3Int.zero;
+            if (pickupPriority > 0 && rideNeed.wantsRide)
+            { hasResolvedObjective = true; objectiveCell = rideNeed.evaluatedTarget; }
 
             // "Consegue ir a pe" só vale quando o prédio continua disponível
             // para ESTE passageiro. Se outro aliado já ocupa/captura o alvo,
             // procura o próximo capturável livre antes de medir os 6 MP.
-            if (hasResolvedObjective
+            if (pickupPriority == 0 && hasResolvedObjective
                 && IsPickupObjectiveClaimedByAlly(
                     candidate, objectiveCell, snapshot.AISlotIndex))
             {
@@ -172,7 +178,7 @@ public partial class AIController
                     Mathf.Max(2, candidateThreshold - thresholdReduction);
             }
             int walkThreshold = candidateThreshold;
-            if (hasResolvedObjective)
+            if (pickupPriority == 0 && hasResolvedObjective)
             {
                 int objectiveTerrainCost = TerrainCostToCell(
                     candidate, candidateCell, objectiveCell, walkThreshold);
@@ -201,8 +207,9 @@ public partial class AIController
                 - (IsPickupBeaconedByOtherTransport(transporter, candidate)
                     ? TransportPickupDistributionPenalty
                     : 0f);
-            if (score > bestScore)
+            if (pickupPriority > bestPickupPriority || (pickupPriority == bestPickupPriority && score > bestScore))
             {
+                bestPickupPriority = pickupPriority;
                 bestScore = score;
                 best = candidate;
                 bestCandidateCell = candidateCell;

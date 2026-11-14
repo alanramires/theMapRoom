@@ -101,6 +101,7 @@ public partial class AIController
         if (unit == null || rideNeed == null)
             return;
 
+        ApplyRallyRidePriority(unit, ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(unit.SlotIndex)), rideNeed);
         int currentTurn = ResolveCurrentTurnNumber();
         if (rideNeed.wantsRide && !unit.IsEmbarked)
         {
@@ -136,6 +137,40 @@ public partial class AIController
     /// resto). Reusar e deliberado: esta fatia muda QUEM escreve e QUANDO, nao
     /// o conteudo da resposta.
     /// </summary>
+    private QueroCaronaRequest BuildRallyAdvanceRideRequest(UnitManager unit, Vector3Int target, int operationalTurns)
+        => new QueroCaronaRequest {
+            unit = unit, map = boardTilemap, terrainDatabase = terrainDatabase,
+            context = QueroCaronaContext.SemPlano, useExplicitTarget = true, explicitTarget = target,
+            explicitTargetLabel = $"alvo da invasao {target}", operationalTurns = Mathf.Max(1, operationalTurns),
+            emulateUnderRepairFromUnitData = false
+        };
+
+    internal bool TryEvaluateRallyAdvanceRideNeed(UnitManager unit, TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot, int operationalTurns, out QueroCaronaResult result)
+    {
+        result = null;
+        if (unit == null || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair
+            || !unit.TryGetUnitData(out UnitData data) || data.IsAircraft() || plan == null
+            || !plan.RallyAdvances.Exists(group => group.RallyParticipantIds.Contains(unit.InstanceId))) return false;
+        snapshot ??= new AIWorldSnapshot { AITeam = unit.TeamId, AISlotIndex = unit.SlotIndex };
+        if (!TryResolveRallyInvasionTarget(plan, snapshot, out Vector3Int target)) return false;
+        if (TryGetRallyRouteCost(unit, target, out float cost))
+        {
+            result = new QueroCaronaResult { wantsRide = false, evaluatedTarget = target,
+                routeCost = Mathf.CeilToInt(cost), reason = "Avanco da invasao: tem rota propria, sem teto de turnos; nao pede carona." };
+            return true;
+        }
+        result = QueroCaronaService.Evaluate(BuildRallyAdvanceRideRequest(unit, target, operationalTurns));
+        if (result != null && result.wantsRide && !result.isEmergency) result.pickupPriority = 1;
+        return true;
+    }
+
+    internal void ApplyRallyRidePriority(UnitManager unit, TeamObjectivePlan plan, QueroCaronaResult request)
+    {
+        if (request == null || !request.wantsRide || request.isEmergency) return;
+        if (TryResolveRallyRideTarget(unit, plan, null, out _)) request.pickupPriority = 1;
+    }
+
     private void PublishRideNeed(
         UnitManager unit,
         TeamObjectivePlan plan,

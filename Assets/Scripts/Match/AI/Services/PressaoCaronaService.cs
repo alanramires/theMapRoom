@@ -128,7 +128,9 @@ public static class PressaoCaronaService
                 try
                 {
                     QueroCaronaRequest req = ai.BuildRidePressureRequest(u, plan, out comPlano);
-                    r = QueroCaronaService.Evaluate(req);
+                    if (!ai.TryEvaluateRallyAdvanceRideNeed(u, plan, null, 2, out r))
+                        r = QueroCaronaService.Evaluate(req);
+                    ai.ApplyRallyRidePriority(u, plan, r);
                 }
                 catch (System.Exception e)
                 {
@@ -148,7 +150,7 @@ public static class PressaoCaronaService
                     : PressaoCaronaCategoria.ComPlano;
                 int waited = u.ResolveAIRideWaitTurns(currentTurn);
                 r.rideWaitTurns = waited;
-                bool useful = capturer && !r.isEmergency && ai.HasKnownAirDeliveryForRide(u, r, models);
+                bool useful = (capturer || r.pickupPriority > 0) && !r.isEmergency && ai.HasKnownAirDeliveryForRide(u, r, models);
                 if (useful)
                 {
                     leitura.UsefulAirWaiting++;

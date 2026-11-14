@@ -738,6 +738,7 @@ public partial class AIController
 
         UnitManager best = null;
         float bestScore = float.MinValue;
+        int bestPickupPriority = -1;
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
@@ -749,6 +750,9 @@ public partial class AIController
             // Passageiro formal de outro casco nao e excluido: o primeiro
             // embarque confirmado resolve a disputa naturalmente.
 
+            QueroCaronaResult rideNeed = EvaluatePickupRideNeed(candidate, plan, 2, snapshot);
+            int pickupPriority = rideNeed != null ? rideNeed.PickupPriority : 0;
+
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
             bool followsAssignedBeacon = assignedSector != null
                 && candidateAssigned != null
@@ -757,7 +761,7 @@ public partial class AIController
                         candidateAssigned.Sector,
                         assignedSector.Sector));
 
-            Vector3Int objectiveCell = ResolveUnitObjectiveCell(candidate, plan, snapshot);
+            Vector3Int objectiveCell = pickupPriority > 0 && rideNeed.wantsRide ? rideNeed.evaluatedTarget : ResolveUnitObjectiveCell(candidate, plan, snapshot);
             if (objectiveCell == Vector3Int.zero) continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
@@ -767,9 +771,9 @@ public partial class AIController
             int candidateMP = candidate.MaxMovementPoints;
             if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
             candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);
-            if (objectiveDist < candidateThreshold) continue;
+            if (pickupPriority == 0 && objectiveDist < candidateThreshold) continue;
 
-            if (preferAirSectors && plan != null)
+            if (pickupPriority == 0 && preferAirSectors && plan != null)
             {
                 bool isAirPreferred = false;
                 foreach (SectorObjective obj in plan.Objectives)
@@ -797,8 +801,9 @@ public partial class AIController
                     ? TransportPickupDistributionPenalty
                     : 0f);
 
-            if (score > bestScore)
+            if (pickupPriority > bestPickupPriority || (pickupPriority == bestPickupPriority && score > bestScore))
             {
+                bestPickupPriority = pickupPriority;
                 bestScore = score;
                 best = candidate;
                 bestCandidateCell = candidateCell;

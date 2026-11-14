@@ -12,6 +12,11 @@ public partial class AIController
     internal QueroCaronaRequest BuildRidePressureRequest(
         UnitManager unit, TeamObjectivePlan plan, out bool comPlano)
     {
+        if (TryResolveRallyRideTarget(unit, plan, null, out Vector3Int invasionTarget))
+        {
+            comPlano = true;
+            return BuildRallyAdvanceRideRequest(unit, invasionTarget, 2);
+        }
         SectorObjective assigned = plan != null ? ResolveAssignedObjective(unit, plan) : null;
         comPlano = assigned != null;
         return BuildCapturerRideRequestWithTarget(unit, assigned);
