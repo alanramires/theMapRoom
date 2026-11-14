@@ -1,15 +1,25 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-11-12, **depois** da tag `v10.10.0`.
+Ponto de retomada. Atualizado em 2026-11-13, **depois** da tag `v10.11.0`.
 Leia isto primeiro — **em especial as Regras de trabalho, no fim.**
 
 ---
 
 ## Estado
 
-`v10.10.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
-v9.2.0. Relatórios: [`relatorio_v10.10.0.md`](relatorio_v10.10.0.md),
-[`relatorio_v10.9.1.md`](relatorio_v10.9.1.md), [`relatorio_v10.9.0.md`](relatorio_v10.9.0.md).
+`v10.11.0` tagueada e publicada (v10 — Cada mapa, a mesma IA). O MVP estável segue na
+v9.2.0. Relatórios: [`relatorio_v10.11.0.md`](relatorio_v10.11.0.md),
+[`relatorio_v10.10.0.md`](relatorio_v10.10.0.md), [`relatorio_v10.9.1.md`](relatorio_v10.9.1.md).
+
+**A descoberta da v10.11.0: a régua parecida não é a régua.** Duas entrevistas viraram duas
+regras (capitania da invasão por alcance, P1–P9; EVAC e reparo pela instalação do próprio ramo), e
+as revisões acharam três vezes o mesmo defeito: pergunta com dono respondida por uma régua
+vizinha. "Tem rota ao alvo?" pelo Operacional de 2 turnos em vez do `AIRouteDistance` (o erro
+foi do meu bloco, e deixaria toda invasão parada no rally num mapa grande); "serve para largar?"
+pela distância ao HQ em vez do anel do `DecideAirEvacHqFallback`; "o prédio atende?" com o limite
+por turno, que a cura da Fase 1 acende. Os três fixtures passavam: cenário pequeno não mostra a
+diferença entre a régua e a parecida. Tudo **só fixture**; o suprimento infinito por debug foi
+visto em Play.
 
 **A descoberta da v10.10.0: o turno da IA congelava o frame por 14 s, e ninguém tinha
 medido.** Plano 6,5 s, pré-compra 1,5 s, compra 6,5 s, num mapa de 86 unidades; o jogador via
@@ -452,6 +462,19 @@ Sem HQ, os dois lados do Q3 e do Q4 são facção sem QG (v8.6.1, Frente 4; desd
 ---
 
 ## Onde eu parei
+
+### O que a v10.11.0 deixou — ver a invasão e o EVAC andando
+
+1. **A marcha em Play.** A capitania nova (`RefreshRallyAdvanceCaptains`, `RallyPoints.cs`)
+   nunca rodou numa partida. O save do slot 3 já está no T14 e não tem o grupo do T12: precisa
+   de um save de antes do GoGreen. Esperado no log: `[Rally] <setor> capitao #a->#b`, `preserva #id:
+   carona da invasao publicada`, `espera carona persistente: estagnacao congelada`.
+2. **Marca de 2026-11-13 09:16, T15 slot 0:** "a AI está montando o orçamento da invasão? a
+   pressão por Chinook tá boa?". Só se responde vendo a invasão em Play com a fila nova.
+3. **EVAC naval** num mapa de praia; nenhuma entrega de EVAC foi vista em partida.
+4. **Quem segura o capitão no mar** (ressalva da P2): degrau 7, com a bandeira naval.
+5. **Consolidar:** interceptador sem terciário e ar com vaga na área do rally, segundo fechamento
+   seguido na lista "Prontos".
 
 ### O que a v10.10.0 deixou — os 3 s que sobraram e os logs
 
@@ -1038,6 +1061,8 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **fixture pequeno aprova a régua errada** | o QG a 2 hexes num tabuleiro de 10×6 fazia o Operacional e a rota darem a mesma resposta, e o capitão "por Operacional" passou. Todo fixture de alcance tem um caso com o alvo **além** da banda (12+ hexes), porque é ali que régua e régua parecida divergem |
+| **flag por turno lida como capacidade** | `ReceivedSuppliesThisTurn` acende na Fase 1 quando o Serviço do Comando cura; a Fase 2 que perguntar "este prédio atende?" sem `ignoreTurnLimit: true` lê "não" para todo ferido já curado. "Atende de novo neste turno" e "atende esta unidade" são perguntas diferentes |
 | **o fix isolado passa e o turno real não** | `medir_planner` caiu de 8,9 s para 0,5 s e o `BuildObjectivePlan` do turno real seguiu em 6,4 s: o replay refaz o plano com os capturadores já atribuídos, e a matriz só roda para quem está livre. Custo que roda **uma vez por turno** só se mede no turno real (marcas do `[AI Perf]`), nunca por replay |
 | **caminho enumerado não é custo** | `CalcularCaminhosValidos(…, 30)` enumera passeios (estado por passos exatos): 57 células em 1,7 s, linear no orçamento mesmo com a malha saturada. Distância para decidir é `CalculateMovementCostMap` (3 ms); caminhos válidos só com o MP real da unidade |
 | **`showAILogs` não cala a IA** | gateia 12 das 541 linhas `[AI …]` do `TL()`; os `[AI Perf]`, `[AI Commit Heavy]`, `[AI Turn Transition Timing]` e `[SectorManager][Perf]` não têm flag. Ver `docs/checklist_logs_publicacao.md` antes de afirmar que um build está sem log |
@@ -1316,3 +1341,12 @@ existia**, refazendo o trabalho dela e esquecendo o que ela sabia. Antes de coda
     orçamento inventado: a busca de caminhos enumera passeios acima do MP real. Antes de otimizar,
     **meça o turno real**: a hipótese "é o AI Step" e as hipóteses "é o solver" e "é o rally"
     caíram pelo número, e o fix isolado que "passou" deixou 6,4 s no turno de verdade.
+
+15. **Banda é formação; rota é existência; e o atalho perde os filtros do dono.** Na v10.11.0
+    "tem rota ao alvo?" foi respondida pelo Operacional de 2 turnos, e não pelo
+    `AIRouteDistance.TryGet`: toda invasão com base a mais de 2 turnos ficaria sem capitão, parada
+    no rally. O erro nasceu no bloco de correção, não no código: **a doutrina diz o que se pergunta,
+    o bloco diz quem responde — nomeie o dono, não a banda.** No mesmo dia, "esta célula serve no
+    raio do HQ?" virou `HexDistance` e pulou os filtros do anel de `DecideAirEvacHqFallback`
+    (`IsRepairHqFallbackCellAllowed`, névoa, seguro/contestado). Régua vizinha que dá a mesma
+    resposta no caso pequeno é o defeito; o teste é um fixture com o caso **além** da régua.
